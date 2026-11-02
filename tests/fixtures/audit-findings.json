@@ -1,0 +1,50 @@
+{
+  "candidate_commit": "e0fbda61b7e91379ade604f425aa49cfa59fbf1f",
+  "coverage": {
+    "investigated": [
+      "Source and documentation review of consensus, execution, controlled scheduler, node runtime, HTTP transport, and CLI",
+      "Existing ordinary, in-process race, and opt-in three-process HTTP suites passed; go vet passed",
+      "600 seeded five-member finite partial-broadcast schedules with two cumulative crashes passed",
+      "400 timed three/five-member schedules with staggered routing, bounded delivery, and one/two crashes passed",
+      "500 near-Delta three/five/seven-member schedules with up to f crashes passed, comparing surviving and crashed members' decisions",
+      "500 additional near-Delta partial-broadcast schedules with delayed request/notification completions and immediate replies passed; compared survivor and crashed-member decisions",
+      "Exact observation-deadline boundary test passed",
+      "Targeted attachment-before-delayed-OBSERVE schedule passed, including immutable first observation, Fast/Seal SCC execution, and retained executed visibility",
+      "Executed positive-Delta deadline overflow regression with ordinary-Delta control; all captured source files remain unchanged"
+    ],
+    "limitations": [
+      "Partial continuing audit; no exhaustive verification",
+      "Overflow finding requires an extreme accepted Delta; no ordinary-Delta failure demonstrated",
+      "No overload, arbitrary partitions, crash-restart, or infinite-workload guarantees tested",
+      "Network process binaries were not race-instrumented; runtime drain/yield questions remain unconfirmed in work/audit/unresolved.md"
+    ]
+  },
+  "issues": [
+    {
+      "id": "F-001",
+      "summary": "Accepted large positive Delta overflows the request deadline and falsely confirms live peers dead at time zero",
+      "property": "Config.Validate accepts positive Delta; protocol sections 1, 3, and 7 require accurate death facts and request timeout only after complete sending plus 2*Delta",
+      "assumptions": [
+        "Three-member fresh configuration",
+        "Delta = time.Duration(1<<62) nanoseconds",
+        "Valid immutable command at original coordinator",
+        "OBSERVE sends complete at time zero; deliveries may legally occur later within Delta",
+        "Zero crashes and no elapsed time"
+      ],
+      "reproduction": {
+        "command": "GOCACHE=\"$PWD/.runtime/go-build\" GOTMPDIR=\"$PWD/.runtime/tmp\" GOPROXY=off go test -count=1 -v -run TestAcceptedDeltaDoesNotExpireAtZero ./audit/repro",
+        "observed": "Exit 1: 250ms control passes; large Delta marks b and c dead and Fast-decides at now=0 with fault=nil",
+        "source_only": false
+      },
+      "polarity": "PASS means no unexpired request is treated as timed out; FAIL means premature death confirmation or decision",
+      "evidence": [
+        "work/audit/repro/deadline_overflow_test.go",
+        "work/audit/logs/deadline-overflow.txt",
+        "work/audit/evidence/config-validation.txt",
+        "work/audit/evidence/deadline-source.txt",
+        "work/audit/evidence/protocol-deadlines.txt",
+        "work/audit/evidence/source-comparison.txt"
+      ]
+    }
+  ]
+}

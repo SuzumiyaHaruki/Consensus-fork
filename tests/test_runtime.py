@@ -1,0 +1,172 @@
+"""Shared infrastructure: source association and evidence feedback, without model calls."""
+import ast
+import asyncio
+import json
+from pathlib import Path
+import select
+import subprocess
+import sys
+import tempfile
+import time
+import unittest
+from unittest.mock import patch
+
+from runtime import replay
+from runtime.local_exec import execution_lock
+from runtime.evidence import inspect_item, report_feedback
+
+
+class RuntimeTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        self.work, self.source = self.root/'work', self.root/'source'
+        self.work.mkdir()
+        self.source.mkdir()
+        (self.source/'value.txt').write_text('original')
+        (self.work/'value.txt').write_text('diagnostic')
+        (self.work/'test.py').write_text('print("fixture")')
+        self.folder = self.root/'executions/e1'
+        self.folder.mkdir(parents=True)
+        self.control = {'work': str(self.work), 'source_context': {'phase': 'audit', 'base_commit': 'v0'},
+                        'environment': {'HOME': str(self.work/'.runtime/home'), 'GOCACHE': str(self.work/'.runtime/cache')},
+                        'replay_sources': {'candidate': {'path': str(self.source), 'commit': 'v0'}}}
+
+    def test_private_replay_keeps_original_and_retains_exact_overlay_bytes(self):
+        work, env, context = replay.prepare(self.control, 'candidate', ['test.py', 'value.txt'], self.folder)
+        self.assertEqual(context['commit'], 'v0')
+        self.assertFalse(context['overlays'][0]['replaces_source'])
+        self.assertTrue(context['overlays'][1]['replaces_source'])
+        self.assertEqual((self.folder/'inputs/test.py').read_bytes(), (self.work/'test.py').read_bytes())
+        self.assertEqual((work/'value.txt').read_text(), 'diagnostic')
+        (work/'value.txt').write_text('changed by command')
+        self.assertEqual((self.source/'value.txt').read_text(), 'original')
+        self.assertTrue(Path(env['GOCACHE']).is_relative_to(work))
+        replay.cleanup(self.folder)
+        self.assertFalse(work.exists())
+        self.assertTrue((self.folder/'inputs/test.py').is_file())
+
+    def test_mutable_work_does_not_claim_exact_candidate(self):
+        work, _, context = replay.prepare(self.control, None, [], self.folder)
+        self.assertEqual(work, self.work)
+        self.assertEqual(context['kind'], 'mutable_workspace')
+        self.assertNotIn('commit', context)
+        for source, overlays in [(None, ['test.py']), ('unknown', [])]:
+            with self.assertRaises(ValueError):
+                replay.prepare(self.control, source, overlays, self.folder)
+
+    def test_replay_inputs_cannot_escape_or_copy_private_files(self):
+        (self.work/'link').symlink_to(self.source/'value.txt')
+        (self.work/'dirlink').symlink_to(self.source, target_is_directory=True)
+        (self.work/'.env').write_text('private fixture')
+        for name in ('', '.', '../source/value.txt', str(self.source/'value.txt'), 'link', 'dirlink/value.txt', '.env'):
+            with self.subTest(name=name), self.assertRaises(ValueError):
+                replay.regular_file(self.work, name)
+
+    def test_concurrent_parent_swap_cannot_escape_during_overlay_read(self):
+        directory = self.work/'tests'
+        directory.mkdir()
+        (directory/'value.txt').write_text('local')
+        original_open = replay.os.open
+        def swap(path, flags, **kwargs):
+            if path == 'tests':
+                directory.rename(self.work/'old-tests')
+                directory.symlink_to(self.source, target_is_directory=True)
+            return original_open(path, flags, **kwargs)
+        with patch('runtime.replay.os.open', side_effect=swap), self.assertRaises(OSError):
+            replay.regular_file(self.work, 'tests/value.txt')
+
+    def record(self, **changes):
+        value = {'execution_id': 'e1', 'status': 'completed', 'exit_code': 0,
+                 'argv': ['go', 'test', './...'], 'source_context': {'kind': 'mutable_workspace', 'base_commit': 'v0'}}
+        value.update(changes)
+        (self.folder/'result.json').write_text(json.dumps(value))
+        return {'id': 'F1', 'evidence': ['executions/e1/result.json'], 'method': 'executed'}
+
+    def test_feedback_targets_version_timeout_and_overlay_not_missing_headings(self):
+        item = self.record(status='timeout')
+        result = inspect_item(item, self.root, expected_commits=('v0',))
+        self.assertEqual({entry['code'] for entry in result['evidence_feedback']}, {'execution_incomplete', 'version_not_bound'})
+        self.assertEqual(result['execution_records'][0]['argv'], ['go', 'test', './...'])
+        (self.folder/'inputs').mkdir()
+        (self.folder/'inputs/value.txt').write_text('diagnostic')
+        item = self.record(source_context={'kind': 'candidate_copy', 'commit': 'different', 'overlays': [
+            {'replaces_source': True, 'retained_path': 'inputs/value.txt'}]})
+        codes = {entry['code'] for entry in inspect_item(item, self.root, expected_commits=('v0',))['evidence_feedback']}
+        self.assertEqual(codes, {'different_source_version', 'source_overlay'})
+
+    def test_agent_written_receipt_is_not_a_trusted_execution_record(self):
+        (self.work/'fake.json').write_text(json.dumps({'execution_id': 'fake', 'status': 'completed'}))
+        result = inspect_item({'evidence': ['work/fake.json'], 'execution_records': [{'status': 'completed'}]}, self.root)
+        self.assertEqual(result['execution_records'], [])
+        self.assertEqual(result['evidence_feedback'][0]['code'], 'execution_not_linked')
+        self.assertEqual(inspect_item({'method': 'source_review', 'evidence': ['work/fake.json']}, self.root)['evidence_feedback'], [])
+        item = self.record(execution_id='wrong')
+        self.assertIn('execution_record_unavailable', {entry['code'] for entry in inspect_item(item, self.root)['evidence_feedback']})
+
+    def test_live_feedback_retains_index_and_points_to_concrete_delivery_error(self):
+        path = self.work/'findings.json'
+        raw = json.dumps({'candidate_commit': 'wrong', 'issues': [{'id': 'F1', 'evidence': ['work/missing']}]})
+        path.write_text(raw)
+        result = report_feedback(self.root, 'findings.json', {'candidate_commit': 'v0'})
+        self.assertEqual({item['code'] for item in result['observations']}, {'version_reference', 'evidence_reference'})
+        self.assertEqual(path.read_text(), raw)
+
+    def test_shared_modules_have_no_dependency_on_agent_roles(self):
+        root = Path(__file__).resolve().parents[1]
+        for path in (root/'runtime').glob('*.py'):
+            for node in ast.walk(ast.parse(path.read_text())):
+                if isinstance(node, ast.ImportFrom):
+                    self.assertNotIn((node.module or '').split('.')[0], {'auditor', 'generator'}, str(path))
+                elif isinstance(node, ast.Import):
+                    self.assertFalse(any(name.name.split('.')[0] in {'auditor', 'generator'} for name in node.names), str(path))
+
+
+class ExecutionLockTests(unittest.IsolatedAsyncioTestCase):
+    async def test_separate_server_owner_blocks_waiters_and_process_exit_releases_lock(self):
+        with tempfile.TemporaryDirectory() as temp:
+            records = Path(temp)
+            worker = '''import asyncio, sys, time
+from runtime.local_exec import execution_lock
+async def main():
+    async with execution_lock(sys.argv[1], time.monotonic()+10):
+        print("acquired", flush=True)
+        await asyncio.sleep(30)
+asyncio.run(main())
+'''
+            owner = subprocess.Popen([sys.executable, '-c', worker, str(records)],
+                cwd=Path(__file__).resolve().parents[1], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            try:
+                # Keep this handshake bounded without asyncio's thread wakeup socket,
+                # which can be restricted by the outer test sandbox.
+                ready, _, _ = select.select([owner.stdout], [], [], 5)
+                self.assertTrue(ready, 'Lock owner did not become ready')
+                self.assertEqual(owner.stdout.readline(), b'acquired\n')
+                # A second process must honor the same lock and its own deadline.
+                with self.assertRaisesRegex(TimeoutError, 'Run deadline'):
+                    async with execution_lock(records, time.monotonic()+.1):
+                        self.fail('Concurrent server entered the execution section')
+                entered = asyncio.Event()
+                async def wait_for_owner():
+                    async with execution_lock(records, time.monotonic()+5):
+                        entered.set()
+                waiter = asyncio.create_task(wait_for_owner())
+                await asyncio.sleep(.05)
+                self.assertFalse(entered.is_set())
+                waiter.cancel()
+                with self.assertRaises(asyncio.CancelledError):
+                    await waiter
+                owner.kill()
+                owner.wait(timeout=3)
+                # No manual removal of a stale lock file is required.
+                async with execution_lock(records, time.monotonic()+1):
+                    pass
+            finally:
+                if owner.poll() is None:
+                    owner.kill()
+                owner.communicate(timeout=5)
+
+
+if __name__ == '__main__':
+    unittest.main()

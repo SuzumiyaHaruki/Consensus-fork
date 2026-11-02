@@ -1,0 +1,15 @@
+# Implement a runnable synchronous consensus system
+
+Implement the Go replicated KV system described by `protocol.md` and `system.md`, using module `example.com/syncepaxos`. Deliver reusable node components, separate server processes, real transport, client tooling usable by multiple concurrent clients, controlled execution support, tests and documentation. A library or a plan alone is insufficient. Prefer the standard library for offline builds. Do not substitute another consensus algorithm.
+
+Start a concise `DESIGN.md` explaining supported guarantees, their basis, mutable-state ownership and completion events. Distinguish supplied requirements, external assumptions, engineering choices and unresolved specification questions; cite the relevant material when an interpretation affects behavior. Implement runnable increments: first connect a normal client request through replica communication, decision, application execution and response, then extend that same path to concurrency, retries, dependency execution and crash-stop takeover. Each increment should expose integration behavior; the final delivery must cover the requested scope. Exercise relevant behavior as you go and leave time to review structure. Choose packages and interfaces by actual responsibility; no fixed layout, line-count target or test inventory is prescribed.
+
+Pay attention to the boundaries between local concurrency and message interleavings, enqueue and send completion, decision and application execution, and client cancellation and protocol obligations. Real-time and controlled execution must share protocol logic. Expose actual events sufficiently for another engineer to investigate a schedule; a testing adapter must not repair or reimplement the protocol. Use the materials for detailed rules rather than treating these examples as a checklist.
+
+Choose tests according to the design's risks and investigate boundaries beyond the examples above. Follow `AGENTS.md` for test placement and reporting. Document precise specification gaps without silently inventing guarantees or editing supplied materials. The supported service and fault scope are defined in `system.md`; a local runnable cluster does not establish long-term production readiness.
+
+Finish the implementation and provide build, launch and cleanup instructions for a local three-process cluster, concurrent operations and stable retries/results. Report implemented behavior, executed checks, failures and remaining limitations. Keep `DESIGN.md` aligned with the final code.
+
+Use `forge_local.isolated_exec` for TCP or multi-process checks. Its tool description explains private networking, process lifetime, retained records and optional source copies. These are test-environment facilities; the delivered server/client programs must also run through ordinary documented commands without Codex or MCP. The stage budget includes execution.
+
+For the optional finite transmission/crash ledger helper, run `python3 ../inputs/tracecheck.py --help`. It does not establish reachability or consensus correctness. Keep external fault schedules legal while allowing implementation bugs to occur and be observed.
