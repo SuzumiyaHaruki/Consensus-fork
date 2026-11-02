@@ -69,9 +69,18 @@ def inspect_item(item, root, *, work_name='work', raw_name='.', expected_commits
             if not inside(root, path).is_file():
                 ask('replay_input_missing', f'Retained replay input is missing: {path}',
                     'Locate the test/helper bytes used by this invocation before relying on its replayability.')
+        restore = {}
+        for entry in context.get('overlays', []):
+            if isinstance(entry, dict) and isinstance(entry.get('path'), str) and 'retained_path' in entry:
+                inside(root / work_name, entry['path'])  # Never advertise an escaping destination.
+                restore[entry['path']] = str(Path(raw_name, 'executions', parts[1], entry['retained_path']))
+        outputs = {name: str(Path(raw_name, 'executions', parts[1], name + '.txt')) for name in ('stdout', 'stderr')
+                   if inside(root, Path(raw_name, 'executions', parts[1], name + '.txt')).is_file()}
         executions.append({'path': record_path, 'execution_id': parts[1], 'argv': record.get('argv'),
                            'status': record.get('status'), 'exit_code': record.get('exit_code'),
-                           'source_context': context, 'inputs': inputs})
+                           'source_context': context, 'inputs': inputs, 'restore': restore, 'outputs': outputs,
+                           'cwd': record.get('cwd'), 'cwd_relative': record.get('cwd_relative'),
+                           'timeout_seconds': record.get('timeout_seconds')})
         if record.get('status') != 'completed':
             ask('execution_incomplete', f"{record_path} ended as {record.get('status')!r}.",
                 'Explain what the partial output establishes; rerun if useful or retain the limitation. A timeout alone is not a protocol failure.')

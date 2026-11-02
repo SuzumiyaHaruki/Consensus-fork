@@ -105,6 +105,27 @@ class RuntimeTests(unittest.TestCase):
         item = self.record(execution_id='wrong')
         self.assertIn('execution_record_unavailable', {entry['code'] for entry in inspect_item(item, self.root)['evidence_feedback']})
 
+    def test_rerun_information_uses_retained_inputs_and_logs_without_rewriting_command(self):
+        _, _, context = replay.prepare(self.control, 'candidate', ['test.py'], self.folder)
+        (self.folder / 'stdout.txt').write_text('Original observation')
+        (self.folder / 'stderr.txt').write_text('')
+        argv = ['/old/work/.runtime/helper', '--script', '/old/work/test.py']
+        item = self.record(argv=argv, cwd='/old/work/tests', cwd_relative='tests', timeout_seconds=30,
+                           stdout={'path': '/outside/never-follow-this'}, source_context=context)
+        replay.cleanup(self.folder)
+        entry = inspect_item(item, self.root)['execution_records'][0]
+        self.assertEqual(entry['argv'], argv)
+        self.assertEqual(entry['cwd_relative'], 'tests')
+        self.assertEqual(entry['cwd'], '/old/work/tests')
+        self.assertEqual(entry['restore'], {'test.py': 'executions/e1/inputs/test.py'})
+        self.assertEqual(entry['outputs']['stdout'], 'executions/e1/stdout.txt')
+        self.assertEqual((self.root / entry['restore']['test.py']).read_text(), 'print("fixture")')
+        original = self.record(cwd='/old/work/tests')
+        self.assertIsNone(inspect_item(original, self.root)['execution_records'][0]['cwd_relative'])
+        context['overlays'][0]['path'] = '../escape'
+        with self.assertRaises(ValueError):
+            inspect_item(self.record(source_context=context), self.root)
+
     def test_live_feedback_retains_index_and_points_to_concrete_delivery_error(self):
         path = self.work/'findings.json'
         raw = json.dumps({'candidate_commit': 'wrong', 'issues': [{'id': 'F1', 'evidence': ['work/missing']}]})

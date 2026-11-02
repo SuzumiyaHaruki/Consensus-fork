@@ -8,14 +8,14 @@ import subprocess
 import tempfile
 import time
 
-from artifacts import (candidate_commit, check_materials, copy_regular, copy_tree,
+from artifacts import (candidate_commit, check_materials, copy_regular, copy_tree, inside,
                        prepare_handoff, read_repair_result)
 from generator.config import Settings
 from processes import invoke
 from generator.runner import (REQUIRED_INPUTS, Terminated, doctor as generation_doctor, execute as execute_agent,
                               exclusive_run, prepare as prepare_agent, read_json, utc_now, write_json)
 from workflow_config import ROOT, from_dict
-from issues import findings, pending, feedback_bundle, review_result, apply_review
+from issues import findings, pending, repairable, feedback_bundle, review_result, apply_review
 
 
 class StopWorkflow(Exception):
@@ -155,6 +155,43 @@ def delta(previous, current):
                                if (Path(previous['path']) / name).read_bytes() != (Path(current['path']) / name).read_bytes())}
 
 
+def record_audit_progress(root, entry):
+    """Expose retained output without importing unfinished claims or changing issue states."""
+    if entry['kind'] not in {'audit', 'final_audit', 'repair_verification'}:
+        return
+    try:
+        folder = inside(root, Path(entry['path']).relative_to(root))
+        runs = [inside(folder, path.relative_to(folder)) for path in (folder / 'runs').glob('*/run.json')]
+        if not runs:
+            return
+        if len(runs) != 1:
+            raise ValueError('Multiple audit runs in one stage; cannot select retained output')
+        audit_run = runs[0].parent
+        data = read_json(runs[0])
+        entry.update(audit_run=str(audit_run), audit_stop=data.get('stop'))
+        if data.get('reason'):
+            entry['audit_reason'] = data['reason']
+        if data.get('agents'):
+            entry['agents'] = {**data['agents'], 'run_dir': str(audit_run)}
+        if entry['status'] in {'running', 'returned', 'not_started'}:
+            return
+        index = 'review.json' if entry['kind'] == 'repair_verification' else 'findings.json'
+        paths = {key: str(path) for key, name in (('report', 'report.md'), ('index', index))
+                 if (path := inside(audit_run, 'work/' + name)).is_file()}
+        if paths:
+            source = read_json(inside(audit_run, 'inputs/source.json'))
+            entry['pending_report'] = {
+                'status': 'needs_review', 'candidate_commit': source['commit'],
+                'audit_run': str(audit_run), **paths,
+                'turns': str(inside(audit_run, 'turns')),
+                'executions': str(inside(audit_run, 'executions')),
+                'note': 'Unfinished or unimported agent output. Report and index may disagree; an empty index does not establish no findings. No issue is imported or closed from these files.',
+            }
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        # Failure navigation must not hide the original failure or prevent final saving.
+        entry['retained_output_error'] = str(exc)
+
+
 def execute(root, runtime=None):
     root = Path(root).resolve()
     runtime = runtime or Runtime()
@@ -174,8 +211,12 @@ def execute(root, runtime=None):
             state = ('not_started' if not imports else 'incomplete' if any(item['status'] == 'failed' for item in imports)
                      else 'pending' if any(item['status'] == 'pending' for item in imports) else 'imported')
             record['issue_index_status'] = state
-            write_json(root / 'issues.json', {'import_status': state, 'imports': imports, 'issues': issues})
+            drafts = [stage['pending_report'] for stage in record['stages'] if 'pending_report' in stage]
+            record['pending_audit_reports'] = drafts
+            write_json(root / 'issues.json', {'import_status': state, 'imports': imports,
+                                             'issues': issues, 'pending_reports': drafts})
             record['open_issues'] = [issue['id'] for issue in pending(issues)]
+            record['awaiting_specification'] = [issue['id'] for issue in issues if issue['state'] == 'needs_specification']
             write_json(root / 'experiment.json', record)
 
         def remaining():
@@ -303,9 +344,10 @@ def execute(root, runtime=None):
                              last_completed_turn=handoff['last_completed_turn'], coverage=coverage,
                              discovered_issues=[issue['id'] for issue in discovered])
                 save()
-                if forced_stop or not pending(issues) or final:
+                if forced_stop or not repairable(issues) or final:
                     entry['final_discovery'] = True
                     reason = (forced_stop or ('no_open_findings' if not pending(issues) else
+                              'needs_specification' if not repairable(issues) else
                               'repair_limit' if repairs >= settings.max_repairs else 'insufficient_repair_budget'))
                     status = reason if reason in {'needs_specification', 'verification_incomplete', 'verification_failed', 'environment_blocked'} else 'cycle_complete'
                     record.update(status=status, stop_reason=reason,
@@ -319,7 +361,7 @@ def execute(root, runtime=None):
                     continue
                 feedback = root / 'feedback' / f'{repairs:03d}'
                 feedback_bundle(feedback, handoff_path, candidate, issues)
-                expected_ids = [issue['id'] for issue in pending(issues)]
+                expected_ids = [issue['id'] for issue in repairable(issues)]
                 stage = run_agent('repair', seconds, candidate, feedback,
                                   reserve_seconds=reserve + settings.repair_verification_seconds + 60)
                 if stage is None:
@@ -329,8 +371,9 @@ def execute(root, runtime=None):
                 repair = read_repair_result(stage / 'workspace', candidate['commit'], expected_ids)
                 record['stages'][-1]['repair_claim'] = repair
                 save()
-                if repair['action'] == 'needs_specification':
-                    raise StopWorkflow('needs_specification', repair['summary'])
+                # Legacy global claims remain readable; neither form bypasses review.
+                specification_claim = repair['action'] == 'needs_specification' or any(
+                    item['disposition'] == 'needs_specification' for item in repair['issues'])
                 previous = candidate
                 candidate = capture(stage, repairs + 1)
                 candidate['changes'] = delta(previous, candidate)
@@ -378,11 +421,10 @@ def execute(root, runtime=None):
                         entry['review_result'] = result
                         entry['discovered_issues'] = [item['id'] for item in result['new_issues']]
                         states = {issue['state'] for issue in pending(issues)}
-                        if 'needs_specification' in states:
-                            forced_stop = 'needs_specification'
-                        elif 'environment_blocked' in states:
+                        if 'environment_blocked' in states:
                             forced_stop = 'environment_blocked'
-                if repair['action'] == 'no_change' and not forced_stop:
+                if (repair['action'] == 'no_change' and not specification_claim and not forced_stop
+                        and not any(issue['id'] in expected_ids and issue['state'] == 'needs_specification' for issue in issues)):
                     forced_stop = 'no_change'
                 save()
                 number += 1
@@ -401,6 +443,7 @@ def execute(root, runtime=None):
                         entry.update(status=record['status'], ended_at=utc_now())
                     if entry.get('finding_import', {}).get('status') == 'pending':
                         entry['finding_import'].update(status='failed', error=record.get('reason', 'No completed import'))
+                    record_audit_progress(root, entry)
                 record.update(ended_at=utc_now(), elapsed_seconds=time.monotonic() - start)
                 save()
             finally:
@@ -412,10 +455,16 @@ def execute(root, runtime=None):
 def inspect(root):
     root = Path(root).resolve()
     record = read_json(root / 'experiment.json')
+    # Also expose old failed runs read-only; never rewrite their archived experiment.
+    for entry in record['stages']:
+        if entry['status'] not in {'running', 'returned', 'not_started'}:
+            record_audit_progress(root, entry)
     return {'experiment_dir': str(root), 'status': record['status'],
             'issue_index_status': record.get('issue_index_status',
                                              'incomplete' if record['status'] == 'audit_incomplete' else 'unknown'),
             'reason': record.get('reason'), 'stop_reason': record.get('stop_reason'), 'open_issues': record.get('open_issues', []), 'elapsed_seconds': record.get('elapsed_seconds'),
+            'awaiting_specification': record.get('awaiting_specification', []),
+            'pending_audit_reports': [stage['pending_report'] for stage in record['stages'] if 'pending_report' in stage],
             'models': {'generation_and_repair': [record['settings']['generator_model'], record['settings']['generator_reasoning_effort']],
                        'audit': [record['settings']['audit_model'], record['settings']['audit_reasoning_effort']]},
             'candidate': record.get('current_candidate'), 'last_audit': record.get('last_audit'),

@@ -13,6 +13,7 @@ from unittest.mock import patch
 
 from generator.config import ROOT, Settings, settings_from_dict
 from generator.runner import execute, prepare, read_json, summarize_events
+from generator.client import Client
 
 
 def process_alive(pid):
@@ -38,9 +39,13 @@ class RunnerTests(unittest.TestCase):
         self.addCleanup(stub.stop)
         self.temporary = tempfile.TemporaryDirectory(prefix="forge-runner-tests-")
         self.root = Path(self.temporary.name)
-        home = patch.dict(os.environ, {'CODEX_HOME': str(self.root / 'codex-home')})
+        home = patch.dict(os.environ, {'CODEX_HOME': str(self.root / 'codex-home'), 'CODEX_API_KEY': '',
+                                      'FORGE_HOST_SENTINEL': 'not-for-the-agent'})
         home.start()
         self.addCleanup(home.stop)
+        private = self.root / 'codex-home'
+        private.mkdir()
+        (private / 'auth.json').write_text(json.dumps({'auth_mode': 'chatgpt', 'tokens': {'access_token': 'fixture-login'}}))
         self.inputs = self.root / "inputs"
         shutil.copytree(ROOT / "inputs", self.inputs)
         self.fake = self.root / "fake codex"
@@ -59,6 +64,7 @@ class RunnerTests(unittest.TestCase):
         if timeout is not None:
             settings = settings_from_dict(settings.to_dict() | {"timeout_seconds": timeout}, self.root)
         run = prepare(settings)
+        (run / 'execution-control.json').write_text(json.dumps({'environment': {'PATH': '/usr/bin:/bin'}}))
         (run / "workspace" / "FAKE_MODE").write_text(mode)
         return run
 
@@ -73,6 +79,9 @@ class RunnerTests(unittest.TestCase):
         self.assertFalse((first / "workspace" / "evaluation").exists())
         self.assertEqual((first / 'inputs/tracecheck.py').read_bytes(), (ROOT / 'runtime/tracecheck.py').read_bytes())
         self.assertFalse((first / 'workspace/tracecheck.py').exists())
+        self.assertEqual((first / 'inputs/schedule.py').read_bytes(), (ROOT / 'runtime/schedule.py').read_bytes())
+        self.assertFalse((first / 'workspace/schedule.py').exists())
+        self.assertEqual(read_json(first / 'run.json')['schedule_helper'], 'inputs/schedule.py')
         original = (first / "inputs" / "TASK.md").read_text()
         (self.inputs / "TASK.md").write_text("Changed for a later experiment")
         self.assertEqual((first / "prompt.txt").read_text(), original)
@@ -93,6 +102,68 @@ class RunnerTests(unittest.TestCase):
         self.assertIn("workspace-write", args)
         self.assertNotIn("--dangerously-bypass-approvals-and-sandbox", args)
         self.assertEqual(args[args.index("--ask-for-approval") + 1], "never")
+        env = read_json(run / 'workspace/received-environment.json')
+        self.assertNotEqual(env['CODEX_HOME'], os.environ['CODEX_HOME'])
+        self.assertIsNone(env['FORGE_HOST_SENTINEL'])
+        self.assertFalse(Path(env['CODEX_HOME']).exists())
+        self.assertFalse(list(run.glob('.client-*')))
+        config = read_json(run / 'client-settings.json')
+        self.assertEqual(config['developer_instructions'], (self.inputs / 'AGENTS.md').read_text())
+        self.assertEqual(config['project_doc_max_bytes'], 0)
+
+    def test_private_client_copies_only_auth_and_cleans_secrets_on_failure(self):
+        run = self.prepared()
+        host = self.root / 'codex-home'
+        (host / 'config.toml').write_text('developer_instructions="HOST"\n')
+        (host / 'AGENTS.md').write_text('HOST')
+        (host / 'skills').mkdir()
+        original = (host / 'auth.json').read_bytes()
+        client = Client(self.settings, run, time.monotonic() + 10)
+        try:
+            client.prepare({'PATH': '/usr/bin:/bin'})
+            client.authenticate()
+            private_auth = client.client_home / 'auth.json'
+            self.assertEqual(private_auth.read_bytes(), original)
+            self.assertEqual(private_auth.stat().st_mode & 0o777, 0o600)
+            self.assertFalse((client.client_home / 'config.toml').exists())
+            self.assertFalse((client.client_home / 'AGENTS.md').exists())
+            (run / 'stderr.log').write_text('fixture-login')
+        finally:
+            client.close()
+        self.assertEqual((host / 'auth.json').read_bytes(), original)
+        self.assertEqual((run / 'stderr.log').read_text(), '[REDACTED_CREDENTIAL]')
+        self.assertFalse(client.home.exists())
+
+    def test_isolation_failure_stops_before_authentication_or_model_call(self):
+        run = self.prepared()
+        items = [{'internal_chat_message_metadata_passthrough': {'content_item_kinds': ['host_skills.instructions']}}]
+        with patch.object(Client, 'probe', return_value=items), patch.object(Client, 'authenticate') as auth:
+            result = execute(run)
+        auth.assert_not_called()
+        self.assertEqual(result['status'], 'launch_failed')
+        self.assertFalse((run / 'workspace/received-prompt.txt').exists())
+        self.assertFalse(list(run.glob('.client-*')))
+
+    def test_explicit_api_key_is_not_in_shell_environment_or_saved_settings(self):
+        run = self.prepared()
+        client = Client(self.settings, run, time.monotonic() + 10)
+        try:
+            client.prepare({'PATH': '/usr/bin:/bin'})
+            with patch.dict(os.environ, {'CODEX_API_KEY': 'fixture-api-key'}):
+                client.authenticate()
+            self.assertEqual(client.environment['CODEX_API_KEY'], 'fixture-api-key')
+            self.assertNotIn('fixture-api-key', json.dumps(client.settings))
+            self.assertFalse((client.client_home / 'auth.json').exists())
+        finally:
+            client.close()
+
+    def test_missing_authentication_does_not_fall_back_to_host_configuration(self):
+        run = self.prepared()
+        (self.root / 'codex-home/auth.json').unlink()
+        result = execute(run)
+        self.assertEqual(result['status'], 'launch_failed')
+        self.assertFalse((run / 'events.jsonl').exists())
+        self.assertFalse(list(run.glob('.client-*')))
 
     def test_failed_execution_preflight_stops_before_any_native_model_invocation(self):
         run = self.prepared()

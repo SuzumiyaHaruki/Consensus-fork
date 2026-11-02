@@ -176,7 +176,7 @@ async def execute_locked(control, arguments, request_id):
     try:
         execution_work, environment, context = replay.prepare(control, args.source, args.overlays, folder)
         cwd = validate_directory(execution_work, args.cwd)
-        record.update(cwd=str(cwd), source_context=context)
+        record.update(cwd=str(cwd), cwd_relative=str(cwd.relative_to(execution_work)), source_context=context)
         write_json(folder/'result.json', record)
         if clock_path:
             clock = json.loads(clock_path.read_text())

@@ -232,6 +232,8 @@ def brief(root, source, target, deadline, timeout, calls_left):
         "review_context": str(root / 'context') if (root / 'context').is_dir() else None,
         "trace_helper": {"path": str(root / 'tools/tracecheck.py'),
                          "usage": "python3 PATH --help; optional finite event-ledger consistency check, not a consensus or reachability verdict"},
+        "schedule_helper": {"path": str(root / 'tools/schedule.py'),
+                            "usage": "python3 -I PATH --help; optional adapter-driven event scheduling and strict JSONL replay inside isolated_exec; retain adapter/plan as overlays and cite stdout"},
         "execution_sources": (['candidate', 'before'] if (root/'context/before').is_dir() else ['candidate']) if target['execution_backend'] == 'go_module' else [],
         "execution_evidence": "isolated_exec optionally accepts source and overlays (relative helper/test files). Cite executions/<id>/result.json or its logs. Source selects captured starting bytes, not proof of what an arbitrary command actually tests.",
         "permissions": "Source/logs read only; work writable; ordinary shell has no network. isolated_exec supports private local TCP; no host or external network.",
@@ -424,7 +426,8 @@ def run(config, target, *, client_factory=Codex, environment_only=False):
         git(root / "work", "-c", "init.templateDir=", "init", deadline=deadline)
         freeze(root / "source")
         (root / 'tools').mkdir()
-        shutil.copyfile(Path(__file__).resolve().parents[1] / 'runtime/tracecheck.py', root / 'tools/tracecheck.py')
+        for name in ('tracecheck.py', 'schedule.py'):
+            shutil.copyfile(Path(__file__).resolve().parents[1] / 'runtime' / name, root / 'tools' / name)
         freeze(root / 'tools')
         if config.review_context:
             if config.task_mode != 'review':

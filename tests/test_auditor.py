@@ -99,12 +99,16 @@ class AuditorTests(unittest.TestCase):
         self.assertEqual(set(source['excluded']), {'AGENTS.md', '.env', 'outside'})
         self.assertEqual((root / 'source/main.go').stat().st_mode & 0o222, 0)
         identity = json.loads((root / 'inputs/implementation.json').read_text())
-        for name in ('auditor/runner.py', 'runtime/storage.py', 'runtime/tracecheck.py', 'audit_bridge.py', 'requirements.txt'):
+        for name in ('auditor/runner.py', 'runtime/storage.py', 'runtime/tracecheck.py', 'runtime/schedule.py', 'audit_bridge.py', 'requirements.txt'):
             self.assertTrue((root / identity['retained_source'][name]['record']).is_file())
         helper = root / 'tools/tracecheck.py'
         self.assertEqual(helper.stat().st_mode & 0o222, 0)
         self.assertIn(str(helper), client.prompts[0])
         self.assertFalse((root / 'work/tracecheck.py').exists())
+        schedule = root / 'tools/schedule.py'
+        self.assertEqual(schedule.stat().st_mode & 0o222, 0)
+        self.assertIn(str(schedule), client.prompts[0])
+        self.assertFalse((root / 'work/schedule.py').exists())
         self.assertEqual({Path(path).name for path in identity['reload_inputs']}, {'local_exec.py', 'storage.py', 'replay.py'})
         feedback = self.root / 'feedback'
         handoff = prepare_handoff(root, {'path': self.config.repo_path, 'commit': self.commit}, feedback)
@@ -114,6 +118,7 @@ class AuditorTests(unittest.TestCase):
         self.assertIn('Completed fixture', (feedback / handoff['report']).read_text())
         self.assertEqual((feedback / 'raw/turns/0002/changes/files/tests/witness.bin').read_bytes(), b'\x02\x00\xff')
         self.assertEqual((feedback / 'raw/tools/tracecheck.py').read_bytes(), helper.read_bytes())
+        self.assertEqual((feedback / 'raw/tools/schedule.py').read_bytes(), schedule.read_bytes())
         self.assertEqual(git(Path(self.config.repo_path), 'status', '--porcelain'), b'')
 
     def test_review_is_finite_and_receives_readonly_context(self):

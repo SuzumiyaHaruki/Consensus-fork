@@ -32,17 +32,20 @@ def rebase_evidence(item, prefix):
             'trace_checks': [{**check, 'path': str(prefix / check['path'])}
                              for check in item.get('trace_checks', [])],
             'execution_records': [{**entry, 'path': str(prefix / entry['path']),
-                                   'inputs': [str(prefix / path) for path in entry.get('inputs', [])]}
+                                   'inputs': [str(prefix / path) for path in entry.get('inputs', [])],
+                                   **{field: {name: str(prefix / path) for name, path in entry.get(field, {}).items()}
+                                      for field in ('restore', 'outputs')}}
                                   for entry in item.get('execution_records', [])]}
 
 
 def feedback_overview(candidate, issues):
     lines = ['# Repair evidence overview', '',
              'Navigation only. Descriptions below are copied from retained records, not independently established facts. Read the original reports, traces, commands and outputs. PASS can mean a defect was observed.', '',
+             'For each execution record, restore maps workspace destinations to retained input files; outputs points to original logs. cwd_relative is the execution directory within the selected source, or null if not recorded. argv and original cwd are unchanged: inspect absolute paths, rebuild temporary binaries and adapt only with an explanation. Use isolated_exec; no command is automatically run by this handoff.', '',
              f"Current candidate: `{candidate['commit']}`. Full issue and review records: `issues.json`.", '']
     for issue in issues:
         lines.extend([f"## {issue['id']}", '',
-                      f"Origin: `{issue['source_commit']}`; original bundle: `{issue['evidence_bundle']}`.", ''])
+                      f"State: `{issue['state']}`; origin: `{issue['source_commit']}`; original bundle: `{issue['evidence_bundle']}`.", ''])
         fields = ('summary', 'property', 'assumptions', *FINDING_DETAILS, 'reproduction', 'polarity',
                   'evidence', 'trace_files', 'execution_records', 'evidence_feedback', 'reviews')
         for field in fields:
@@ -87,6 +90,11 @@ def pending(issues):
     return [issue for issue in issues if issue['state'] not in CLOSED]
 
 
+def repairable(issues):
+    # Only apply_review assigns this deferred state; a repairer's claim cannot.
+    return [issue for issue in pending(issues) if issue['state'] != 'needs_specification']
+
+
 def feedback_bundle(destination, latest, candidate, issues):
     copy_tree(latest, destination)
     brief = read_json(destination / 'handoff.json')
@@ -116,7 +124,8 @@ def feedback_bundle(destination, latest, candidate, issues):
     (destination / 'overview.md').write_text(feedback_overview(candidate, delivered), encoding='utf-8')
     brief.update(issues_file='issues.json', candidate_commit=candidate['commit'],
                  overview_file='overview.md',
-                 note='Pending issues may originate in earlier versions; original source_commit remains explicit.')
+                 repair_issue_ids=[issue['id'] for issue in repairable(issues)],
+                 note='Repair only repair_issue_ids. Other pending issues are retained as specification context, not closed. Original source_commit remains explicit.')
     write_json(destination / 'handoff.json', brief)
 
 

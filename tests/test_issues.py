@@ -92,15 +92,21 @@ class IssueTests(unittest.TestCase):
     def test_execution_records_are_linked_and_remapped_in_feedback(self):
         folder = self.bundle / 'raw/executions/actual'
         folder.mkdir(parents=True)
+        (folder / 'inputs/tests').mkdir(parents=True)
+        (folder / 'inputs/tests/repro.py').write_text('print("witness")')
+        (folder / 'stdout.txt').write_text('Witness observed')
         write_json(folder / 'result.json', {'execution_id': 'actual', 'argv': ['go', 'test', './...'],
-                   'status': 'completed', 'exit_code': 1,
-                   'source_context': {'kind': 'candidate_copy', 'commit': 'before', 'overlays': []}})
+                   'status': 'completed', 'exit_code': 1, 'cwd_relative': '.',
+                   'source_context': {'kind': 'candidate_copy', 'commit': 'before', 'overlays': [
+                       {'path': 'tests/repro.py', 'retained_path': 'inputs/tests/repro.py', 'replaces_source': False}]}})
         self.finding['evidence'].append('executions/actual/result.json')
         self.finding['execution_records'] = [{'path': 'forged'}]
         item = self.find()[0]
         self.assertEqual(item['execution_records'][0]['path'], 'raw/executions/actual/result.json')
         self.assertEqual(item['execution_records'][0]['exit_code'], 1)
         self.assertEqual(item['evidence_feedback'], [])  # Nonzero exit is not an inferred test polarity.
+        self.review['issues'][0].update(disposition='unresolved', evidence=self.finding['evidence'])
+        apply_review([item], self.verify(), self.bundle, self.after)
         write_json(self.bundle / 'handoff.json', {'candidate_commit': 'before'})
         with tempfile.TemporaryDirectory() as temp:
             latest = Path(temp) / 'latest'
@@ -111,6 +117,12 @@ class IssueTests(unittest.TestCase):
             delivered = read_json(dest/'issues.json')['issues'][0]['execution_records'][0]
             self.assertTrue((dest / delivered['path']).is_file())
             self.assertEqual(delivered['source_context']['commit'], 'before')
+            self.assertEqual(delivered['restore'], {'tests/repro.py': 'previous/000/raw/executions/actual/inputs/tests/repro.py'})
+            self.assertEqual((dest / delivered['restore']['tests/repro.py']).read_text(), 'print("witness")')
+            self.assertEqual((dest / delivered['outputs']['stdout']).read_text(), 'Witness observed')
+            reviewed = read_json(dest / 'issues.json')['issues'][0]['reviews'][0]['execution_records'][0]
+            self.assertEqual(reviewed['restore'], delivered['restore'])
+            self.assertEqual(reviewed['outputs'], delivered['outputs'])
 
     def test_feedback_remaps_historical_traces_and_review_without_loss(self):
         write_json(self.bundle / 'audit-work/trace.json', {

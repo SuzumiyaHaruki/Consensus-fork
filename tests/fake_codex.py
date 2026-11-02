@@ -2,6 +2,7 @@
 """Offline CLI fixture, never an implementation of the consensus protocol."""
 
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -14,6 +15,10 @@ if "--version" in sys.argv:
 if "--help" in sys.argv:
     print("--json --output-last-message --sandbox --no-daemon --ask-for-approval")
     raise SystemExit(0)
+if sys.argv[1:4] == ['--no-daemon', 'debug', 'prompt-input']:
+    print(json.dumps([{'role': 'developer', 'content': [],
+                      'internal_chat_message_metadata_passthrough': {'content_item_kinds': ['generic.developer_instructions']}}]))
+    raise SystemExit(0)
 
 arguments = sys.argv[1:]
 workspace = Path(arguments[arguments.index("--cd") + 1])
@@ -21,6 +26,8 @@ final = Path(arguments[arguments.index("--output-last-message") + 1])
 prompt = sys.stdin.read()
 (workspace / "received-prompt.txt").write_text(prompt)
 (workspace / "received-args.json").write_text(json.dumps(arguments))
+(workspace / 'received-environment.json').write_text(json.dumps({key: os.environ.get(key)
+    for key in ('HOME', 'CODEX_HOME', 'FORGE_HOST_SENTINEL')}))
 mode_file = workspace / "FAKE_MODE"
 mode = mode_file.read_text().strip() if mode_file.exists() else "complete"
 

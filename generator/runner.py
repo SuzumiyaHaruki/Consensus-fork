@@ -15,7 +15,9 @@ import time
 
 from .config import Settings, settings_from_dict
 from . import execution
+from .client import Client
 from runtime import agent_records
+from runtime.codex_support import codex_options
 
 
 __version__ = "0.2.0"
@@ -105,8 +107,6 @@ def command_for(settings: Settings, run_dir: Path) -> list[str]:
         command.extend(["--model", settings.model])
     if settings.reasoning_effort:
         command.extend(["--config", "model_reasoning_effort=" + json.dumps(settings.reasoning_effort)])
-    if settings.profile:
-        command.extend(["--profile", settings.profile])
     command.append("-")
     return command
 
@@ -128,7 +128,8 @@ def prepare(settings: Settings, label: str = "native") -> Path:
         "workspace": str(run_dir / "workspace"), "input_files": list(REQUIRED_INPUTS),
         "environment": {
             "mode": "host", "read_isolation": False,
-            "user_config": "inherited", "user_instructions_and_skills": "inherited",
+            "user_config": "private", "user_instructions_and_skills": "disabled",
+            "project_instructions": "explicit inputs/AGENTS.md",
             "sandbox": "workspace-write", "approval_policy": "never",
             "shared_daemon": False,
             "subagents": "native_allowed",
@@ -141,9 +142,11 @@ def prepare(settings: Settings, label: str = "native") -> Path:
                 path = destination / relative
                 path.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copyfile(source / relative, path)
-        helper = Path(__file__).resolve().parent.parent / 'runtime/tracecheck.py'
-        shutil.copyfile(helper, run_dir / 'inputs/tracecheck.py')
+        for name in ('tracecheck.py', 'schedule.py'):
+            helper = Path(__file__).resolve().parent.parent / 'runtime' / name
+            shutil.copyfile(helper, run_dir / 'inputs' / name)
         metadata['trace_helper'] = 'inputs/tracecheck.py'
+        metadata['schedule_helper'] = 'inputs/schedule.py'
         prompt = (run_dir / "inputs" / "TASK.md").read_text(encoding="utf-8")
         (run_dir / "prompt.txt").write_text(prompt, encoding="utf-8")
         (run_dir / "workspace" / ".gitignore").write_text("*.test\ncoverage.out\n.runtime/\n", encoding="utf-8")
@@ -273,6 +276,7 @@ def execute(run_dir: Path) -> dict:
         write_json(run_dir / "run.json", metadata)
         started = time.monotonic()
         process = None
+        client = None
         execution_ready = False
         returncode = None
         state = "launch_failed"
@@ -285,14 +289,19 @@ def execute(run_dir: Path) -> dict:
         try:
             prepared = execution.prepare(settings, run_dir, started + settings.timeout_seconds)
             execution_ready = True
-            command[-1:-1] = prepared['options']
+            client = Client(settings, run_dir, started + settings.timeout_seconds)
+            tool_environment = read_json(run_dir / 'execution-control.json')['environment']
+            client.prepare(tool_environment)
+            client.authenticate()
+            command[0] = client.executable
+            command[-1:-1] = [*codex_options(client.settings), *prepared['options']]
             metadata.update(command=command, isolated_execution=prepared)
             write_json(run_dir / 'run.json', metadata)
             with (run_dir / "events.jsonl").open("w", encoding="utf-8") as events, (run_dir / "stderr.log").open("w", encoding="utf-8") as errors:
                 process = subprocess.Popen(
                     command, cwd=run_dir / "workspace", stdin=subprocess.PIPE,
                     stdout=events, stderr=errors, text=True, encoding="utf-8",
-                    start_new_session=True,
+                    start_new_session=True, env=client.environment,
                 )
                 metadata["pid"] = process.pid
                 write_json(run_dir / "run.json", metadata)
@@ -322,8 +331,9 @@ def execute(run_dir: Path) -> dict:
                 execution.reconcile(run_dir)
                 summary = summarize_events(run_dir / "events.jsonl")
                 try:
-                    agents = agent_records.collect(os.environ.get('CODEX_HOME', Path.home() / '.codex'),
-                        summary['thread_ids'], run_dir / 'workspace', metadata['started_at'], run_dir)
+                    agents = agent_records.collect(client.client_home if client else run_dir / '.unstarted-client',
+                        summary['thread_ids'], run_dir / 'workspace', metadata['started_at'], run_dir,
+                        secrets=client.secrets if client else ())
                 except OSError as exc:
                     agents = {'record': None, 'usage': None, 'usage_complete': False,
                               'warnings': [f'{type(exc).__name__} retaining agent records']}
@@ -344,6 +354,10 @@ def execute(run_dir: Path) -> dict:
                 })
                 write_json(run_dir / "run.json", metadata)
             finally:
-                signal.signal(signal.SIGTERM, old_term)
-                signal.signal(signal.SIGINT, old_int)
+                try:
+                    if client is not None:
+                        client.close()
+                finally:
+                    signal.signal(signal.SIGTERM, old_term)
+                    signal.signal(signal.SIGINT, old_int)
         return metadata

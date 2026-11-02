@@ -2,7 +2,6 @@
 import json
 import re
 from enum import Enum
-from .storage import redact
 
 
 class ExecutionStatus(str, Enum):
@@ -62,6 +61,7 @@ def classify_failure(text: str) -> ExecutionStatus:
 
 def codex_diagnostic(events):
     """Only top-level failures authorize transport recovery; mixed/unknown errors do not."""
+    from .storage import redact
     errors = [e.get('error') if e.get('type') == 'turn.failed' else e.get('message')
         for e in events if e.get('type') in {'turn.failed','error'}]
     messages = [' '.join(str(error[k]) for k in ('code','message') if error.get(k))

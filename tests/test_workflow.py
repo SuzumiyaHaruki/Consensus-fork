@@ -63,6 +63,8 @@ class OfflineRuntime(workflow.Runtime):
         self.calls = []
         self.empty_after = None
         self.review_disposition = 'fixed'
+        self.repair_dispositions = {}
+        self.review_dispositions = {}
         self.review_invalid = False
         self.budgets = []
 
@@ -73,6 +75,7 @@ class OfflineRuntime(workflow.Runtime):
         role = read_json(stage / 'run.json')['workflow_role']
         self.calls.append(role)
         workspace = stage / 'workspace'
+        write_json(stage / 'execution-control.json', {'environment': {'PATH': '/usr/bin:/bin'}})
         # Exercise the actual native runner, stdin delivery, model arguments, and final-event validation.
         with patch('generator.execution.prepare', return_value={'options': []}):
             result = execute_agent(stage)
@@ -93,11 +96,13 @@ class OfflineRuntime(workflow.Runtime):
             write_json(workspace / '.forge/repair-result.json', {
                 'input_commit': 'wrong-commit' if self.wrong_commit else handoff['candidate_commit'],
                 'action': self.action, 'summary': 'Offline fixture repair result.',
-                'issues': [{'id': issue['id'], 'disposition': 'addressed' if self.action == 'repaired' else 'unresolved',
+                'issues': [{'id': issue['id'], 'disposition': self.repair_dispositions.get(
+                            issue['id'], 'addressed' if self.action == 'repaired' else 'unresolved'),
                             'reason': 'Fixture only; no consensus claim.',
                             'before_check': {'fixture': 'Not a consensus replay'},
                             'checks': ['No real consensus checks']}
-                           for issue in read_json(workspace / '.forge/feedback/issues.json')['issues']],
+                           for issue in read_json(workspace / '.forge/feedback/issues.json')['issues']
+                           if issue['id'] in handoff['repair_issue_ids']],
             })
             if self.action == 'repaired':
                 put(workspace / 'server.go', f'package syncepaxos\nconst Version = {self.calls.count("repair")}\n')
@@ -133,7 +138,7 @@ class OfflineRuntime(workflow.Runtime):
         path = audit / 'turns/0001/changes'
         result = {'before_commit': request['before_commit'], 'after_commit': candidate['commit'],
                   'summary': 'Offline verification fixture.', 'issues': [
-                      {'id': ident, 'disposition': self.review_disposition, 'reason': 'Fixture observation',
+                      {'id': ident, 'disposition': self.review_dispositions.get(ident, self.review_disposition), 'reason': 'Fixture observation',
                        'method': 'executed', 'before_observation': 'Fixture before', 'after_observation': 'Fixture after',
                        'variant_checks': ['Fixture only'], 'trace_files': ['work/tests/trace.json'],
                        'evidence': ['work/tests/witness.bin']} for ident in request['issue_ids']]}
@@ -153,6 +158,7 @@ class WorkflowTests(unittest.TestCase):
         home = patch.dict(os.environ, {'CODEX_HOME': str(self.root / 'codex-home')})
         home.start()
         self.addCleanup(home.stop)
+        put(self.root / 'codex-home/auth.json', json.dumps({'auth_mode': 'chatgpt', 'tokens': {}}))
         fake = self.root / 'fake codex'
         shutil.copyfile(ROOT / 'tests/fake_codex.py', fake)
         fake.chmod(0o755)
@@ -383,6 +389,68 @@ class WorkflowTests(unittest.TestCase):
         self.assertEqual(workflow.inspect(root)['issue_index_status'], 'incomplete')
         self.assertEqual(runtime.calls, ['generation', 'audit'])
 
+    def test_failed_audit_keeps_drafts_visible_without_importing_and_inspects_old_runs(self):
+        runtime = OfflineRuntime(incomplete=True)
+        original = runtime.audit
+        def fail(*args):
+            audit = original(*args)
+            data = read_json(audit / 'run.json')
+            data.update(stop='external_error', reason='Fixture service refusal',
+                        agents={'record': 'agents.json', 'thread_count': 2, 'usage': {'output_tokens': 17}})
+            write_json(audit / 'run.json', data)
+            put(audit / 'work/report.md', 'Evidence for a new defect, not yet in the index.\n')
+            write_json(audit / 'work/findings.json', {'candidate_commit': args[1]['commit'], 'issues': []})
+            raise workflow.StopWorkflow('audit_failed', 'Fixture service refusal')
+        with patch.object(runtime, 'audit', side_effect=fail):
+            root, result = self.run_fixture(runtime)
+        self.assertEqual(result['status'], 'audit_failed')
+        self.assertEqual(runtime.calls, ['generation', 'audit'])
+        index = read_json(root / 'issues.json')
+        self.assertEqual(index['import_status'], 'incomplete')
+        self.assertEqual(index['issues'], [])
+        self.assertIsNone(index['imports'][0]['issue_count'])
+        draft, = index['pending_reports']
+        self.assertEqual(draft['status'], 'needs_review')
+        self.assertEqual(draft['candidate_commit'], result['current_candidate']['commit'])
+        self.assertIn('new defect', Path(draft['report']).read_text())
+        self.assertEqual(read_json(Path(draft['index']))['issues'], [])
+        self.assertEqual(result['pending_audit_reports'], [draft])
+        stage = result['stages'][-1]
+        self.assertEqual(stage['agents']['usage']['output_tokens'], 17)
+        self.assertEqual(stage['audit_reason'], 'Fixture service refusal')
+
+        # Older archives have no top-level draft or failed-stage usage pointers.
+        for key in ('pending_report', 'audit_run', 'audit_stop', 'audit_reason', 'agents'):
+            stage.pop(key, None)
+        result.pop('pending_audit_reports')
+        write_json(root / 'experiment.json', result)
+        before = {p: p.read_bytes() for p in root.rglob('*') if p.is_file() and '.git' not in p.parts}
+        inspected = workflow.inspect(root)
+        self.assertEqual(inspected['pending_audit_reports'], [draft])
+        self.assertEqual(inspected['stages'][-1]['agents']['thread_count'], 2)
+        self.assertEqual(before, {p: p.read_bytes() for p in before})
+
+    def test_failed_review_draft_cannot_close_issue_and_damaged_index_stays_visible(self):
+        runtime = OfflineRuntime()
+        runtime.empty_after = 1
+        original = runtime.verify
+        def fail(*args):
+            audit = original(*args)
+            put(audit / 'work/review.json', '{"issues": [{"disposition": "fixed"')
+            data = read_json(audit / 'run.json')
+            data.update(stop='external_error', last_completed_report=None)
+            write_json(audit / 'run.json', data)
+            raise workflow.StopWorkflow('audit_failed', 'Fixture interrupted review')
+        with patch.object(runtime, 'verify', side_effect=fail):
+            root, result = self.run_fixture(runtime)
+        self.assertEqual(result['status'], 'verification_failed')
+        self.assertEqual(runtime.calls, ['generation', 'audit', 'repair', 'verify', 'audit'])
+        self.assertEqual(result['open_issues'], ['a000-F1'])
+        self.assertEqual(read_json(root / 'issues.json')['issues'][0]['state'], 'open')
+        draft, = result['pending_audit_reports']
+        self.assertTrue(draft['index'].endswith('/work/review.json'))
+        self.assertEqual(Path(draft['index']).read_text(), '{"issues": [{"disposition": "fixed"')
+
     def test_budget_reserves_final_audit_instead_of_starting_short_repair(self):
         runtime = OfflineRuntime()
         root, result = self.run_fixture(runtime, total_seconds=2000, max_repairs=3)
@@ -440,11 +508,86 @@ class WorkflowTests(unittest.TestCase):
         self.assertEqual(result['status'], 'cycle_complete')
         self.assertEqual(runtime.calls, ['generation', 'audit'])
 
-    def test_specification_gap_stops_without_rewriting_candidate(self):
+    def test_specification_claim_requires_review_even_without_code_changes(self):
+        for action in ('needs_specification', 'no_change'):
+            with self.subTest(action=action):
+                runtime = OfflineRuntime(action=action)
+                if action == 'no_change':
+                    runtime.repair_dispositions = {'a000-F1': 'needs_specification'}
+                runtime.review_disposition, runtime.empty_after = 'needs_specification', 1
+                root, result = self.run_fixture(runtime, max_repairs=3)
+                self.assertEqual(result['status'], 'needs_specification')
+                self.assertEqual(result['open_issues'], ['a000-F1'])
+                self.assertEqual(workflow.inspect(root)['awaiting_specification'], ['a000-F1'])
+                self.assertEqual(runtime.calls, ['generation', 'audit', 'repair', 'verify', 'audit'])
+                self.assertEqual(result['candidates'][-1]['changes'], {'added': [], 'deleted': [], 'modified': []})
+                self.assertEqual(read_json(root / 'issues.json')['issues'][0]['reviews'][0]['disposition'], 'needs_specification')
+
+    def test_mixed_issues_keep_repairs_moving_with_deferred_evidence_as_context(self):
+        runtime = OfflineRuntime()
+        runtime.empty_after = 1
+        runtime.repair_dispositions = {'a000-F2': 'needs_specification'}
+        runtime.review_dispositions = {'a000-F2': 'needs_specification', 'a000-F3': 'unresolved'}
+        audit, verify = runtime.audit, runtime.verify
+        def with_three_issues(*args):
+            run = audit(*args)
+            path = run / 'turns/0001/changes/files/findings.json'
+            data = read_json(path)
+            if data['issues']:
+                data['issues'] += [data['issues'][0] | {'id': name} for name in ('F2', 'F3')]
+                write_json(path, data)
+            return run
+        def review_next(settings, candidate, *args):
+            if candidate['version'] == 2:
+                runtime.review_dispositions['a000-F3'] = 'fixed'
+            return verify(settings, candidate, *args)
+        with patch.object(runtime, 'audit', side_effect=with_three_issues), patch.object(runtime, 'verify', side_effect=review_next):
+            root, result = self.run_fixture(runtime, max_repairs=3)
+        self.assertEqual(runtime.calls.count('repair'), 2)
+        self.assertEqual(result['status'], 'needs_specification')
+        self.assertEqual(result['awaiting_specification'], ['a000-F2'])
+        self.assertEqual(result['open_issues'], ['a000-F2'])
+        issues = read_json(root / 'issues.json')['issues']
+        self.assertEqual([item['state'] for item in issues], ['fixed', 'needs_specification', 'fixed'])
+        self.assertEqual(len(issues[1]['reviews']), 1)
+        feedback = root / 'feedback/001'
+        self.assertEqual(read_json(feedback / 'handoff.json')['repair_issue_ids'], ['a000-F3'])
+        delivered = read_json(feedback / 'issues.json')['issues']
+        self.assertEqual([item['id'] for item in delivered], ['a000-F2', 'a000-F3'])
+        self.assertTrue((feedback / delivered[0]['reviews'][0]['evidence'][0]).is_file())
+        self.assertEqual(read_json(root / 'reviews/002/context/request.json')['issue_ids'], ['a000-F3'])
+
+    def test_rejected_specification_claim_returns_to_repair(self):
+        runtime = OfflineRuntime(action='no_change')
+        runtime.repair_dispositions = {'a000-F1': 'needs_specification'}
+        runtime.review_disposition, runtime.empty_after = 'unresolved', 1
+        verify = runtime.verify
+        def review_next(settings, candidate, *args):
+            if candidate['version'] == 2:
+                runtime.review_disposition = 'not_substantiated'
+            return verify(settings, candidate, *args)
+        with patch.object(runtime, 'verify', side_effect=review_next):
+            root, result = self.run_fixture(runtime, max_repairs=3)
+        self.assertEqual(runtime.calls.count('repair'), 2)
+        self.assertEqual(result['stop_reason'], 'no_open_findings')
+        self.assertEqual(result['awaiting_specification'], [])
+        self.assertEqual(read_json(root / 'feedback/001/handoff.json')['repair_issue_ids'], ['a000-F1'])
+        item = read_json(root / 'issues.json')['issues'][0]
+        self.assertEqual([review['disposition'] for review in item['reviews']], ['unresolved', 'not_substantiated'])
+
+    def test_specification_claim_cannot_deliver_changed_materials(self):
         runtime = OfflineRuntime(action='needs_specification')
-        _, result = self.run_fixture(runtime)
+        agent = runtime.agent
+        def change_input(stage):
+            result = agent(stage)
+            if read_json(stage / 'run.json')['workflow_role'] == 'repair':
+                put(stage / 'workspace/protocol.md', 'The repair silently changes supplied semantics.')
+            return result
+        with patch.object(runtime, 'agent', side_effect=change_input):
+            _, result = self.run_fixture(runtime)
         self.assertEqual(result['status'], 'needs_specification')
         self.assertEqual(len(result['candidates']), 1)
+        self.assertEqual(result['awaiting_specification'], [])  # No independent confirmation.
         self.assertEqual(runtime.calls[-1], 'repair')
 
     def test_wrong_repair_version_does_not_produce_next_candidate(self):
@@ -563,6 +706,16 @@ class HandoffTests(unittest.TestCase):
         self.assertEqual((destination / 'audit-work/tests/witness.bin').read_bytes(), b'\x01\x00\xff')
         self.assertEqual((destination / 'raw/turns/0002/changes/files/tests/witness.bin').read_bytes(), b'\x02\x00\xff')
         self.assertIn('PASS may mean', result['test_polarity'])
+
+    def test_failed_output_navigation_rejects_links_without_masking_stage_failure(self):
+        folder = self.root / 'failed'
+        (folder / 'runs').mkdir(parents=True)
+        (folder / 'runs/linked').symlink_to(self.audit, target_is_directory=True)
+        entry = {'kind': 'audit', 'status': 'audit_failed', 'path': str(folder)}
+        workflow.record_audit_progress(self.root, entry)
+        self.assertEqual(entry['status'], 'audit_failed')
+        self.assertIn('link is not allowed', entry['retained_output_error'])
+        self.assertNotIn('pending_report', entry)
 
     def test_archive_reconstructs_directory_replaced_by_file(self):
         first = self.audit / 'turns/0001/changes'

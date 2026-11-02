@@ -13,10 +13,12 @@ import subprocess
 import sys
 import tempfile
 import time
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from generator.config import Settings
 from generator.execution import prepare
+from generator.client import Client
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
@@ -84,11 +86,32 @@ async def exercise(prepared, stage, host_port):
             assert record['status'] == 'completed' and record['exit_code'] == 0, record
             record = await call(['/usr/bin/python3', '-I', str(stage / 'inputs/tracecheck.py'), 'tests/trace.json'])
             assert record['status'] == 'completed' and record['exit_code'] == 0, record
+            overlays = ['tests/schedule_adapter.py', 'tests/schedule.json']
+            for mode, filename in [('--plan', 'schedule.json'), ('--replay', 'previous.jsonl')]:
+                record = await call(['/usr/bin/python3', '-I', str(stage / 'inputs/schedule.py'), mode,
+                                     'tests/' + filename, '--', '/usr/bin/python3', '-I', 'tests/schedule_adapter.py'],
+                                    source='candidate', overlays=overlays)
+                assert record['status'] == 'completed' and record['exit_code'] == 0, record
+                assert record['source_context']['commit'] == 'new', record
+                stdout = Path(record['stdout']['path'])
+                rows = [json.loads(line) for line in stdout.read_text().splitlines()]
+                assert rows[-1]['status'] == 'completed', rows[-1]
+                assert rows[-2]['response']['observations']['delivered'] == ['a:1'], rows[-2]
+                folder = stage / 'executions' / record['execution_id']
+                assert not (folder / 'replay-work').exists()
+                for name in overlays:
+                    assert (folder / 'inputs' / name).read_bytes() == (stage / 'workspace' / name).read_bytes()
+                if mode == '--plan':
+                    shutil.copyfile(stdout, stage / 'workspace/tests/previous.jsonl')
+                    overlays.append('tests/previous.jsonl')
+                else:
+                    assert rows[-1]['replay_match'] is True, rows[-1]
             for selected, expected in [('before', 'old'), ('candidate', 'new')]:
-                record = await call(['/usr/bin/python3', '-I', 'tests/replay_check.py'], source=selected,
-                                    overlays=['tests/replay_check.py'])
+                record = await call(['/usr/bin/python3', '-I', 'replay_check.py'], source=selected,
+                                    cwd='tests', overlays=['tests/replay_check.py'])
                 assert record['status'] == 'completed' and record['exit_code'] == 0, record
                 assert record['source_context']['commit'] == expected, record
+                assert record['cwd_relative'] == 'tests', record
                 assert record['stdout']['preview'].strip() == expected, record
                 folder = stage/'executions'/record['execution_id']
                 assert not (folder/'replay-work').exists()
@@ -111,11 +134,18 @@ def main():
         (stage / 'workspace/tests').mkdir(parents=True)
         (stage / 'inputs').mkdir()
         (stage / 'inputs/material.txt').write_text('read-only')
-        shutil.copyfile(Path(__file__).resolve().parents[1] / 'runtime/tracecheck.py', stage / 'inputs/tracecheck.py')
+        project = Path(__file__).resolve().parents[1]
+        for name in ('tracecheck.py', 'schedule.py'):
+            shutil.copyfile(project / 'runtime' / name, stage / 'inputs' / name)
+        shutil.copyfile(project / 'tests/fixtures/schedule_adapter.py', stage / 'workspace/tests/schedule_adapter.py')
+        (stage / 'workspace/tests/schedule.json').write_text(json.dumps({
+            'setup': {'pending': [{'id': 'a:1', 'actions': ['deliver'], 'dst': 'b'}]},
+            'steps': [{'do': 'deliver', 'select': {'dst': 'b'}},
+                      {'expect': {'observations': {'delivered': ['a:1']}}}]}))
         (stage / 'host-only.txt').write_text('local fixture, no credentials')
         (stage / 'workspace/go.mod').write_text('module local/check\n\ngo 1.22\n')
         (stage / 'workspace/tests/process_test.go').write_text(GO_TEST)
-        (stage / 'workspace/tests/replay_check.py').write_text('from pathlib import Path\np=Path("value.txt")\nprint(p.read_text())\np.write_text("private change")\n')
+        (stage / 'workspace/tests/replay_check.py').write_text('from pathlib import Path\np=Path("../value.txt")\nprint(p.read_text())\np.write_text("private change")\n')
         (stage / 'workspace/tests/trace.json').write_text(json.dumps({
             'clock': 'controlled', 'members': ['A', 'B', 'C'], 'fault_limit': 1,
             'delivery_bound_ns': 10, 'end_ns': 11, 'events': [
@@ -125,6 +155,29 @@ def main():
                 {'at_ns': 10, 'kind': 'deliver', 'id': 'tx1'}]}))
         prepared = prepare(Settings(action_seconds=90), stage, time.monotonic() + 150)
         control = json.loads((stage/'execution-control.json').read_text())
+        # Deliberately conflicting host, ancestor and project instructions must not be loaded.
+        unwanted = 'FORGE_UNWANTED_LOCAL_INSTRUCTIONS'
+        (stage / 'inputs/AGENTS.md').write_text('FORGE_SUPPLIED_INSTRUCTIONS')
+        (stage / 'AGENTS.md').write_text(unwanted)
+        (stage / 'workspace/AGENTS.md').write_text(unwanted)
+        (stage / 'workspace/.codex').mkdir()
+        (stage / 'workspace/.codex/config.toml').write_text('developer_instructions="' + unwanted + '"\n')
+        host_config = stage / 'host-config'
+        (host_config / 'skills/local').mkdir(parents=True)
+        (host_config / 'AGENTS.md').write_text(unwanted)
+        (host_config / 'config.toml').write_text('developer_instructions="' + unwanted + '"\n')
+        (host_config / 'skills/local/SKILL.md').write_text('---\nname: local\ndescription: ' + unwanted + '\n---\n' + unwanted)
+        with patch.dict(os.environ, {'CODEX_HOME': str(host_config), 'FORGE_HOST_SENTINEL': unwanted}):
+            client = Client(Settings(), stage, time.monotonic() + 60)
+            try:
+                client.prepare(control['environment'])
+                context = (stage / 'client-prompt.json').read_text()
+                assert 'FORGE_SUPPLIED_INSTRUCTIONS' in context and unwanted not in context
+                assert 'FORGE_HOST_SENTINEL' not in client.environment
+                assert client.settings['features.multi_agent'] is True
+            finally:
+                client.close()
+        assert not client.home.exists()
         control['execution_clock_path'] = str(stage/'execution-clock.json')
         (stage/'execution-clock.json').write_text(json.dumps({'elapsed_seconds': 0.0}))
         control['replay_sources'] = {}
@@ -148,9 +201,11 @@ def main():
             host.listen()
             asyncio.run(asyncio.wait_for(exercise(prepared, stage, host.getsockname()[1]), 120))
         print(json.dumps({'status': 'passed', 'checks': ['native MCP configuration', 'STDIO private TCP',
+                         'private generation configuration and explicit supplied instructions without host skills',
                          'separate MCP servers serialize execution and preserve the shared clock',
                          'two Go subprocesses with race detector', 'read-only materials', 'retained trace helper execution',
                          'host files/logs/network inaccessible', 'before/after source replay and retained overlays',
+                         'event scheduling and strict replay through the shared helper',
                          'action timeout', 'descendant cleanup'],
                          'model_calls': 0}))
 

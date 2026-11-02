@@ -131,7 +131,7 @@ def read_repair_result(workspace, expected_commit, expected_ids=None):
         if any(not isinstance(issue[k], str) or not issue[k].strip() for k in ('id', 'disposition')):
             raise ValueError('Repair issue id and disposition must be nonempty strings')
         require_description(issue['reason'], 'repair reason')
-        if issue['id'] in ids or issue['disposition'] not in {'addressed', 'not_substantiated', 'unresolved'}:
+        if issue['id'] in ids or issue['disposition'] not in {'addressed', 'not_substantiated', 'unresolved', 'needs_specification'}:
             raise ValueError('Duplicate repair issue or invalid disposition')
         ids.add(issue['id'])
     if expected_ids is not None and ids != set(expected_ids):
