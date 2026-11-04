@@ -1,0 +1,3203 @@
+{
+  "date": "2026-11-04",
+  "pre_comparison_push": "2f4b0af",
+  "runs": {
+    "correctness": "20261104T052539Z-correctness-mpazo8yj",
+    "boundary": "20261104T052903Z-boundary-b5jvrm_e",
+    "http": "20261104T052645Z-http-tbtjz5w9",
+    "history": "20261104T052717Z-history-xogv6e3h",
+    "network": "20261104T053253Z-network-6_invfl1"
+  },
+  "environment": {
+    "go": "go version go1.25.8 linux/amd64",
+    "python": "3.10.12",
+    "platform": "Linux-6.8.0-138-generic-x86_64-with-glibc2.35",
+    "cpu": "Intel(R) Core(TM) Ultra 5 245KF"
+  },
+  "cases": {
+    "correctness": [
+      {
+        "candidate": "baseline",
+        "commit": "d1773a72277c2e77028211feb987066662df3728",
+        "repeat": 1,
+        "returncode": 0,
+        "tests": [
+          {
+            "Test": "TestComparisonConcurrent/0",
+            "Action": "pass",
+            "Elapsed": 0.22
+          },
+          {
+            "Test": "TestComparisonConcurrent/1",
+            "Action": "pass",
+            "Elapsed": 0.2
+          },
+          {
+            "Test": "TestComparisonConcurrent/2",
+            "Action": "pass",
+            "Elapsed": 0.24
+          },
+          {
+            "Test": "TestComparisonConcurrent/3",
+            "Action": "pass",
+            "Elapsed": 0.22
+          },
+          {
+            "Test": "TestComparisonConcurrent/4",
+            "Action": "pass",
+            "Elapsed": 0.22
+          },
+          {
+            "Test": "TestComparisonConcurrent/5",
+            "Action": "pass",
+            "Elapsed": 0.22
+          },
+          {
+            "Test": "TestComparisonConcurrent/6",
+            "Action": "pass",
+            "Elapsed": 0.24
+          },
+          {
+            "Test": "TestComparisonConcurrent/7",
+            "Action": "pass",
+            "Elapsed": 0.21
+          },
+          {
+            "Test": "TestComparisonConcurrent/8",
+            "Action": "pass",
+            "Elapsed": 0.24
+          },
+          {
+            "Test": "TestComparisonConcurrent/9",
+            "Action": "pass",
+            "Elapsed": 0.21
+          },
+          {
+            "Test": "TestComparisonConcurrent/10",
+            "Action": "pass",
+            "Elapsed": 0.21
+          },
+          {
+            "Test": "TestComparisonConcurrent/11",
+            "Action": "pass",
+            "Elapsed": 0.22
+          },
+          {
+            "Test": "TestComparisonConcurrent/12",
+            "Action": "pass",
+            "Elapsed": 0.2
+          },
+          {
+            "Test": "TestComparisonConcurrent/13",
+            "Action": "pass",
+            "Elapsed": 0.25
+          },
+          {
+            "Test": "TestComparisonConcurrent/14",
+            "Action": "pass",
+            "Elapsed": 0.21
+          },
+          {
+            "Test": "TestComparisonConcurrent/15",
+            "Action": "pass",
+            "Elapsed": 0.19
+          },
+          {
+            "Test": "TestComparisonConcurrent/16",
+            "Action": "pass",
+            "Elapsed": 0.21
+          },
+          {
+            "Test": "TestComparisonConcurrent/17",
+            "Action": "pass",
+            "Elapsed": 0.22
+          },
+          {
+            "Test": "TestComparisonConcurrent/18",
+            "Action": "pass",
+            "Elapsed": 0.21
+          },
+          {
+            "Test": "TestComparisonConcurrent/19",
+            "Action": "pass",
+            "Elapsed": 0.22
+          },
+          {
+            "Test": "TestComparisonConcurrent",
+            "Action": "pass",
+            "Elapsed": 4.36
+          },
+          {
+            "Test": "TestComparisonCycle",
+            "Action": "pass",
+            "Elapsed": 0.22
+          },
+          {
+            "Test": "TestComparisonRecovery",
+            "Action": "pass",
+            "Elapsed": 0.97
+          }
+        ]
+      },
+      {
+        "candidate": "v000",
+        "commit": "9117e613f184f78bae49a0a0e3d8d39cd1172a8d",
+        "repeat": 1,
+        "returncode": 0,
+        "tests": [
+          {
+            "Test": "TestComparisonConcurrent/0",
+            "Action": "pass",
+            "Elapsed": 0.28
+          },
+          {
+            "Test": "TestComparisonConcurrent/1",
+            "Action": "pass",
+            "Elapsed": 0.28
+          },
+          {
+            "Test": "TestComparisonConcurrent/2",
+            "Action": "pass",
+            "Elapsed": 0.28
+          },
+          {
+            "Test": "TestComparisonConcurrent/3",
+            "Action": "pass",
+            "Elapsed": 0.33
+          },
+          {
+            "Test": "TestComparisonConcurrent/4",
+            "Action": "pass",
+            "Elapsed": 0.3
+          },
+          {
+            "Test": "TestComparisonConcurrent/5",
+            "Action": "pass",
+            "Elapsed": 0.34
+          },
+          {
+            "Test": "TestComparisonConcurrent/6",
+            "Action": "pass",
+            "Elapsed": 0.28
+          },
+          {
+            "Test": "TestComparisonConcurrent/7",
+            "Action": "pass",
+            "Elapsed": 0.28
+          },
+          {
+            "Test": "TestComparisonConcurrent/8",
+            "Action": "pass",
+            "Elapsed": 0.28
+          },
+          {
+            "Test": "TestComparisonConcurrent/9",
+            "Action": "pass",
+            "Elapsed": 0.34
+          },
+          {
+            "Test": "TestComparisonConcurrent/10",
+            "Action": "pass",
+            "Elapsed": 0.26
+          },
+          {
+            "Test": "TestComparisonConcurrent/11",
+            "Action": "pass",
+            "Elapsed": 0.29
+          },
+          {
+            "Test": "TestComparisonConcurrent/12",
+            "Action": "pass",
+            "Elapsed": 0.28
+          },
+          {
+            "Test": "TestComparisonConcurrent/13",
+            "Action": "pass",
+            "Elapsed": 0.3
+          },
+          {
+            "Test": "TestComparisonConcurrent/14",
+            "Action": "pass",
+            "Elapsed": 0.31
+          },
+          {
+            "Test": "TestComparisonConcurrent/15",
+            "Action": "pass",
+            "Elapsed": 0.26
+          },
+          {
+            "Test": "TestComparisonConcurrent/16",
+            "Action": "pass",
+            "Elapsed": 0.3
+          },
+          {
+            "Test": "TestComparisonConcurrent/17",
+            "Action": "pass",
+            "Elapsed": 0.35
+          },
+          {
+            "Test": "TestComparisonConcurrent/18",
+            "Action": "pass",
+            "Elapsed": 0.32
+          },
+          {
+            "Test": "TestComparisonConcurrent/19",
+            "Action": "pass",
+            "Elapsed": 0.29
+          },
+          {
+            "Test": "TestComparisonConcurrent",
+            "Action": "pass",
+            "Elapsed": 5.96
+          },
+          {
+            "Test": "TestComparisonCycle",
+            "Action": "pass",
+            "Elapsed": 0.23
+          },
+          {
+            "Test": "TestComparisonRecovery",
+            "Action": "pass",
+            "Elapsed": 0.95
+          }
+        ]
+      },
+      {
+        "candidate": "v002",
+        "commit": "6d19311d01d5710f48e730efa59bfc5a95281821",
+        "repeat": 1,
+        "returncode": 0,
+        "tests": [
+          {
+            "Test": "TestComparisonConcurrent/0",
+            "Action": "pass",
+            "Elapsed": 0.28
+          },
+          {
+            "Test": "TestComparisonConcurrent/1",
+            "Action": "pass",
+            "Elapsed": 0.25
+          },
+          {
+            "Test": "TestComparisonConcurrent/2",
+            "Action": "pass",
+            "Elapsed": 0.25
+          },
+          {
+            "Test": "TestComparisonConcurrent/3",
+            "Action": "pass",
+            "Elapsed": 0.27
+          },
+          {
+            "Test": "TestComparisonConcurrent/4",
+            "Action": "pass",
+            "Elapsed": 0.29
+          },
+          {
+            "Test": "TestComparisonConcurrent/5",
+            "Action": "pass",
+            "Elapsed": 0.29
+          },
+          {
+            "Test": "TestComparisonConcurrent/6",
+            "Action": "pass",
+            "Elapsed": 0.34
+          },
+          {
+            "Test": "TestComparisonConcurrent/7",
+            "Action": "pass",
+            "Elapsed": 0.29
+          },
+          {
+            "Test": "TestComparisonConcurrent/8",
+            "Action": "pass",
+            "Elapsed": 0.28
+          },
+          {
+            "Test": "TestComparisonConcurrent/9",
+            "Action": "pass",
+            "Elapsed": 0.3
+          },
+          {
+            "Test": "TestComparisonConcurrent/10",
+            "Action": "pass",
+            "Elapsed": 0.27
+          },
+          {
+            "Test": "TestComparisonConcurrent/11",
+            "Action": "pass",
+            "Elapsed": 0.29
+          },
+          {
+            "Test": "TestComparisonConcurrent/12",
+            "Action": "pass",
+            "Elapsed": 0.3
+          },
+          {
+            "Test": "TestComparisonConcurrent/13",
+            "Action": "pass",
+            "Elapsed": 0.29
+          },
+          {
+            "Test": "TestComparisonConcurrent/14",
+            "Action": "pass",
+            "Elapsed": 0.29
+          },
+          {
+            "Test": "TestComparisonConcurrent/15",
+            "Action": "pass",
+            "Elapsed": 0.32
+          },
+          {
+            "Test": "TestComparisonConcurrent/16",
+            "Action": "pass",
+            "Elapsed": 0.28
+          },
+          {
+            "Test": "TestComparisonConcurrent/17",
+            "Action": "pass",
+            "Elapsed": 0.28
+          },
+          {
+            "Test": "TestComparisonConcurrent/18",
+            "Action": "pass",
+            "Elapsed": 0.28
+          },
+          {
+            "Test": "TestComparisonConcurrent/19",
+            "Action": "pass",
+            "Elapsed": 0.29
+          },
+          {
+            "Test": "TestComparisonConcurrent",
+            "Action": "pass",
+            "Elapsed": 5.74
+          },
+          {
+            "Test": "TestComparisonCycle",
+            "Action": "pass",
+            "Elapsed": 0.23
+          },
+          {
+            "Test": "TestComparisonRecovery",
+            "Action": "pass",
+            "Elapsed": 0.95
+          }
+        ]
+      },
+      {
+        "candidate": "v000",
+        "commit": "9117e613f184f78bae49a0a0e3d8d39cd1172a8d",
+        "repeat": 2,
+        "returncode": 0,
+        "tests": [
+          {
+            "Test": "TestComparisonConcurrent/0",
+            "Action": "pass",
+            "Elapsed": 0.33
+          },
+          {
+            "Test": "TestComparisonConcurrent/1",
+            "Action": "pass",
+            "Elapsed": 0.28
+          },
+          {
+            "Test": "TestComparisonConcurrent/2",
+            "Action": "pass",
+            "Elapsed": 0.31
+          },
+          {
+            "Test": "TestComparisonConcurrent/3",
+            "Action": "pass",
+            "Elapsed": 0.32
+          },
+          {
+            "Test": "TestComparisonConcurrent/4",
+            "Action": "pass",
+            "Elapsed": 0.32
+          },
+          {
+            "Test": "TestComparisonConcurrent/5",
+            "Action": "pass",
+            "Elapsed": 0.3
+          },
+          {
+            "Test": "TestComparisonConcurrent/6",
+            "Action": "pass",
+            "Elapsed": 0.3
+          },
+          {
+            "Test": "TestComparisonConcurrent/7",
+            "Action": "pass",
+            "Elapsed": 0.34
+          },
+          {
+            "Test": "TestComparisonConcurrent/8",
+            "Action": "pass",
+            "Elapsed": 0.29
+          },
+          {
+            "Test": "TestComparisonConcurrent/9",
+            "Action": "pass",
+            "Elapsed": 0.31
+          },
+          {
+            "Test": "TestComparisonConcurrent/10",
+            "Action": "pass",
+            "Elapsed": 0.29
+          },
+          {
+            "Test": "TestComparisonConcurrent/11",
+            "Action": "pass",
+            "Elapsed": 0.31
+          },
+          {
+            "Test": "TestComparisonConcurrent/12",
+            "Action": "pass",
+            "Elapsed": 0.33
+          },
+          {
+            "Test": "TestComparisonConcurrent/13",
+            "Action": "pass",
+            "Elapsed": 0.28
+          },
+          {
+            "Test": "TestComparisonConcurrent/14",
+            "Action": "pass",
+            "Elapsed": 0.3
+          },
+          {
+            "Test": "TestComparisonConcurrent/15",
+            "Action": "pass",
+            "Elapsed": 0.31
+          },
+          {
+            "Test": "TestComparisonConcurrent/16",
+            "Action": "pass",
+            "Elapsed": 0.29
+          },
+          {
+            "Test": "TestComparisonConcurrent/17",
+            "Action": "pass",
+            "Elapsed": 0.31
+          },
+          {
+            "Test": "TestComparisonConcurrent/18",
+            "Action": "pass",
+            "Elapsed": 0.28
+          },
+          {
+            "Test": "TestComparisonConcurrent/19",
+            "Action": "pass",
+            "Elapsed": 0.29
+          },
+          {
+            "Test": "TestComparisonConcurrent",
+            "Action": "pass",
+            "Elapsed": 6.11
+          },
+          {
+            "Test": "TestComparisonCycle",
+            "Action": "pass",
+            "Elapsed": 0.22
+          },
+          {
+            "Test": "TestComparisonRecovery",
+            "Action": "pass",
+            "Elapsed": 0.95
+          }
+        ]
+      },
+      {
+        "candidate": "v002",
+        "commit": "6d19311d01d5710f48e730efa59bfc5a95281821",
+        "repeat": 2,
+        "returncode": 0,
+        "tests": [
+          {
+            "Test": "TestComparisonConcurrent/0",
+            "Action": "pass",
+            "Elapsed": 0.3
+          },
+          {
+            "Test": "TestComparisonConcurrent/1",
+            "Action": "pass",
+            "Elapsed": 0.26
+          },
+          {
+            "Test": "TestComparisonConcurrent/2",
+            "Action": "pass",
+            "Elapsed": 0.27
+          },
+          {
+            "Test": "TestComparisonConcurrent/3",
+            "Action": "pass",
+            "Elapsed": 0.29
+          },
+          {
+            "Test": "TestComparisonConcurrent/4",
+            "Action": "pass",
+            "Elapsed": 0.26
+          },
+          {
+            "Test": "TestComparisonConcurrent/5",
+            "Action": "pass",
+            "Elapsed": 0.29
+          },
+          {
+            "Test": "TestComparisonConcurrent/6",
+            "Action": "pass",
+            "Elapsed": 0.3
+          },
+          {
+            "Test": "TestComparisonConcurrent/7",
+            "Action": "pass",
+            "Elapsed": 0.27
+          },
+          {
+            "Test": "TestComparisonConcurrent/8",
+            "Action": "pass",
+            "Elapsed": 0.23
+          },
+          {
+            "Test": "TestComparisonConcurrent/9",
+            "Action": "pass",
+            "Elapsed": 0.27
+          },
+          {
+            "Test": "TestComparisonConcurrent/10",
+            "Action": "pass",
+            "Elapsed": 0.27
+          },
+          {
+            "Test": "TestComparisonConcurrent/11",
+            "Action": "pass",
+            "Elapsed": 0.27
+          },
+          {
+            "Test": "TestComparisonConcurrent/12",
+            "Action": "pass",
+            "Elapsed": 0.25
+          },
+          {
+            "Test": "TestComparisonConcurrent/13",
+            "Action": "pass",
+            "Elapsed": 0.25
+          },
+          {
+            "Test": "TestComparisonConcurrent/14",
+            "Action": "pass",
+            "Elapsed": 0.25
+          },
+          {
+            "Test": "TestComparisonConcurrent/15",
+            "Action": "pass",
+            "Elapsed": 0.24
+          },
+          {
+            "Test": "TestComparisonConcurrent/16",
+            "Action": "pass",
+            "Elapsed": 0.25
+          },
+          {
+            "Test": "TestComparisonConcurrent/17",
+            "Action": "pass",
+            "Elapsed": 0.27
+          },
+          {
+            "Test": "TestComparisonConcurrent/18",
+            "Action": "pass",
+            "Elapsed": 0.27
+          },
+          {
+            "Test": "TestComparisonConcurrent/19",
+            "Action": "pass",
+            "Elapsed": 0.26
+          },
+          {
+            "Test": "TestComparisonConcurrent",
+            "Action": "pass",
+            "Elapsed": 5.34
+          },
+          {
+            "Test": "TestComparisonCycle",
+            "Action": "pass",
+            "Elapsed": 0.22
+          },
+          {
+            "Test": "TestComparisonRecovery",
+            "Action": "pass",
+            "Elapsed": 0.95
+          }
+        ]
+      },
+      {
+        "candidate": "baseline",
+        "commit": "d1773a72277c2e77028211feb987066662df3728",
+        "repeat": 2,
+        "returncode": 0,
+        "tests": [
+          {
+            "Test": "TestComparisonConcurrent/0",
+            "Action": "pass",
+            "Elapsed": 0.17
+          },
+          {
+            "Test": "TestComparisonConcurrent/1",
+            "Action": "pass",
+            "Elapsed": 0.16
+          },
+          {
+            "Test": "TestComparisonConcurrent/2",
+            "Action": "pass",
+            "Elapsed": 0.2
+          },
+          {
+            "Test": "TestComparisonConcurrent/3",
+            "Action": "pass",
+            "Elapsed": 0.25
+          },
+          {
+            "Test": "TestComparisonConcurrent/4",
+            "Action": "pass",
+            "Elapsed": 0.21
+          },
+          {
+            "Test": "TestComparisonConcurrent/5",
+            "Action": "pass",
+            "Elapsed": 0.21
+          },
+          {
+            "Test": "TestComparisonConcurrent/6",
+            "Action": "pass",
+            "Elapsed": 0.21
+          },
+          {
+            "Test": "TestComparisonConcurrent/7",
+            "Action": "pass",
+            "Elapsed": 0.21
+          },
+          {
+            "Test": "TestComparisonConcurrent/8",
+            "Action": "pass",
+            "Elapsed": 0.22
+          },
+          {
+            "Test": "TestComparisonConcurrent/9",
+            "Action": "pass",
+            "Elapsed": 0.21
+          },
+          {
+            "Test": "TestComparisonConcurrent/10",
+            "Action": "pass",
+            "Elapsed": 0.2
+          },
+          {
+            "Test": "TestComparisonConcurrent/11",
+            "Action": "pass",
+            "Elapsed": 0.23
+          },
+          {
+            "Test": "TestComparisonConcurrent/12",
+            "Action": "pass",
+            "Elapsed": 0.22
+          },
+          {
+            "Test": "TestComparisonConcurrent/13",
+            "Action": "pass",
+            "Elapsed": 0.2
+          },
+          {
+            "Test": "TestComparisonConcurrent/14",
+            "Action": "pass",
+            "Elapsed": 0.23
+          },
+          {
+            "Test": "TestComparisonConcurrent/15",
+            "Action": "pass",
+            "Elapsed": 0.21
+          },
+          {
+            "Test": "TestComparisonConcurrent/16",
+            "Action": "pass",
+            "Elapsed": 0.2
+          },
+          {
+            "Test": "TestComparisonConcurrent/17",
+            "Action": "pass",
+            "Elapsed": 0.21
+          },
+          {
+            "Test": "TestComparisonConcurrent/18",
+            "Action": "pass",
+            "Elapsed": 0.21
+          },
+          {
+            "Test": "TestComparisonConcurrent/19",
+            "Action": "pass",
+            "Elapsed": 0.21
+          },
+          {
+            "Test": "TestComparisonConcurrent",
+            "Action": "pass",
+            "Elapsed": 4.19
+          },
+          {
+            "Test": "TestComparisonCycle",
+            "Action": "pass",
+            "Elapsed": 0.22
+          },
+          {
+            "Test": "TestComparisonRecovery",
+            "Action": "pass",
+            "Elapsed": 0.98
+          }
+        ]
+      },
+      {
+        "candidate": "v002",
+        "commit": "6d19311d01d5710f48e730efa59bfc5a95281821",
+        "repeat": 3,
+        "returncode": 0,
+        "tests": [
+          {
+            "Test": "TestComparisonConcurrent/0",
+            "Action": "pass",
+            "Elapsed": 0.26
+          },
+          {
+            "Test": "TestComparisonConcurrent/1",
+            "Action": "pass",
+            "Elapsed": 0.2
+          },
+          {
+            "Test": "TestComparisonConcurrent/2",
+            "Action": "pass",
+            "Elapsed": 0.26
+          },
+          {
+            "Test": "TestComparisonConcurrent/3",
+            "Action": "pass",
+            "Elapsed": 0.31
+          },
+          {
+            "Test": "TestComparisonConcurrent/4",
+            "Action": "pass",
+            "Elapsed": 0.29
+          },
+          {
+            "Test": "TestComparisonConcurrent/5",
+            "Action": "pass",
+            "Elapsed": 0.3
+          },
+          {
+            "Test": "TestComparisonConcurrent/6",
+            "Action": "pass",
+            "Elapsed": 0.29
+          },
+          {
+            "Test": "TestComparisonConcurrent/7",
+            "Action": "pass",
+            "Elapsed": 0.27
+          },
+          {
+            "Test": "TestComparisonConcurrent/8",
+            "Action": "pass",
+            "Elapsed": 0.27
+          },
+          {
+            "Test": "TestComparisonConcurrent/9",
+            "Action": "pass",
+            "Elapsed": 0.27
+          },
+          {
+            "Test": "TestComparisonConcurrent/10",
+            "Action": "pass",
+            "Elapsed": 0.26
+          },
+          {
+            "Test": "TestComparisonConcurrent/11",
+            "Action": "pass",
+            "Elapsed": 0.3
+          },
+          {
+            "Test": "TestComparisonConcurrent/12",
+            "Action": "pass",
+            "Elapsed": 0.27
+          },
+          {
+            "Test": "TestComparisonConcurrent/13",
+            "Action": "pass",
+            "Elapsed": 0.31
+          },
+          {
+            "Test": "TestComparisonConcurrent/14",
+            "Action": "pass",
+            "Elapsed": 0.31
+          },
+          {
+            "Test": "TestComparisonConcurrent/15",
+            "Action": "pass",
+            "Elapsed": 0.28
+          },
+          {
+            "Test": "TestComparisonConcurrent/16",
+            "Action": "pass",
+            "Elapsed": 0.29
+          },
+          {
+            "Test": "TestComparisonConcurrent/17",
+            "Action": "pass",
+            "Elapsed": 0.28
+          },
+          {
+            "Test": "TestComparisonConcurrent/18",
+            "Action": "pass",
+            "Elapsed": 0.29
+          },
+          {
+            "Test": "TestComparisonConcurrent/19",
+            "Action": "pass",
+            "Elapsed": 0.29
+          },
+          {
+            "Test": "TestComparisonConcurrent",
+            "Action": "pass",
+            "Elapsed": 5.63
+          },
+          {
+            "Test": "TestComparisonCycle",
+            "Action": "pass",
+            "Elapsed": 0.23
+          },
+          {
+            "Test": "TestComparisonRecovery",
+            "Action": "pass",
+            "Elapsed": 0.95
+          }
+        ]
+      },
+      {
+        "candidate": "baseline",
+        "commit": "d1773a72277c2e77028211feb987066662df3728",
+        "repeat": 3,
+        "returncode": 0,
+        "tests": [
+          {
+            "Test": "TestComparisonConcurrent/0",
+            "Action": "pass",
+            "Elapsed": 0.24
+          },
+          {
+            "Test": "TestComparisonConcurrent/1",
+            "Action": "pass",
+            "Elapsed": 0.25
+          },
+          {
+            "Test": "TestComparisonConcurrent/2",
+            "Action": "pass",
+            "Elapsed": 0.27
+          },
+          {
+            "Test": "TestComparisonConcurrent/3",
+            "Action": "pass",
+            "Elapsed": 0.27
+          },
+          {
+            "Test": "TestComparisonConcurrent/4",
+            "Action": "pass",
+            "Elapsed": 0.25
+          },
+          {
+            "Test": "TestComparisonConcurrent/5",
+            "Action": "pass",
+            "Elapsed": 0.27
+          },
+          {
+            "Test": "TestComparisonConcurrent/6",
+            "Action": "pass",
+            "Elapsed": 0.36
+          },
+          {
+            "Test": "TestComparisonConcurrent/7",
+            "Action": "pass",
+            "Elapsed": 0.36
+          },
+          {
+            "Test": "TestComparisonConcurrent/8",
+            "Action": "pass",
+            "Elapsed": 0.33
+          },
+          {
+            "Test": "TestComparisonConcurrent/9",
+            "Action": "pass",
+            "Elapsed": 0.34
+          },
+          {
+            "Test": "TestComparisonConcurrent/10",
+            "Action": "pass",
+            "Elapsed": 0.31
+          },
+          {
+            "Test": "TestComparisonConcurrent/11",
+            "Action": "pass",
+            "Elapsed": 0.36
+          },
+          {
+            "Test": "TestComparisonConcurrent/12",
+            "Action": "pass",
+            "Elapsed": 0.36
+          },
+          {
+            "Test": "TestComparisonConcurrent/13",
+            "Action": "pass",
+            "Elapsed": 0.3
+          },
+          {
+            "Test": "TestComparisonConcurrent/14",
+            "Action": "pass",
+            "Elapsed": 0.26
+          },
+          {
+            "Test": "TestComparisonConcurrent/15",
+            "Action": "pass",
+            "Elapsed": 0.29
+          },
+          {
+            "Test": "TestComparisonConcurrent/16",
+            "Action": "pass",
+            "Elapsed": 0.24
+          },
+          {
+            "Test": "TestComparisonConcurrent/17",
+            "Action": "pass",
+            "Elapsed": 0.27
+          },
+          {
+            "Test": "TestComparisonConcurrent/18",
+            "Action": "pass",
+            "Elapsed": 0.2
+          },
+          {
+            "Test": "TestComparisonConcurrent/19",
+            "Action": "pass",
+            "Elapsed": 0.18
+          },
+          {
+            "Test": "TestComparisonConcurrent",
+            "Action": "pass",
+            "Elapsed": 5.72
+          },
+          {
+            "Test": "TestComparisonCycle",
+            "Action": "pass",
+            "Elapsed": 0.22
+          },
+          {
+            "Test": "TestComparisonRecovery",
+            "Action": "pass",
+            "Elapsed": 1.02
+          }
+        ]
+      },
+      {
+        "candidate": "v000",
+        "commit": "9117e613f184f78bae49a0a0e3d8d39cd1172a8d",
+        "repeat": 3,
+        "returncode": 0,
+        "tests": [
+          {
+            "Test": "TestComparisonConcurrent/0",
+            "Action": "pass",
+            "Elapsed": 0.33
+          },
+          {
+            "Test": "TestComparisonConcurrent/1",
+            "Action": "pass",
+            "Elapsed": 0.29
+          },
+          {
+            "Test": "TestComparisonConcurrent/2",
+            "Action": "pass",
+            "Elapsed": 0.28
+          },
+          {
+            "Test": "TestComparisonConcurrent/3",
+            "Action": "pass",
+            "Elapsed": 0.31
+          },
+          {
+            "Test": "TestComparisonConcurrent/4",
+            "Action": "pass",
+            "Elapsed": 0.32
+          },
+          {
+            "Test": "TestComparisonConcurrent/5",
+            "Action": "pass",
+            "Elapsed": 0.29
+          },
+          {
+            "Test": "TestComparisonConcurrent/6",
+            "Action": "pass",
+            "Elapsed": 0.29
+          },
+          {
+            "Test": "TestComparisonConcurrent/7",
+            "Action": "pass",
+            "Elapsed": 0.24
+          },
+          {
+            "Test": "TestComparisonConcurrent/8",
+            "Action": "pass",
+            "Elapsed": 0.23
+          },
+          {
+            "Test": "TestComparisonConcurrent/9",
+            "Action": "pass",
+            "Elapsed": 0.3
+          },
+          {
+            "Test": "TestComparisonConcurrent/10",
+            "Action": "pass",
+            "Elapsed": 0.27
+          },
+          {
+            "Test": "TestComparisonConcurrent/11",
+            "Action": "pass",
+            "Elapsed": 0.28
+          },
+          {
+            "Test": "TestComparisonConcurrent/12",
+            "Action": "pass",
+            "Elapsed": 0.27
+          },
+          {
+            "Test": "TestComparisonConcurrent/13",
+            "Action": "pass",
+            "Elapsed": 0.28
+          },
+          {
+            "Test": "TestComparisonConcurrent/14",
+            "Action": "pass",
+            "Elapsed": 0.29
+          },
+          {
+            "Test": "TestComparisonConcurrent/15",
+            "Action": "pass",
+            "Elapsed": 0.31
+          },
+          {
+            "Test": "TestComparisonConcurrent/16",
+            "Action": "pass",
+            "Elapsed": 0.28
+          },
+          {
+            "Test": "TestComparisonConcurrent/17",
+            "Action": "pass",
+            "Elapsed": 0.28
+          },
+          {
+            "Test": "TestComparisonConcurrent/18",
+            "Action": "pass",
+            "Elapsed": 0.31
+          },
+          {
+            "Test": "TestComparisonConcurrent/19",
+            "Action": "pass",
+            "Elapsed": 0.27
+          },
+          {
+            "Test": "TestComparisonConcurrent",
+            "Action": "pass",
+            "Elapsed": 5.72
+          },
+          {
+            "Test": "TestComparisonCycle",
+            "Action": "pass",
+            "Elapsed": 0.22
+          },
+          {
+            "Test": "TestComparisonRecovery",
+            "Action": "pass",
+            "Elapsed": 0.95
+          }
+        ]
+      }
+    ],
+    "boundary": [
+      {
+        "candidate": "baseline",
+        "commit": "d1773a72277c2e77028211feb987066662df3728",
+        "repeat": 1,
+        "returncode": 1,
+        "tests": [
+          {
+            "Test": "TestComparisonDelta",
+            "Action": "fail",
+            "Elapsed": 0.22
+          },
+          {
+            "Test": "TestComparisonMemberIdentity/ordinary",
+            "Action": "pass",
+            "Elapsed": 0.03
+          },
+          {
+            "Test": "TestComparisonMemberIdentity/newline",
+            "Action": "pass",
+            "Elapsed": 0.02
+          },
+          {
+            "Test": "TestComparisonMemberIdentity/trailing_space",
+            "Action": "pass",
+            "Elapsed": 0.02
+          },
+          {
+            "Test": "TestComparisonMemberIdentity/large",
+            "Action": "pass",
+            "Elapsed": 0.88
+          },
+          {
+            "Test": "TestComparisonMemberIdentity",
+            "Action": "pass",
+            "Elapsed": 0.96
+          }
+        ]
+      },
+      {
+        "candidate": "v000",
+        "commit": "9117e613f184f78bae49a0a0e3d8d39cd1172a8d",
+        "repeat": 1,
+        "returncode": 1,
+        "tests": [
+          {
+            "Test": "TestComparisonDelta",
+            "Action": "pass",
+            "Elapsed": 0
+          },
+          {
+            "Test": "TestComparisonMemberIdentity/ordinary",
+            "Action": "pass",
+            "Elapsed": 0.02
+          },
+          {
+            "Test": "TestComparisonMemberIdentity/newline",
+            "Action": "fail",
+            "Elapsed": 8.01
+          },
+          {
+            "Test": "TestComparisonMemberIdentity/trailing_space",
+            "Action": "fail",
+            "Elapsed": 8.01
+          },
+          {
+            "Test": "TestComparisonMemberIdentity/large",
+            "Action": "pass",
+            "Elapsed": 4.26
+          },
+          {
+            "Test": "TestComparisonMemberIdentity",
+            "Action": "fail",
+            "Elapsed": 20.31
+          }
+        ]
+      },
+      {
+        "candidate": "v001",
+        "commit": "e6c15b4aec4bc9e25699609c287f47f200740a23",
+        "repeat": 1,
+        "returncode": 1,
+        "tests": [
+          {
+            "Test": "TestComparisonDelta",
+            "Action": "pass",
+            "Elapsed": 0
+          },
+          {
+            "Test": "TestComparisonMemberIdentity/ordinary",
+            "Action": "pass",
+            "Elapsed": 0.02
+          },
+          {
+            "Test": "TestComparisonMemberIdentity/newline",
+            "Action": "pass",
+            "Elapsed": 0.02
+          },
+          {
+            "Test": "TestComparisonMemberIdentity/trailing_space",
+            "Action": "pass",
+            "Elapsed": 0.01
+          },
+          {
+            "Test": "TestComparisonMemberIdentity/large",
+            "Action": "fail",
+            "Elapsed": 8.01
+          },
+          {
+            "Test": "TestComparisonMemberIdentity",
+            "Action": "fail",
+            "Elapsed": 8.06
+          }
+        ]
+      },
+      {
+        "candidate": "v002",
+        "commit": "6d19311d01d5710f48e730efa59bfc5a95281821",
+        "repeat": 1,
+        "returncode": 0,
+        "tests": [
+          {
+            "Test": "TestComparisonDelta",
+            "Action": "pass",
+            "Elapsed": 0
+          },
+          {
+            "Test": "TestComparisonMemberIdentity/ordinary",
+            "Action": "pass",
+            "Elapsed": 0.02
+          },
+          {
+            "Test": "TestComparisonMemberIdentity/newline",
+            "Action": "pass",
+            "Elapsed": 0.01
+          },
+          {
+            "Test": "TestComparisonMemberIdentity/trailing_space",
+            "Action": "pass",
+            "Elapsed": 0.01
+          },
+          {
+            "Test": "TestComparisonMemberIdentity/large",
+            "Action": "pass",
+            "Elapsed": 3.83
+          },
+          {
+            "Test": "TestComparisonMemberIdentity",
+            "Action": "pass",
+            "Elapsed": 3.87
+          }
+        ]
+      }
+    ],
+    "http": [
+      {
+        "candidate": "baseline",
+        "results": [
+          {
+            "case": "ordinary",
+            "request": "{\"Configuration\": \"comparison\", \"Coordinator\": \"a\", \"ID\": {\"client_id\": \"00000000000000000000000000000001\", \"request_seq\": 1}, \"Operation\": {\"Kind\": \"Put\", \"Key\": \"ordinary\", \"Value\": \"value\"}}",
+            "response": {
+              "http_status": 200,
+              "body": {
+                "status": "outcome",
+                "outcome": {
+                  "Value": "value",
+                  "Found": true,
+                  "Error": ""
+                }
+              }
+            },
+            "subsequent_read": {
+              "http_status": 200,
+              "body": {
+                "status": "outcome",
+                "outcome": {
+                  "Value": "value",
+                  "Found": true,
+                  "Error": ""
+                }
+              }
+            }
+          },
+          {
+            "case": "ascii_duplicate",
+            "request": "{\"Configuration\": \"comparison\", \"Coordinator\": \"a\", \"ID\": {\"client_id\": \"00000000000000000000000000000001\", \"request_seq\": 11, \"request_seq\": 12}, \"Operation\": {\"Kind\": \"Put\", \"Key\": \"ascii_duplicate\", \"Value\": \"value\"}}",
+            "response": {
+              "http_status": 400,
+              "body": {
+                "status": "rejected",
+                "outcome": {
+                  "Value": "",
+                  "Found": false,
+                  "Error": ""
+                },
+                "error": "malformed command body"
+              }
+            },
+            "subsequent_read": {
+              "http_status": 200,
+              "body": {
+                "status": "outcome",
+                "outcome": {
+                  "Value": "",
+                  "Found": false,
+                  "Error": ""
+                }
+              }
+            }
+          },
+          {
+            "case": "unicode_alias",
+            "request": "{\"Configuration\": \"comparison\", \"Coordinator\": \"a\", \"ID\": {\"client_id\": \"00000000000000000000000000000001\", \"request_seq\": 21, \"requeſt_ſeq\": 22}, \"Operation\": {\"Kind\": \"Put\", \"Key\": \"unicode_alias\", \"Value\": \"value\"}}",
+            "response": {
+              "http_status": 200,
+              "body": {
+                "status": "outcome",
+                "outcome": {
+                  "Value": "value",
+                  "Found": true,
+                  "Error": ""
+                }
+              }
+            },
+            "subsequent_read": {
+              "http_status": 200,
+              "body": {
+                "status": "outcome",
+                "outcome": {
+                  "Value": "value",
+                  "Found": true,
+                  "Error": ""
+                }
+              }
+            }
+          }
+        ]
+      },
+      {
+        "candidate": "v000",
+        "results": [
+          {
+            "case": "ordinary",
+            "request": "{\"configuration\": \"comparison\", \"coordinator\": \"a\", \"id\": {\"client\": \"00000000000000000000000000000001\", \"seq\": 1}, \"operation\": {\"type\": \"put\", \"key\": \"ordinary\", \"value\": \"value\"}}",
+            "response": {
+              "http_status": 200,
+              "body": {
+                "status": "executed",
+                "command": {
+                  "configuration": "comparison",
+                  "id": {
+                    "client": "00000000000000000000000000000001",
+                    "seq": 1
+                  },
+                  "coordinator": "a",
+                  "operation": {
+                    "type": "put",
+                    "key": "ordinary",
+                    "value": "value"
+                  }
+                },
+                "result": {
+                  "value": "value",
+                  "found": true
+                }
+              }
+            },
+            "subsequent_read": {
+              "http_status": 200,
+              "body": {
+                "status": "executed",
+                "command": {
+                  "configuration": "comparison",
+                  "id": {
+                    "client": "00000000000000000000000000000001",
+                    "seq": 3
+                  },
+                  "coordinator": "a",
+                  "operation": {
+                    "type": "get",
+                    "key": "ordinary"
+                  }
+                },
+                "result": {
+                  "value": "value",
+                  "found": true
+                }
+              }
+            }
+          },
+          {
+            "case": "ascii_duplicate",
+            "request": "{\"configuration\": \"comparison\", \"coordinator\": \"a\", \"id\": {\"client\": \"00000000000000000000000000000001\", \"seq\": 11, \"seq\": 12}, \"operation\": {\"type\": \"put\", \"key\": \"ascii_duplicate\", \"value\": \"value\"}}",
+            "response": {
+              "http_status": 200,
+              "body": {
+                "status": "executed",
+                "command": {
+                  "configuration": "comparison",
+                  "id": {
+                    "client": "00000000000000000000000000000001",
+                    "seq": 12
+                  },
+                  "coordinator": "a",
+                  "operation": {
+                    "type": "put",
+                    "key": "ascii_duplicate",
+                    "value": "value"
+                  }
+                },
+                "result": {
+                  "value": "value",
+                  "found": true
+                }
+              }
+            },
+            "subsequent_read": {
+              "http_status": 200,
+              "body": {
+                "status": "executed",
+                "command": {
+                  "configuration": "comparison",
+                  "id": {
+                    "client": "00000000000000000000000000000001",
+                    "seq": 13
+                  },
+                  "coordinator": "a",
+                  "operation": {
+                    "type": "get",
+                    "key": "ascii_duplicate"
+                  }
+                },
+                "result": {
+                  "value": "value",
+                  "found": true
+                }
+              }
+            }
+          },
+          {
+            "case": "unicode_alias",
+            "request": "{\"configuration\": \"comparison\", \"coordinator\": \"a\", \"id\": {\"client\": \"00000000000000000000000000000001\", \"seq\": 21, \"ſeq\": 22}, \"operation\": {\"type\": \"put\", \"key\": \"unicode_alias\", \"value\": \"value\"}}",
+            "response": {
+              "http_status": 200,
+              "body": {
+                "status": "executed",
+                "command": {
+                  "configuration": "comparison",
+                  "id": {
+                    "client": "00000000000000000000000000000001",
+                    "seq": 22
+                  },
+                  "coordinator": "a",
+                  "operation": {
+                    "type": "put",
+                    "key": "unicode_alias",
+                    "value": "value"
+                  }
+                },
+                "result": {
+                  "value": "value",
+                  "found": true
+                }
+              }
+            },
+            "subsequent_read": {
+              "http_status": 200,
+              "body": {
+                "status": "executed",
+                "command": {
+                  "configuration": "comparison",
+                  "id": {
+                    "client": "00000000000000000000000000000001",
+                    "seq": 23
+                  },
+                  "coordinator": "a",
+                  "operation": {
+                    "type": "get",
+                    "key": "unicode_alias"
+                  }
+                },
+                "result": {
+                  "value": "value",
+                  "found": true
+                }
+              }
+            }
+          }
+        ]
+      },
+      {
+        "candidate": "v002",
+        "results": [
+          {
+            "case": "ordinary",
+            "request": "{\"configuration\": \"comparison\", \"coordinator\": \"a\", \"id\": {\"client\": \"00000000000000000000000000000001\", \"seq\": 1}, \"operation\": {\"type\": \"put\", \"key\": \"ordinary\", \"value\": \"value\"}}",
+            "response": {
+              "http_status": 200,
+              "body": {
+                "status": "executed",
+                "command": {
+                  "configuration": "comparison",
+                  "id": {
+                    "client": "00000000000000000000000000000001",
+                    "seq": 1
+                  },
+                  "coordinator": "a",
+                  "operation": {
+                    "type": "put",
+                    "key": "ordinary",
+                    "value": "value"
+                  }
+                },
+                "result": {
+                  "value": "value",
+                  "found": true
+                }
+              }
+            },
+            "subsequent_read": {
+              "http_status": 200,
+              "body": {
+                "status": "executed",
+                "command": {
+                  "configuration": "comparison",
+                  "id": {
+                    "client": "00000000000000000000000000000001",
+                    "seq": 3
+                  },
+                  "coordinator": "a",
+                  "operation": {
+                    "type": "get",
+                    "key": "ordinary"
+                  }
+                },
+                "result": {
+                  "value": "value",
+                  "found": true
+                }
+              }
+            }
+          },
+          {
+            "case": "ascii_duplicate",
+            "request": "{\"configuration\": \"comparison\", \"coordinator\": \"a\", \"id\": {\"client\": \"00000000000000000000000000000001\", \"seq\": 11, \"seq\": 12}, \"operation\": {\"type\": \"put\", \"key\": \"ascii_duplicate\", \"value\": \"value\"}}",
+            "response": {
+              "http_status": 200,
+              "body": {
+                "status": "executed",
+                "command": {
+                  "configuration": "comparison",
+                  "id": {
+                    "client": "00000000000000000000000000000001",
+                    "seq": 12
+                  },
+                  "coordinator": "a",
+                  "operation": {
+                    "type": "put",
+                    "key": "ascii_duplicate",
+                    "value": "value"
+                  }
+                },
+                "result": {
+                  "value": "value",
+                  "found": true
+                }
+              }
+            },
+            "subsequent_read": {
+              "http_status": 200,
+              "body": {
+                "status": "executed",
+                "command": {
+                  "configuration": "comparison",
+                  "id": {
+                    "client": "00000000000000000000000000000001",
+                    "seq": 13
+                  },
+                  "coordinator": "a",
+                  "operation": {
+                    "type": "get",
+                    "key": "ascii_duplicate"
+                  }
+                },
+                "result": {
+                  "value": "value",
+                  "found": true
+                }
+              }
+            }
+          },
+          {
+            "case": "unicode_alias",
+            "request": "{\"configuration\": \"comparison\", \"coordinator\": \"a\", \"id\": {\"client\": \"00000000000000000000000000000001\", \"seq\": 21, \"ſeq\": 22}, \"operation\": {\"type\": \"put\", \"key\": \"unicode_alias\", \"value\": \"value\"}}",
+            "response": {
+              "http_status": 200,
+              "body": {
+                "status": "executed",
+                "command": {
+                  "configuration": "comparison",
+                  "id": {
+                    "client": "00000000000000000000000000000001",
+                    "seq": 22
+                  },
+                  "coordinator": "a",
+                  "operation": {
+                    "type": "put",
+                    "key": "unicode_alias",
+                    "value": "value"
+                  }
+                },
+                "result": {
+                  "value": "value",
+                  "found": true
+                }
+              }
+            },
+            "subsequent_read": {
+              "http_status": 200,
+              "body": {
+                "status": "executed",
+                "command": {
+                  "configuration": "comparison",
+                  "id": {
+                    "client": "00000000000000000000000000000001",
+                    "seq": 23
+                  },
+                  "coordinator": "a",
+                  "operation": {
+                    "type": "get",
+                    "key": "unicode_alias"
+                  }
+                },
+                "result": {
+                  "value": "value",
+                  "found": true
+                }
+              }
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "history": {
+    "baseline": {
+      "first_batch_mean_ns_median": 34861,
+      "last_batch_mean_ns_median": 606296,
+      "ratio": 17.39181320099825,
+      "trials": [
+        [
+          {
+            "first": 1,
+            "last": 1000,
+            "mean_ns": 32825,
+            "p50_ns": 24610,
+            "p95_ns": 61725,
+            "heap_alloc": 2733408
+          },
+          {
+            "first": 1001,
+            "last": 2000,
+            "mean_ns": 75905,
+            "p50_ns": 54712,
+            "p95_ns": 176656,
+            "heap_alloc": 2909208
+          },
+          {
+            "first": 2001,
+            "last": 3000,
+            "mean_ns": 152059,
+            "p50_ns": 119963,
+            "p95_ns": 345216,
+            "heap_alloc": 4602968
+          },
+          {
+            "first": 3001,
+            "last": 4000,
+            "mean_ns": 207136,
+            "p50_ns": 184291,
+            "p95_ns": 413200,
+            "heap_alloc": 6287376
+          },
+          {
+            "first": 4001,
+            "last": 5000,
+            "mean_ns": 212748,
+            "p50_ns": 164420,
+            "p95_ns": 503591,
+            "heap_alloc": 6604256
+          },
+          {
+            "first": 5001,
+            "last": 6000,
+            "mean_ns": 261700,
+            "p50_ns": 200203,
+            "p95_ns": 608617,
+            "heap_alloc": 5725576
+          },
+          {
+            "first": 6001,
+            "last": 7000,
+            "mean_ns": 338729,
+            "p50_ns": 258837,
+            "p95_ns": 796882,
+            "heap_alloc": 8732704
+          },
+          {
+            "first": 7001,
+            "last": 8000,
+            "mean_ns": 400601,
+            "p50_ns": 303395,
+            "p95_ns": 955700,
+            "heap_alloc": 13232080
+          },
+          {
+            "first": 8001,
+            "last": 9000,
+            "mean_ns": 444035,
+            "p50_ns": 377424,
+            "p95_ns": 905446,
+            "heap_alloc": 14475776
+          },
+          {
+            "first": 9001,
+            "last": 10000,
+            "mean_ns": 622777,
+            "p50_ns": 546515,
+            "p95_ns": 1323120,
+            "heap_alloc": 14541504
+          },
+          {
+            "first": 10001,
+            "last": 11000,
+            "mean_ns": 620757,
+            "p50_ns": 505147,
+            "p95_ns": 1384895,
+            "heap_alloc": 13886600
+          },
+          {
+            "first": 11001,
+            "last": 12000,
+            "mean_ns": 614012,
+            "p50_ns": 566310,
+            "p95_ns": 1292685,
+            "heap_alloc": 12524976
+          }
+        ],
+        [
+          {
+            "first": 1,
+            "last": 1000,
+            "mean_ns": 34861,
+            "p50_ns": 23446,
+            "p95_ns": 85395,
+            "heap_alloc": 2776824
+          },
+          {
+            "first": 1001,
+            "last": 2000,
+            "mean_ns": 74294,
+            "p50_ns": 55213,
+            "p95_ns": 164837,
+            "heap_alloc": 2544168
+          },
+          {
+            "first": 2001,
+            "last": 3000,
+            "mean_ns": 102315,
+            "p50_ns": 80638,
+            "p95_ns": 217106,
+            "heap_alloc": 3950688
+          },
+          {
+            "first": 3001,
+            "last": 4000,
+            "mean_ns": 150029,
+            "p50_ns": 115882,
+            "p95_ns": 339759,
+            "heap_alloc": 5628920
+          },
+          {
+            "first": 4001,
+            "last": 5000,
+            "mean_ns": 214063,
+            "p50_ns": 176927,
+            "p95_ns": 477451,
+            "heap_alloc": 5866760
+          },
+          {
+            "first": 5001,
+            "last": 6000,
+            "mean_ns": 170028,
+            "p50_ns": 129546,
+            "p95_ns": 426445,
+            "heap_alloc": 8971424
+          },
+          {
+            "first": 6001,
+            "last": 7000,
+            "mean_ns": 225011,
+            "p50_ns": 182389,
+            "p95_ns": 493774,
+            "heap_alloc": 7436360
+          },
+          {
+            "first": 7001,
+            "last": 8000,
+            "mean_ns": 408903,
+            "p50_ns": 322313,
+            "p95_ns": 931874,
+            "heap_alloc": 11920176
+          },
+          {
+            "first": 8001,
+            "last": 9000,
+            "mean_ns": 392104,
+            "p50_ns": 291439,
+            "p95_ns": 854396,
+            "heap_alloc": 12650440
+          },
+          {
+            "first": 9001,
+            "last": 10000,
+            "mean_ns": 352400,
+            "p50_ns": 290961,
+            "p95_ns": 779462,
+            "heap_alloc": 12616024
+          },
+          {
+            "first": 10001,
+            "last": 11000,
+            "mean_ns": 393727,
+            "p50_ns": 335754,
+            "p95_ns": 710535,
+            "heap_alloc": 11832968
+          },
+          {
+            "first": 11001,
+            "last": 12000,
+            "mean_ns": 591383,
+            "p50_ns": 529571,
+            "p95_ns": 1130795,
+            "heap_alloc": 18630608
+          }
+        ],
+        [
+          {
+            "first": 1,
+            "last": 1000,
+            "mean_ns": 45762,
+            "p50_ns": 29781,
+            "p95_ns": 104105,
+            "heap_alloc": 2717576
+          },
+          {
+            "first": 1001,
+            "last": 2000,
+            "mean_ns": 82406,
+            "p50_ns": 64647,
+            "p95_ns": 155989,
+            "heap_alloc": 2596272
+          },
+          {
+            "first": 2001,
+            "last": 3000,
+            "mean_ns": 144483,
+            "p50_ns": 115737,
+            "p95_ns": 298655,
+            "heap_alloc": 4084456
+          },
+          {
+            "first": 3001,
+            "last": 4000,
+            "mean_ns": 192681,
+            "p50_ns": 167735,
+            "p95_ns": 360157,
+            "heap_alloc": 5366624
+          },
+          {
+            "first": 4001,
+            "last": 5000,
+            "mean_ns": 236913,
+            "p50_ns": 184677,
+            "p95_ns": 530005,
+            "heap_alloc": 5367632
+          },
+          {
+            "first": 5001,
+            "last": 6000,
+            "mean_ns": 257864,
+            "p50_ns": 195407,
+            "p95_ns": 613450,
+            "heap_alloc": 8424680
+          },
+          {
+            "first": 6001,
+            "last": 7000,
+            "mean_ns": 289102,
+            "p50_ns": 236945,
+            "p95_ns": 636600,
+            "heap_alloc": 7003776
+          },
+          {
+            "first": 7001,
+            "last": 8000,
+            "mean_ns": 415099,
+            "p50_ns": 280580,
+            "p95_ns": 985413,
+            "heap_alloc": 11371672
+          },
+          {
+            "first": 8001,
+            "last": 9000,
+            "mean_ns": 433753,
+            "p50_ns": 311616,
+            "p95_ns": 958815,
+            "heap_alloc": 11878416
+          },
+          {
+            "first": 9001,
+            "last": 10000,
+            "mean_ns": 584938,
+            "p50_ns": 529698,
+            "p95_ns": 1157539,
+            "heap_alloc": 11764624
+          },
+          {
+            "first": 10001,
+            "last": 11000,
+            "mean_ns": 656860,
+            "p50_ns": 590923,
+            "p95_ns": 1321725,
+            "heap_alloc": 10888640
+          },
+          {
+            "first": 11001,
+            "last": 12000,
+            "mean_ns": 606296,
+            "p50_ns": 530561,
+            "p95_ns": 1197855,
+            "heap_alloc": 17686256
+          }
+        ]
+      ]
+    },
+    "v000": {
+      "first_batch_mean_ns_median": 59317,
+      "last_batch_mean_ns_median": 1211555,
+      "ratio": 20.42508892897483,
+      "trials": [
+        [
+          {
+            "first": 1,
+            "last": 1000,
+            "mean_ns": 60132,
+            "p50_ns": 49802,
+            "p95_ns": 122647,
+            "heap_alloc": 1934872
+          },
+          {
+            "first": 1001,
+            "last": 2000,
+            "mean_ns": 174365,
+            "p50_ns": 117709,
+            "p95_ns": 327005,
+            "heap_alloc": 3490448
+          },
+          {
+            "first": 2001,
+            "last": 3000,
+            "mean_ns": 313319,
+            "p50_ns": 248713,
+            "p95_ns": 713679,
+            "heap_alloc": 3602248
+          },
+          {
+            "first": 3001,
+            "last": 4000,
+            "mean_ns": 307297,
+            "p50_ns": 228364,
+            "p95_ns": 742427,
+            "heap_alloc": 5016192
+          },
+          {
+            "first": 4001,
+            "last": 5000,
+            "mean_ns": 420286,
+            "p50_ns": 364496,
+            "p95_ns": 725646,
+            "heap_alloc": 6347456
+          },
+          {
+            "first": 5001,
+            "last": 6000,
+            "mean_ns": 507582,
+            "p50_ns": 415918,
+            "p95_ns": 982769,
+            "heap_alloc": 7226240
+          },
+          {
+            "first": 6001,
+            "last": 7000,
+            "mean_ns": 565398,
+            "p50_ns": 496775,
+            "p95_ns": 970630,
+            "heap_alloc": 8079768
+          },
+          {
+            "first": 7001,
+            "last": 8000,
+            "mean_ns": 1054832,
+            "p50_ns": 825897,
+            "p95_ns": 2388259,
+            "heap_alloc": 9738232
+          },
+          {
+            "first": 8001,
+            "last": 9000,
+            "mean_ns": 1276601,
+            "p50_ns": 1101378,
+            "p95_ns": 2642359,
+            "heap_alloc": 9267360
+          },
+          {
+            "first": 9001,
+            "last": 10000,
+            "mean_ns": 1276525,
+            "p50_ns": 1027119,
+            "p95_ns": 2532833,
+            "heap_alloc": 12835760
+          },
+          {
+            "first": 10001,
+            "last": 11000,
+            "mean_ns": 984481,
+            "p50_ns": 858184,
+            "p95_ns": 1688917,
+            "heap_alloc": 11025600
+          },
+          {
+            "first": 11001,
+            "last": 12000,
+            "mean_ns": 1211555,
+            "p50_ns": 1034849,
+            "p95_ns": 2344076,
+            "heap_alloc": 14491216
+          }
+        ],
+        [
+          {
+            "first": 1,
+            "last": 1000,
+            "mean_ns": 51767,
+            "p50_ns": 41216,
+            "p95_ns": 101791,
+            "heap_alloc": 1924176
+          },
+          {
+            "first": 1001,
+            "last": 2000,
+            "mean_ns": 153280,
+            "p50_ns": 111994,
+            "p95_ns": 377850,
+            "heap_alloc": 3491088
+          },
+          {
+            "first": 2001,
+            "last": 3000,
+            "mean_ns": 256473,
+            "p50_ns": 179178,
+            "p95_ns": 595598,
+            "heap_alloc": 3658248
+          },
+          {
+            "first": 3001,
+            "last": 4000,
+            "mean_ns": 284942,
+            "p50_ns": 259441,
+            "p95_ns": 566366,
+            "heap_alloc": 4930664
+          },
+          {
+            "first": 4001,
+            "last": 5000,
+            "mean_ns": 428142,
+            "p50_ns": 326128,
+            "p95_ns": 1010609,
+            "heap_alloc": 6625112
+          },
+          {
+            "first": 5001,
+            "last": 6000,
+            "mean_ns": 465167,
+            "p50_ns": 382164,
+            "p95_ns": 909576,
+            "heap_alloc": 7442752
+          },
+          {
+            "first": 6001,
+            "last": 7000,
+            "mean_ns": 546825,
+            "p50_ns": 444045,
+            "p95_ns": 1112021,
+            "heap_alloc": 8234712
+          },
+          {
+            "first": 7001,
+            "last": 8000,
+            "mean_ns": 778586,
+            "p50_ns": 678164,
+            "p95_ns": 1505913,
+            "heap_alloc": 10004720
+          },
+          {
+            "first": 8001,
+            "last": 9000,
+            "mean_ns": 933381,
+            "p50_ns": 794085,
+            "p95_ns": 1795760,
+            "heap_alloc": 9749200
+          },
+          {
+            "first": 9001,
+            "last": 10000,
+            "mean_ns": 970492,
+            "p50_ns": 837895,
+            "p95_ns": 1737358,
+            "heap_alloc": 8294072
+          },
+          {
+            "first": 10001,
+            "last": 11000,
+            "mean_ns": 1042624,
+            "p50_ns": 872042,
+            "p95_ns": 1974812,
+            "heap_alloc": 11773112
+          },
+          {
+            "first": 11001,
+            "last": 12000,
+            "mean_ns": 1108818,
+            "p50_ns": 965418,
+            "p95_ns": 2063171,
+            "heap_alloc": 9307016
+          }
+        ],
+        [
+          {
+            "first": 1,
+            "last": 1000,
+            "mean_ns": 59317,
+            "p50_ns": 43835,
+            "p95_ns": 138684,
+            "heap_alloc": 1940224
+          },
+          {
+            "first": 1001,
+            "last": 2000,
+            "mean_ns": 133673,
+            "p50_ns": 109639,
+            "p95_ns": 271371,
+            "heap_alloc": 3502544
+          },
+          {
+            "first": 2001,
+            "last": 3000,
+            "mean_ns": 221047,
+            "p50_ns": 185763,
+            "p95_ns": 399360,
+            "heap_alloc": 3563160
+          },
+          {
+            "first": 3001,
+            "last": 4000,
+            "mean_ns": 339971,
+            "p50_ns": 275980,
+            "p95_ns": 685886,
+            "heap_alloc": 4880352
+          },
+          {
+            "first": 4001,
+            "last": 5000,
+            "mean_ns": 567837,
+            "p50_ns": 405222,
+            "p95_ns": 1236030,
+            "heap_alloc": 6337248
+          },
+          {
+            "first": 5001,
+            "last": 6000,
+            "mean_ns": 625408,
+            "p50_ns": 456443,
+            "p95_ns": 1409698,
+            "heap_alloc": 7343144
+          },
+          {
+            "first": 6001,
+            "last": 7000,
+            "mean_ns": 791950,
+            "p50_ns": 663889,
+            "p95_ns": 1635149,
+            "heap_alloc": 8312984
+          },
+          {
+            "first": 7001,
+            "last": 8000,
+            "mean_ns": 1022709,
+            "p50_ns": 844418,
+            "p95_ns": 2053871,
+            "heap_alloc": 10123216
+          },
+          {
+            "first": 8001,
+            "last": 9000,
+            "mean_ns": 1389991,
+            "p50_ns": 1241187,
+            "p95_ns": 2700053,
+            "heap_alloc": 9730632
+          },
+          {
+            "first": 9001,
+            "last": 10000,
+            "mean_ns": 1583809,
+            "p50_ns": 1436860,
+            "p95_ns": 2993965,
+            "heap_alloc": 8171848
+          },
+          {
+            "first": 10001,
+            "last": 11000,
+            "mean_ns": 1494306,
+            "p50_ns": 1360871,
+            "p95_ns": 2788145,
+            "heap_alloc": 11643352
+          },
+          {
+            "first": 11001,
+            "last": 12000,
+            "mean_ns": 1525730,
+            "p50_ns": 1295691,
+            "p95_ns": 3154769,
+            "heap_alloc": 9223888
+          }
+        ]
+      ]
+    },
+    "v002": {
+      "first_batch_mean_ns_median": 54877,
+      "last_batch_mean_ns_median": 1193200,
+      "ratio": 21.743171091714196,
+      "trials": [
+        [
+          {
+            "first": 1,
+            "last": 1000,
+            "mean_ns": 61171,
+            "p50_ns": 47843,
+            "p95_ns": 136261,
+            "heap_alloc": 1911128
+          },
+          {
+            "first": 1001,
+            "last": 2000,
+            "mean_ns": 168929,
+            "p50_ns": 134159,
+            "p95_ns": 364825,
+            "heap_alloc": 3483608
+          },
+          {
+            "first": 2001,
+            "last": 3000,
+            "mean_ns": 247453,
+            "p50_ns": 216617,
+            "p95_ns": 478156,
+            "heap_alloc": 3491384
+          },
+          {
+            "first": 3001,
+            "last": 4000,
+            "mean_ns": 279576,
+            "p50_ns": 251894,
+            "p95_ns": 476959,
+            "heap_alloc": 4719416
+          },
+          {
+            "first": 4001,
+            "last": 5000,
+            "mean_ns": 498831,
+            "p50_ns": 371097,
+            "p95_ns": 1114806,
+            "heap_alloc": 5931480
+          },
+          {
+            "first": 5001,
+            "last": 6000,
+            "mean_ns": 656946,
+            "p50_ns": 583085,
+            "p95_ns": 1320063,
+            "heap_alloc": 6810568
+          },
+          {
+            "first": 6001,
+            "last": 7000,
+            "mean_ns": 622990,
+            "p50_ns": 546452,
+            "p95_ns": 1251640,
+            "heap_alloc": 7260272
+          },
+          {
+            "first": 7001,
+            "last": 8000,
+            "mean_ns": 705515,
+            "p50_ns": 627392,
+            "p95_ns": 1225233,
+            "heap_alloc": 9387872
+          },
+          {
+            "first": 8001,
+            "last": 9000,
+            "mean_ns": 892683,
+            "p50_ns": 783643,
+            "p95_ns": 1579225,
+            "heap_alloc": 8623888
+          },
+          {
+            "first": 9001,
+            "last": 10000,
+            "mean_ns": 992945,
+            "p50_ns": 835644,
+            "p95_ns": 1958484,
+            "heap_alloc": 12188704
+          },
+          {
+            "first": 10001,
+            "last": 11000,
+            "mean_ns": 1238430,
+            "p50_ns": 1045428,
+            "p95_ns": 2501734,
+            "heap_alloc": 10335464
+          },
+          {
+            "first": 11001,
+            "last": 12000,
+            "mean_ns": 1030454,
+            "p50_ns": 905976,
+            "p95_ns": 1822666,
+            "heap_alloc": 13803400
+          }
+        ],
+        [
+          {
+            "first": 1,
+            "last": 1000,
+            "mean_ns": 53183,
+            "p50_ns": 43604,
+            "p95_ns": 105386,
+            "heap_alloc": 1906440
+          },
+          {
+            "first": 1001,
+            "last": 2000,
+            "mean_ns": 127779,
+            "p50_ns": 108236,
+            "p95_ns": 202211,
+            "heap_alloc": 3471864
+          },
+          {
+            "first": 2001,
+            "last": 3000,
+            "mean_ns": 219064,
+            "p50_ns": 181538,
+            "p95_ns": 383763,
+            "heap_alloc": 3514288
+          },
+          {
+            "first": 3001,
+            "last": 4000,
+            "mean_ns": 412365,
+            "p50_ns": 247617,
+            "p95_ns": 1191341,
+            "heap_alloc": 4799680
+          },
+          {
+            "first": 4001,
+            "last": 5000,
+            "mean_ns": 417537,
+            "p50_ns": 350835,
+            "p95_ns": 829295,
+            "heap_alloc": 6197696
+          },
+          {
+            "first": 5001,
+            "last": 6000,
+            "mean_ns": 521085,
+            "p50_ns": 438799,
+            "p95_ns": 911477,
+            "heap_alloc": 6973168
+          },
+          {
+            "first": 6001,
+            "last": 7000,
+            "mean_ns": 637231,
+            "p50_ns": 504704,
+            "p95_ns": 1274265,
+            "heap_alloc": 7782360
+          },
+          {
+            "first": 7001,
+            "last": 8000,
+            "mean_ns": 980556,
+            "p50_ns": 788249,
+            "p95_ns": 2103550,
+            "heap_alloc": 9419560
+          },
+          {
+            "first": 8001,
+            "last": 9000,
+            "mean_ns": 1127838,
+            "p50_ns": 896297,
+            "p95_ns": 2294175,
+            "heap_alloc": 8557064
+          },
+          {
+            "first": 9001,
+            "last": 10000,
+            "mean_ns": 957800,
+            "p50_ns": 797120,
+            "p95_ns": 1865982,
+            "heap_alloc": 12129928
+          },
+          {
+            "first": 10001,
+            "last": 11000,
+            "mean_ns": 1050214,
+            "p50_ns": 895624,
+            "p95_ns": 2043791,
+            "heap_alloc": 10272248
+          },
+          {
+            "first": 11001,
+            "last": 12000,
+            "mean_ns": 1193200,
+            "p50_ns": 977673,
+            "p95_ns": 2429714,
+            "heap_alloc": 13746376
+          }
+        ],
+        [
+          {
+            "first": 1,
+            "last": 1000,
+            "mean_ns": 54877,
+            "p50_ns": 44141,
+            "p95_ns": 112157,
+            "heap_alloc": 1952616
+          },
+          {
+            "first": 1001,
+            "last": 2000,
+            "mean_ns": 181830,
+            "p50_ns": 136780,
+            "p95_ns": 375129,
+            "heap_alloc": 3522040
+          },
+          {
+            "first": 2001,
+            "last": 3000,
+            "mean_ns": 228378,
+            "p50_ns": 194930,
+            "p95_ns": 395814,
+            "heap_alloc": 3516104
+          },
+          {
+            "first": 3001,
+            "last": 4000,
+            "mean_ns": 360382,
+            "p50_ns": 286784,
+            "p95_ns": 810126,
+            "heap_alloc": 4767424
+          },
+          {
+            "first": 4001,
+            "last": 5000,
+            "mean_ns": 486434,
+            "p50_ns": 375403,
+            "p95_ns": 1007671,
+            "heap_alloc": 6206592
+          },
+          {
+            "first": 5001,
+            "last": 6000,
+            "mean_ns": 570228,
+            "p50_ns": 411384,
+            "p95_ns": 1248909,
+            "heap_alloc": 7040680
+          },
+          {
+            "first": 6001,
+            "last": 7000,
+            "mean_ns": 625742,
+            "p50_ns": 499235,
+            "p95_ns": 1367510,
+            "heap_alloc": 7864656
+          },
+          {
+            "first": 7001,
+            "last": 8000,
+            "mean_ns": 784519,
+            "p50_ns": 647330,
+            "p95_ns": 1446063,
+            "heap_alloc": 9637080
+          },
+          {
+            "first": 8001,
+            "last": 9000,
+            "mean_ns": 1152675,
+            "p50_ns": 894406,
+            "p95_ns": 2520975,
+            "heap_alloc": 9163080
+          },
+          {
+            "first": 9001,
+            "last": 10000,
+            "mean_ns": 1354612,
+            "p50_ns": 1087269,
+            "p95_ns": 2917223,
+            "heap_alloc": 12728280
+          },
+          {
+            "first": 10001,
+            "last": 11000,
+            "mean_ns": 1407414,
+            "p50_ns": 1119767,
+            "p95_ns": 3144840,
+            "heap_alloc": 10946848
+          },
+          {
+            "first": 11001,
+            "last": 12000,
+            "mean_ns": 1489221,
+            "p50_ns": 1266211,
+            "p95_ns": 3212256,
+            "heap_alloc": 14415136
+          }
+        ]
+      ]
+    }
+  },
+  "network": {
+    "baseline": {
+      "trial_mean_ns": [
+        5907905.5,
+        6365815.75,
+        6475468.75
+      ],
+      "mean_ns_median": 6365815.75,
+      "final_sum_rss_kib_median": 54620,
+      "trials": [
+        [
+          {
+            "first": 1,
+            "last": 250,
+            "mean_ns": 5961375,
+            "p50_ns": 5743762,
+            "p95_ns": 8197312,
+            "wall_seconds": 2.7976333599999634,
+            "process_rss_kib": [
+              11384,
+              14392,
+              14156,
+              14092
+            ],
+            "sum_rss_kib": 54024
+          },
+          {
+            "first": 251,
+            "last": 500,
+            "mean_ns": 5796713,
+            "p50_ns": 5606053,
+            "p95_ns": 7703594,
+            "wall_seconds": 2.7531255350004358,
+            "process_rss_kib": [
+              11168,
+              14672,
+              14560,
+              14184
+            ],
+            "sum_rss_kib": 54584
+          },
+          {
+            "first": 501,
+            "last": 750,
+            "mean_ns": 5887876,
+            "p50_ns": 5825843,
+            "p95_ns": 7985126,
+            "wall_seconds": 2.7770245040010195,
+            "process_rss_kib": [
+              11416,
+              14628,
+              14268,
+              14304
+            ],
+            "sum_rss_kib": 54616
+          },
+          {
+            "first": 751,
+            "last": 1000,
+            "mean_ns": 5985658,
+            "p50_ns": 5639220,
+            "p95_ns": 8331915,
+            "wall_seconds": 2.800306463999732,
+            "process_rss_kib": [
+              11488,
+              14748,
+              14212,
+              14172
+            ],
+            "sum_rss_kib": 54620
+          }
+        ],
+        [
+          {
+            "first": 1,
+            "last": 250,
+            "mean_ns": 5895381,
+            "p50_ns": 5716952,
+            "p95_ns": 8183808,
+            "wall_seconds": 2.7801561370033596,
+            "process_rss_kib": [
+              11564,
+              14640,
+              14348,
+              14388
+            ],
+            "sum_rss_kib": 54940
+          },
+          {
+            "first": 251,
+            "last": 500,
+            "mean_ns": 6171323,
+            "p50_ns": 6115932,
+            "p95_ns": 8384948,
+            "wall_seconds": 2.853030211997975,
+            "process_rss_kib": [
+              11348,
+              14420,
+              14472,
+              14284
+            ],
+            "sum_rss_kib": 54524
+          },
+          {
+            "first": 501,
+            "last": 750,
+            "mean_ns": 6522596,
+            "p50_ns": 6398766,
+            "p95_ns": 8737857,
+            "wall_seconds": 2.940081159998954,
+            "process_rss_kib": [
+              11280,
+              14556,
+              14088,
+              14368
+            ],
+            "sum_rss_kib": 54292
+          },
+          {
+            "first": 751,
+            "last": 1000,
+            "mean_ns": 6873963,
+            "p50_ns": 6774581,
+            "p95_ns": 9331006,
+            "wall_seconds": 3.027696246001142,
+            "process_rss_kib": [
+              11264,
+              14612,
+              14224,
+              14216
+            ],
+            "sum_rss_kib": 54316
+          }
+        ],
+        [
+          {
+            "first": 1,
+            "last": 250,
+            "mean_ns": 6654617,
+            "p50_ns": 6538824,
+            "p95_ns": 8646280,
+            "wall_seconds": 2.9714413680012512,
+            "process_rss_kib": [
+              11188,
+              14276,
+              13964,
+              14120
+            ],
+            "sum_rss_kib": 53548
+          },
+          {
+            "first": 251,
+            "last": 500,
+            "mean_ns": 6520092,
+            "p50_ns": 6381719,
+            "p95_ns": 8405730,
+            "wall_seconds": 2.9362996449999628,
+            "process_rss_kib": [
+              11592,
+              14908,
+              14316,
+              14384
+            ],
+            "sum_rss_kib": 55200
+          },
+          {
+            "first": 501,
+            "last": 750,
+            "mean_ns": 6240317,
+            "p50_ns": 6009901,
+            "p95_ns": 8473114,
+            "wall_seconds": 2.864174334001291,
+            "process_rss_kib": [
+              11476,
+              14612,
+              14336,
+              14420
+            ],
+            "sum_rss_kib": 54844
+          },
+          {
+            "first": 751,
+            "last": 1000,
+            "mean_ns": 6486849,
+            "p50_ns": 6497246,
+            "p95_ns": 8725416,
+            "wall_seconds": 2.9285477680023178,
+            "process_rss_kib": [
+              11508,
+              14584,
+              14424,
+              14400
+            ],
+            "sum_rss_kib": 54916
+          }
+        ]
+      ]
+    },
+    "v000": {
+      "trial_mean_ns": [
+        4285574.5,
+        4368497.75,
+        4606364.75
+      ],
+      "mean_ns_median": 4368497.75,
+      "final_sum_rss_kib_median": 45588,
+      "trials": [
+        [
+          {
+            "first": 1,
+            "last": 250,
+            "mean_ns": 3883670,
+            "p50_ns": 3658890,
+            "p95_ns": 6236856,
+            "wall_seconds": 2.285383857999477,
+            "process_rss_kib": [
+              14896,
+              14840,
+              15016
+            ],
+            "sum_rss_kib": 44752
+          },
+          {
+            "first": 251,
+            "last": 500,
+            "mean_ns": 4255156,
+            "p50_ns": 4139930,
+            "p95_ns": 6084928,
+            "wall_seconds": 2.3708721659986622,
+            "process_rss_kib": [
+              15084,
+              14896,
+              14908
+            ],
+            "sum_rss_kib": 44888
+          },
+          {
+            "first": 501,
+            "last": 750,
+            "mean_ns": 4407062,
+            "p50_ns": 4330345,
+            "p95_ns": 6432295,
+            "wall_seconds": 2.4086276780017215,
+            "process_rss_kib": [
+              15288,
+              15136,
+              15356
+            ],
+            "sum_rss_kib": 45780
+          },
+          {
+            "first": 751,
+            "last": 1000,
+            "mean_ns": 4596410,
+            "p50_ns": 4338302,
+            "p95_ns": 6981411,
+            "wall_seconds": 2.455908603998978,
+            "process_rss_kib": [
+              15312,
+              15060,
+              15128
+            ],
+            "sum_rss_kib": 45500
+          }
+        ],
+        [
+          {
+            "first": 1,
+            "last": 250,
+            "mean_ns": 3977166,
+            "p50_ns": 3746081,
+            "p95_ns": 6377173,
+            "wall_seconds": 2.2994986119992973,
+            "process_rss_kib": [
+              15140,
+              14920,
+              15704
+            ],
+            "sum_rss_kib": 45764
+          },
+          {
+            "first": 251,
+            "last": 500,
+            "mean_ns": 4433961,
+            "p50_ns": 4244764,
+            "p95_ns": 6631186,
+            "wall_seconds": 2.417120600999624,
+            "process_rss_kib": [
+              15164,
+              15320,
+              15136
+            ],
+            "sum_rss_kib": 45620
+          },
+          {
+            "first": 501,
+            "last": 750,
+            "mean_ns": 4492671,
+            "p50_ns": 4334030,
+            "p95_ns": 6710460,
+            "wall_seconds": 2.435217472997465,
+            "process_rss_kib": [
+              15376,
+              15108,
+              15116
+            ],
+            "sum_rss_kib": 45600
+          },
+          {
+            "first": 751,
+            "last": 1000,
+            "mean_ns": 4570193,
+            "p50_ns": 4400114,
+            "p95_ns": 6478171,
+            "wall_seconds": 2.451554967999982,
+            "process_rss_kib": [
+              15660,
+              14936,
+              14992
+            ],
+            "sum_rss_kib": 45588
+          }
+        ],
+        [
+          {
+            "first": 1,
+            "last": 250,
+            "mean_ns": 4367058,
+            "p50_ns": 4122380,
+            "p95_ns": 6306669,
+            "wall_seconds": 2.4033399510008167,
+            "process_rss_kib": [
+              14936,
+              14852,
+              15192
+            ],
+            "sum_rss_kib": 44980
+          },
+          {
+            "first": 251,
+            "last": 500,
+            "mean_ns": 4732048,
+            "p50_ns": 4484488,
+            "p95_ns": 7315201,
+            "wall_seconds": 2.5018390430013824,
+            "process_rss_kib": [
+              14972,
+              14824,
+              14872
+            ],
+            "sum_rss_kib": 44668
+          },
+          {
+            "first": 501,
+            "last": 750,
+            "mean_ns": 4669682,
+            "p50_ns": 4529558,
+            "p95_ns": 6718112,
+            "wall_seconds": 2.4698259299984784,
+            "process_rss_kib": [
+              15428,
+              14968,
+              15136
+            ],
+            "sum_rss_kib": 45532
+          },
+          {
+            "first": 751,
+            "last": 1000,
+            "mean_ns": 4656671,
+            "p50_ns": 4493011,
+            "p95_ns": 7196179,
+            "wall_seconds": 2.4681664550007554,
+            "process_rss_kib": [
+              15392,
+              15052,
+              15344
+            ],
+            "sum_rss_kib": 45788
+          }
+        ]
+      ]
+    },
+    "v002": {
+      "trial_mean_ns": [
+        4263029.25,
+        4325316,
+        4585158
+      ],
+      "mean_ns_median": 4325316,
+      "final_sum_rss_kib_median": 45768,
+      "trials": [
+        [
+          {
+            "first": 1,
+            "last": 250,
+            "mean_ns": 3900980,
+            "p50_ns": 3791170,
+            "p95_ns": 5627802,
+            "wall_seconds": 2.279567090998171,
+            "process_rss_kib": [
+              14852,
+              14776,
+              14900
+            ],
+            "sum_rss_kib": 44528
+          },
+          {
+            "first": 251,
+            "last": 500,
+            "mean_ns": 4177348,
+            "p50_ns": 4048662,
+            "p95_ns": 6191787,
+            "wall_seconds": 2.350313044000359,
+            "process_rss_kib": [
+              15268,
+              14820,
+              14948
+            ],
+            "sum_rss_kib": 45036
+          },
+          {
+            "first": 501,
+            "last": 750,
+            "mean_ns": 4545678,
+            "p50_ns": 4359077,
+            "p95_ns": 6814238,
+            "wall_seconds": 2.449291381999501,
+            "process_rss_kib": [
+              15312,
+              15404,
+              15048
+            ],
+            "sum_rss_kib": 45764
+          },
+          {
+            "first": 751,
+            "last": 1000,
+            "mean_ns": 4428111,
+            "p50_ns": 4281730,
+            "p95_ns": 6701501,
+            "wall_seconds": 2.415789651000523,
+            "process_rss_kib": [
+              15508,
+              15192,
+              14968
+            ],
+            "sum_rss_kib": 45668
+          }
+        ],
+        [
+          {
+            "first": 1,
+            "last": 250,
+            "mean_ns": 4153200,
+            "p50_ns": 3852876,
+            "p95_ns": 6418043,
+            "wall_seconds": 2.3475737250009843,
+            "process_rss_kib": [
+              14920,
+              14704,
+              14928
+            ],
+            "sum_rss_kib": 44552
+          },
+          {
+            "first": 251,
+            "last": 500,
+            "mean_ns": 4030516,
+            "p50_ns": 3667309,
+            "p95_ns": 6833410,
+            "wall_seconds": 2.32003928800259,
+            "process_rss_kib": [
+              14924,
+              14856,
+              14760
+            ],
+            "sum_rss_kib": 44540
+          },
+          {
+            "first": 501,
+            "last": 750,
+            "mean_ns": 4441131,
+            "p50_ns": 4287322,
+            "p95_ns": 6816615,
+            "wall_seconds": 2.4246165550030128,
+            "process_rss_kib": [
+              15052,
+              15000,
+              14952
+            ],
+            "sum_rss_kib": 45004
+          },
+          {
+            "first": 751,
+            "last": 1000,
+            "mean_ns": 4676417,
+            "p50_ns": 4474020,
+            "p95_ns": 7202684,
+            "wall_seconds": 2.4746957269999257,
+            "process_rss_kib": [
+              15492,
+              15188,
+              15088
+            ],
+            "sum_rss_kib": 45768
+          }
+        ],
+        [
+          {
+            "first": 1,
+            "last": 250,
+            "mean_ns": 4015236,
+            "p50_ns": 3810666,
+            "p95_ns": 5990836,
+            "wall_seconds": 2.3096096070003114,
+            "process_rss_kib": [
+              15000,
+              14924,
+              14836
+            ],
+            "sum_rss_kib": 44760
+          },
+          {
+            "first": 251,
+            "last": 500,
+            "mean_ns": 4598796,
+            "p50_ns": 4444767,
+            "p95_ns": 6919519,
+            "wall_seconds": 2.460059874003491,
+            "process_rss_kib": [
+              14892,
+              14856,
+              14992
+            ],
+            "sum_rss_kib": 44740
+          },
+          {
+            "first": 501,
+            "last": 750,
+            "mean_ns": 4689935,
+            "p50_ns": 4539807,
+            "p95_ns": 6884541,
+            "wall_seconds": 2.4869389760024205,
+            "process_rss_kib": [
+              15120,
+              15120,
+              15172
+            ],
+            "sum_rss_kib": 45412
+          },
+          {
+            "first": 751,
+            "last": 1000,
+            "mean_ns": 5036665,
+            "p50_ns": 4594125,
+            "p95_ns": 7063459,
+            "wall_seconds": 2.5661106719999225,
+            "process_rss_kib": [
+              15680,
+              15080,
+              15232
+            ],
+            "sum_rss_kib": 45992
+          }
+        ]
+      ]
+    }
+  },
+  "construction_cost": {
+    "baseline": {
+      "usage_complete": true,
+      "usage": {
+        "input_tokens": 5788533,
+        "cached_input_tokens": 5634560,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 76394,
+        "reasoning_output_tokens": 24926,
+        "total_tokens": 5864927,
+        "noncached_input_tokens": 153973
+      },
+      "sources": [
+        "baseline/experiments/20261104T034354Z-sol-high-baseline-01-6p10v7pd/agents.json"
+      ],
+      "elapsed_seconds": 1211.96
+    },
+    "v000": {
+      "usage_complete": true,
+      "usage": {
+        "input_tokens": 10795106,
+        "cached_input_tokens": 10574848,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 111617,
+        "reasoning_output_tokens": 38515,
+        "total_tokens": 10906723,
+        "noncached_input_tokens": 220258
+      },
+      "sources": [
+        "experiments/20261103T104654Z-sol-high-complete-collection-02-z2hq9xag/stages/20261103T104655Z-generation-lf1jpvct/agents.json"
+      ],
+      "elapsed_seconds": 2398.36
+    },
+    "v002": {
+      "usage_complete": true,
+      "usage": {
+        "input_tokens": 38577801,
+        "cached_input_tokens": 36957824,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 311112,
+        "reasoning_output_tokens": 97272,
+        "total_tokens": 38888913,
+        "noncached_input_tokens": 1619977
+      },
+      "sources": [
+        "experiments/20261103T104654Z-sol-high-complete-collection-02-z2hq9xag/stages/20261103T114351Z-repair-201yxggl/agents.json",
+        "experiments/20261103T104654Z-sol-high-complete-collection-02-z2hq9xag/stages/20261103T121800Z-repair-hsi2qym9/agents.json",
+        "experiments/20261103T104654Z-sol-high-complete-collection-02-z2hq9xag/stages/20261103T104655Z-generation-lf1jpvct/agents.json",
+        "experiments/20261103T104654Z-sol-high-complete-collection-02-z2hq9xag/audits/001/runs/2026-11-03_19-58-40-syncepaxos_system-audit/agents.json",
+        "experiments/20261103T104654Z-sol-high-complete-collection-02-z2hq9xag/audits/002/runs/2026-11-03_20-36-07-syncepaxos_system-audit/agents.json",
+        "experiments/20261103T104654Z-sol-high-complete-collection-02-z2hq9xag/audits/000/runs/2026-11-03_19-26-55-syncepaxos_system-audit/agents.json",
+        "experiments/20261103T104654Z-sol-high-complete-collection-02-z2hq9xag/reviews/001/audit/runs/2026-11-03_19-51-14-syncepaxos_system-review/agents.json",
+        "experiments/20261103T104654Z-sol-high-complete-collection-02-z2hq9xag/reviews/002/audit/runs/2026-11-03_20-29-48-syncepaxos_system-review/agents.json"
+      ],
+      "elapsed_seconds": 7624.304487298999
+    }
+  }
+}

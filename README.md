@@ -123,6 +123,8 @@ flowchart LR
 
 协议与系统设计的已补规则、开放问题及当前范围限制集中记录在 [docs/design-issues.md](docs/design-issues.md)，供研究者后续讨论；该文档不作为 agent 输入，也不改变当前协议要求。
 
+现有 baseline 与主流程初始、最终候选的共同场景比较放在 [comparison/](comparison/README.md)，包含真实 Node 测试、TCP/HTTP 交叉检查和历史增长测量。[首轮结果](comparison/report-2026-11-04.md)与原始候选分开保存，不作为生成或审计输入。
+
 提示与参考材料平铺在 `inputs/`：`TASK.md` 是生成提示，`AUDIT.md` 是审计提示，`REPAIR.md` 是修复提示，`VERIFY.md` 是独立复核提示，`AGENTS.md` 是工作要求，`protocol.md` 和 `system.md` 是协议与工程参考材料。控制器按阶段选择输入，初始生成不会收到 `AUDIT.md`、`REPAIR.md` 或 `VERIFY.md`。每次实验会复制当次使用的材料，后续审计读取实验内的 `inputs/AUDIT.md` 副本。审计提示用一个 `<!-- continuation -->` 分隔首次任务和续审提示。
 
 ## 结果在哪里
