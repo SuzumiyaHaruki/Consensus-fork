@@ -119,8 +119,20 @@ async def exercise(prepared, stage, host_port):
                 assert (stage/selected/'value.txt').read_text() == expected
             record = await call(['go', 'test', '-race', '-count=1', './...'], 90.0)
             assert record['status'] == 'completed' and record['exit_code'] == 0, record
-            record = await call(['/usr/bin/python3', '-I', '-c', 'import time;time.sleep(30)'], .1)
-            assert record['status'] == 'timeout', record
+            # Selected outputs must survive disposable-source cleanup, even on failure/timeout.
+            for ending, status, code in [('raise SystemExit(0)', 'completed', 0),
+                                         ('raise SystemExit(7)', 'completed', 7),
+                                         ('import time; time.sleep(30)', 'timeout', None)]:
+                script = 'from pathlib import Path; Path("results").mkdir(); Path("results/history.json").write_text("[1,2]"); ' + ending
+                record = await call(['/usr/bin/python3', '-I', '-c', script], 1.0,
+                                    source='candidate', outputs=['results', 'missing'])
+                assert record['status'] == status, record
+                if code is not None:
+                    assert record['exit_code'] == code, record
+                folder = stage/'executions'/record['execution_id']
+                assert not (folder/'replay-work').exists()
+                assert (folder/'artifacts/results/history.json').read_text() == '[1,2]', record
+                assert record['artifacts']['excluded'][0]['path'] == 'missing', record
             orphan = 'import subprocess;subprocess.Popen(["/bin/sh","-c","sleep 1; touch leaked-child"])'
             record = await call(['/usr/bin/python3', '-I', '-c', orphan])
             assert record['status'] == 'completed' and record['exit_code'] == 0, record
@@ -205,6 +217,7 @@ def main():
                          'separate MCP servers serialize execution and preserve the shared clock',
                          'two Go subprocesses with race detector', 'read-only materials', 'retained trace helper execution',
                          'host files/logs/network inaccessible', 'before/after source replay and retained overlays',
+                         'selected output retention after success, failure and timeout',
                          'event scheduling and strict replay through the shared helper',
                          'action timeout', 'descendant cleanup'],
                          'model_calls': 0}))

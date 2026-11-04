@@ -6,6 +6,9 @@ import stat
 
 from .storage import EXCLUDED_DIRS, MAX_SOURCE_BYTES, sensitive_file
 
+MAX_OUTPUT_BYTES = 64 * 1024 * 1024
+MAX_OUTPUT_FILES = 1024
+
 
 def regular_file(root, name):
     relative = Path(name)
@@ -88,3 +91,61 @@ def cleanup(folder):
     path = folder / 'replay-work'
     if path.is_dir():
         shutil.rmtree(path)
+
+
+def retain_outputs(work, requested, folder):
+    """Copy selected outputs before cleanup; exclusions do not change test results."""
+    result = {'files': [], 'excluded': []}
+    seen, total = set(), 0
+
+    def exclude(name, reason):
+        result['excluded'].append({'path': name, 'reason': reason})
+
+    for name in dict.fromkeys(requested):
+        relative = Path(name)
+        if (not relative.parts or relative.is_absolute() or '..' in relative.parts
+                or set(relative.parts) & (EXCLUDED_DIRS | {'.runtime', '.forge'})):
+            exclude(name, 'Select relative files or subdirectories outside private/cache directories')
+            continue
+        path = work / relative
+        if any(p.is_symlink() for p in (path, *path.parents) if p.is_relative_to(work)):
+            exclude(name, 'Symbolic links are not retained')
+            continue
+        if not path.exists():
+            exclude(name, 'Requested output is missing')
+            continue
+        paths = [path]
+        while paths:
+            current = paths.pop()
+            item = str(current.relative_to(work))
+            if item in seen:
+                continue
+            seen.add(item)
+            if len(seen) > MAX_OUTPUT_FILES:
+                exclude(item, 'Output entry limit reached; remaining outputs were not collected')
+                return result
+            try:
+                if current.is_symlink():
+                    raise ValueError('Symbolic links are not retained')
+                if set(Path(item).parts) & (EXCLUDED_DIRS | {'.runtime', '.forge'}):
+                    raise ValueError('Private/cache directory is excluded')
+                if current.is_dir():
+                    # Bound enumeration as well as copying; no unbounded directory listing.
+                    with os.scandir(current) as entries:
+                        for entry in entries:
+                            if len(paths) + len(seen) >= MAX_OUTPUT_FILES:
+                                exclude(item, 'Output entry limit reached; directory listing is partial')
+                                break
+                            paths.append(Path(entry.path))
+                    continue
+                data, _ = regular_file(work, item)
+                if total + len(data) > MAX_OUTPUT_BYTES:
+                    raise ValueError('Total retained output byte limit exceeded')
+                target = folder / 'artifacts' / item
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(data)
+                total += len(data)
+                result['files'].append({'path': item, 'retained_path': 'artifacts/' + item, 'bytes': len(data)})
+            except (OSError, ValueError) as exc:
+                exclude(item, str(exc))
+    return result

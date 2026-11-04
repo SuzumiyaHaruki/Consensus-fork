@@ -1,29 +1,12 @@
 """Versioned file handoffs; no model-written summary replaces retained evidence."""
 import os
-import math
 from pathlib import Path
 import shutil
 import stat
 import subprocess
 
 from generator.runner import read_json, write_json
-from runtime.evidence import inside
-
-
-def require_description(value, name):
-    """Preserve prose or structured JSON without imposing a narrative layout."""
-    def has_content(part):
-        if isinstance(part, str):
-            return bool(part.strip())
-        if isinstance(part, list):
-            return any(has_content(item) for item in part)
-        if isinstance(part, dict):
-            return any(has_content(item) for item in part.values())
-        # Zero counts and false observations can be meaningful inside structured descriptions.
-        return isinstance(part, (bool, int)) or isinstance(part, float) and math.isfinite(part)
-    if not isinstance(value, (str, list, dict)) or not has_content(value):
-        raise ValueError(f'{name} must be nonempty text, a list, or an object containing descriptive content')
-    return value
+from runtime.evidence import inside, require_description
 
 
 def copy_regular(source, destination):

@@ -15,7 +15,7 @@ from processes import invoke
 from generator.runner import (REQUIRED_INPUTS, Terminated, doctor as generation_doctor, execute as execute_agent,
                               exclusive_run, prepare as prepare_agent, read_json, utc_now, write_json)
 from workflow_config import ROOT, from_dict
-from issues import findings, pending, repairable, feedback_bundle, review_result, apply_review
+from issues import findings, pending, repairable, feedback_bundle, review_result, apply_review, catalog_entry
 
 
 class StopWorkflow(Exception):
@@ -202,9 +202,10 @@ def execute(root, runtime=None):
         settings = from_dict(record['settings'] | {'audit_prompt': str(root / 'inputs/AUDIT.md'),
                                                    'review_prompt': str(root / 'inputs/VERIFY.md')}, root)
         issues = []
+        catalog = []
         start = time.monotonic()
         deadline = start + settings.total_seconds
-        record.update(status='running', started_at=utc_now())
+        record.update(status='running', started_at=utc_now(), evidence_index='evidence-index.json')
 
         def save():
             imports = [stage['finding_import'] for stage in record['stages'] if 'finding_import' in stage]
@@ -217,6 +218,10 @@ def execute(root, runtime=None):
                                              'issues': issues, 'pending_reports': drafts})
             record['open_issues'] = [issue['id'] for issue in pending(issues)]
             record['awaiting_specification'] = [issue['id'] for issue in issues if issue['state'] == 'needs_specification']
+            write_json(root / 'evidence-index.json', {
+                'current_candidate_commit': record.get('current_candidate', {}).get('commit'),
+                'scope': 'Agent-selected cases and open questions, not verdicts or repair assignments. Consult recorded versions and execution source contexts before reuse.',
+                'entries': catalog})
             write_json(root / 'experiment.json', record)
 
         def remaining():
@@ -339,6 +344,9 @@ def execute(root, runtime=None):
                     save()
                     raise StopWorkflow('audit_incomplete', str(exc)) from exc
                 issues.extend(discovered)
+                note = catalog_entry(handoff_path, candidate, f'a{number:03d}', 'findings.json')
+                if note:
+                    catalog.append(note)
                 imported.update(status='imported', issue_count=len(discovered))
                 entry.update(handoff=str(handoff_path / 'handoff.json'),
                              last_completed_turn=handoff['last_completed_turn'], coverage=coverage,
@@ -360,7 +368,7 @@ def execute(root, runtime=None):
                     number += 1
                     continue
                 feedback = root / 'feedback' / f'{repairs:03d}'
-                feedback_bundle(feedback, handoff_path, candidate, issues)
+                feedback_bundle(feedback, handoff_path, candidate, issues, catalog)
                 expected_ids = [issue['id'] for issue in repairable(issues)]
                 stage = run_agent('repair', seconds, candidate, feedback,
                                   reserve_seconds=reserve + settings.repair_verification_seconds + 60)
@@ -378,6 +386,9 @@ def execute(root, runtime=None):
                 candidate = capture(stage, repairs + 1)
                 candidate['changes'] = delta(previous, candidate)
                 record['stages'][-1]['actual_changes'] = candidate['changes']
+                changed = any(candidate['changes'].values())
+                if (repair['action'] == 'no_change' and changed) or (repair['action'] == 'repaired' and not changed):
+                    record['stages'][-1]['action_mismatch'] = 'Declared action differs from the captured file changes.'
                 repairs += 1
                 record['repairs_completed'] = repairs
                 # This session sees original evidence and both versions. Fresh discovery never does.
@@ -387,7 +398,7 @@ def execute(root, runtime=None):
                 if (stage / 'executions').is_dir():
                     copy_tree(stage / 'executions', context / 'repair-executions', excluded={'replay-work'})
                 write_json(context / 'request.json', {'before_commit': previous['commit'], 'after_commit': candidate['commit'],
-                           'issue_ids': expected_ids, 'repair_claim': repair,
+                           'issue_ids': expected_ids, 'repair_claim': repair, 'actual_changes': candidate['changes'],
                            'before_source': 'before/', 'feedback': 'feedback/',
                            'repair_executions': 'repair-executions/' if (context/'repair-executions').is_dir() else None})
                 review_folder = root / 'reviews' / f'{repairs:03d}' / 'audit'
@@ -418,12 +429,15 @@ def execute(root, runtime=None):
                         entry.update(status='incomplete', reason=str(exc))
                     else:
                         apply_review(issues, result, bundle, candidate)
+                        note = catalog_entry(bundle, candidate, f'r{repairs:03d}', 'review.json')
+                        if note:
+                            catalog.append(note)
                         entry['review_result'] = result
                         entry['discovered_issues'] = [item['id'] for item in result['new_issues']]
                         states = {issue['state'] for issue in pending(issues)}
                         if 'environment_blocked' in states:
                             forced_stop = 'environment_blocked'
-                if (repair['action'] == 'no_change' and not specification_claim and not forced_stop
+                if (not changed and not specification_claim and not forced_stop
                         and not any(issue['id'] in expected_ids and issue['state'] == 'needs_specification' for issue in issues)):
                     forced_stop = 'no_change'
                 save()
@@ -464,6 +478,7 @@ def inspect(root):
                                              'incomplete' if record['status'] == 'audit_incomplete' else 'unknown'),
             'reason': record.get('reason'), 'stop_reason': record.get('stop_reason'), 'open_issues': record.get('open_issues', []), 'elapsed_seconds': record.get('elapsed_seconds'),
             'awaiting_specification': record.get('awaiting_specification', []),
+            'evidence_index': str(root / record['evidence_index']) if record.get('evidence_index') else None,
             'pending_audit_reports': [stage['pending_report'] for stage in record['stages'] if 'pending_report' in stage],
             'models': {'generation_and_repair': [record['settings']['generator_model'], record['settings']['generator_reasoning_effort']],
                        'audit': [record['settings']['audit_model'], record['settings']['audit_reasoning_effort']]},

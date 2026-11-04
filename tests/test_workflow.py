@@ -136,12 +136,16 @@ class OfflineRuntime(workflow.Runtime):
         request = read_json(context / 'request.json')
         audit = fixture_audit(folder / 'runs/fixture', candidate)
         path = audit / 'turns/0001/changes'
+        (audit / 'executions/checked').mkdir(parents=True)
+        write_json(audit / 'executions/checked/result.json', {'execution_id': 'checked',
+                   'argv': ['fixture-only'], 'status': 'completed', 'exit_code': 0,
+                   'source_context': {'kind': 'candidate_copy', 'commit': candidate['commit']}})
         result = {'before_commit': request['before_commit'], 'after_commit': candidate['commit'],
                   'summary': 'Offline verification fixture.', 'issues': [
                       {'id': ident, 'disposition': self.review_dispositions.get(ident, self.review_disposition), 'reason': 'Fixture observation',
                        'method': 'executed', 'before_observation': 'Fixture before', 'after_observation': 'Fixture after',
                        'variant_checks': ['Fixture only'], 'trace_files': ['work/tests/trace.json'],
-                       'evidence': ['work/tests/witness.bin']} for ident in request['issue_ids']]}
+                       'evidence': ['work/tests/witness.bin', 'executions/checked/result.json']} for ident in request['issue_ids']]}
         if self.review_invalid:
             result['issues'] = []
         write_json(path / 'files/review.json', result)
@@ -175,6 +179,17 @@ class WorkflowTests(unittest.TestCase):
 
     def test_review_discovery_reaches_next_repair_despite_empty_fresh_audit(self):
         class ReviewDiscovery(OfflineRuntime):
+            def audit(self, settings, candidate, folder, seconds, timeout):
+                audit = super().audit(settings, candidate, folder, seconds, timeout)
+                if candidate['version'] == 0:
+                    path = audit / 'turns/0001/changes/files/findings.json'
+                    result = read_json(path)
+                    result['cases'] = [{'summary': 'Original bounded check without a finding',
+                        'reproduction': 'Fixture only', 'evidence': ['work/tests/witness.bin']}]
+                    result['open_questions'] = 'An unresolved interpretation; not a repair assignment'
+                    write_json(path, result)
+                return audit
+
             def verify(self, settings, candidate, folder, context, seconds, timeout):
                 audit = super().verify(settings, candidate, folder, context, seconds, timeout)
                 if candidate['version'] == 1:
@@ -184,6 +199,8 @@ class WorkflowTests(unittest.TestCase):
                         'property': 'Original promise', 'assumptions': 'Fixture conditions',
                         'reproduction': 'Fixture only', 'polarity': 'PASS observes defect',
                         'evidence': ['work/tests/witness.bin']}]
+                    result['cases'] = [{'summary': 'Review-added reusable check', 'reproduction': 'Fixture only',
+                        'evidence': ['executions/checked/result.json']}]
                     write_json(path, result)
                 return audit
         runtime = ReviewDiscovery()
@@ -198,6 +215,19 @@ class WorkflowTests(unittest.TestCase):
         index = read_json(root / 'issues.json')
         self.assertNotIn('assessment', index)
         self.assertEqual([item['state'] for item in index['issues']], ['fixed', 'fixed'])
+        evidence = read_json(root/'feedback/001/evidence-index.json')
+        self.assertEqual([entry['id'] for entry in evidence['entries']], ['a000', 'r001'])
+        self.assertEqual([entry['candidate_commit'] for entry in evidence['entries']],
+                         [item['commit'] for item in result['candidates'][:2]])
+        for entry in evidence['entries']:
+            self.assertTrue((root/'feedback/001'/entry['report']).is_file())
+            for case in entry['cases']:
+                self.assertTrue(all((root/'feedback/001'/ref).is_file() for ref in case['evidence']))
+        self.assertIn('not a repair assignment', evidence['entries'][0]['open_questions'])
+        self.assertEqual(read_json(root/'evidence-index.json')['current_candidate_commit'], result['candidates'][2]['commit'])
+        self.assertEqual(workflow.inspect(root)['evidence_index'], str(root/'evidence-index.json'))
+        # Fresh discovery gets only the candidate, not the accumulated context.
+        self.assertFalse((root/'audits/001/feedback').exists())
 
     def test_inspect_omits_legacy_assessment_without_rewriting_archive(self):
         root = workflow.prepare(self.settings, 'legacy')
@@ -329,6 +359,30 @@ class WorkflowTests(unittest.TestCase):
         self.assertEqual([x['state'] for x in issues], ['fixed'] * 3 + ['open'])
         self.assertTrue(all(x['reviews'][0]['before_commit'] == result['candidates'][n]['commit']
                             for n, x in enumerate(issues[:-1])))
+        history = read_json(root / 'feedback/002/history.json')['issues']
+        self.assertEqual([item['id'] for item in history], ['a000-F1', 'a001-F1'])
+        self.assertTrue(all((root / 'feedback/002' / item['reviews'][-1]['evidence'][-1]).is_file()
+                            for item in history))
+
+    def test_actual_changes_override_repair_action_in_both_directions(self):
+        for actual_action, claim in (('repaired', 'no_change'), ('no_change', 'repaired')):
+            runtime = OfflineRuntime(action=actual_action)
+            runtime.review_disposition, runtime.empty_after = 'unresolved', 1
+            original = runtime.agent
+            def misreport(stage):
+                result = original(stage)
+                path = stage / 'workspace/.forge/repair-result.json'
+                if path.exists():
+                    write_json(path, read_json(path) | {'action': claim})
+                return result
+            with self.subTest(claim=claim), patch.object(runtime, 'agent', side_effect=misreport):
+                root, result = self.run_fixture(runtime, max_repairs=2)
+                self.assertEqual(runtime.calls.count('repair'), 2 if actual_action == 'repaired' else 1)
+                stage = next(item for item in result['stages'] if item['kind'] == 'repair')
+                self.assertIn('action_mismatch', stage)
+                request = read_json(root / 'reviews/001/context/request.json')
+                self.assertEqual(request['repair_claim']['action'], claim)
+                self.assertEqual(request['actual_changes'], stage['actual_changes'])
 
     def test_empty_discovery_only_stops_when_no_pending_issues(self):
         runtime = OfflineRuntime()

@@ -124,9 +124,15 @@ class AuditorTests(unittest.TestCase):
     def test_review_is_finite_and_receives_readonly_context(self):
         context = self.root / 'review-context'
         context.mkdir()
-        (context / 'request.json').write_text('{"before_commit":"before", "after_commit":"after"}')
+        request = {'before_commit': 'before', 'after_commit': 'after', 'issue_ids': []}
+        write_json(context / 'request.json', request)
         config = self.config.model_copy(update={'task_mode': 'review', 'review_context': str(context)})
-        result = run(config, self.target, client_factory=ScriptedAudit)
+        class CompleteReview(ScriptedAudit):
+            def turn(self, *args):
+                result = super().turn(*args)
+                write_json(self.root / 'work/review.json', {**request, 'summary': 'Fixture', 'issues': []})
+                return result
+        result = run(config, self.target, client_factory=CompleteReview)
         self.assertEqual(result['stop'], 'review_complete')
         root = Path(result['run_dir'])
         record = json.loads((root / 'run.json').read_text())
@@ -134,16 +140,135 @@ class AuditorTests(unittest.TestCase):
         self.assertEqual((root / 'context/request.json').stat().st_mode & 0o222, 0)
         self.assertIn(str(root / 'context'), (root / 'turns/0001/request.txt').read_text())
 
-    def test_budget_plan_adapts_to_recent_duration_without_inventing_a_report(self):
+    def test_review_repairs_incomplete_delivery_in_the_same_session(self):
+        for defect in ('missing_index', 'missing_issue', 'unlinked_fix', 'bad_new_issue', 'missing_report'):
+            with self.subTest(defect=defect):
+                context = self.root / defect
+                context.mkdir()
+                request = {'before_commit': 'before', 'after_commit': 'after', 'issue_ids': ['F1']}
+                write_json(context / 'request.json', request)
+                class CompletingReview(ScriptedAudit):
+                    def turn(client, folder, prompt, timeout, session_id):
+                        client.sessions.append(session_id)
+                        item = {'id': 'F1', 'disposition': 'fixed', 'method': 'executed',
+                                'reason': 'Fixture only', 'before_observation': 'Before', 'after_observation': 'After',
+                                'evidence': ['work/report.md', 'executions/checked/result.json']}
+                        write_json(client.root / 'executions/checked/result.json', {'execution_id': 'checked',
+                                   'turn': folder.name, 'status': 'completed', 'exit_code': 1, 'argv': ['fixture-only'],
+                                   'source_context': {'kind': 'candidate_copy', 'commit': 'after'}})
+                        report = client.root / 'work/report.md'
+                        report.write_text('Fixture report, no consensus claim')
+                        data = {**request, 'summary': 'Fixture', 'issues': [item]}
+                        if session_id is None:
+                            if defect == 'missing_index':
+                                return {'status': 'completed', 'session_id': 'review-session'}
+                            if defect == 'missing_issue':
+                                data['issues'] = []
+                            if defect == 'unlinked_fix':
+                                item['evidence'] = ['work/report.md']
+                            if defect == 'bad_new_issue':
+                                data['new_issues'] = [{'id': 'F2'}]
+                            if defect == 'missing_report':
+                                report.unlink()
+                                item['evidence'] = ['executions/checked/result.json']
+                        write_json(client.root / 'work/review.json', data)
+                        return {'status': 'completed', 'session_id': 'review-session'}
+                config = self.config.model_copy(update={'task_mode': 'review', 'review_context': str(context)})
+                result = run(config, self.target, client_factory=CompletingReview)
+                self.assertEqual(result['stop'], 'review_complete')
+                root = Path(result['run_dir'])
+                self.assertEqual(len(json.loads((root / 'run.json').read_text())['turns']), 2)
+                self.assertIn('Review delivery is incomplete', (root / 'turns/0002/request.txt').read_text())
+                bundle = self.root / f'handoff-{defect}'
+                prepare_handoff(root, {'commit': self.commit}, bundle)
+                from issues import review_result
+                result = review_result(bundle, {'commit': 'before'}, {'commit': 'after', 'version': 1}, ['F1'])
+                self.assertEqual(result['issues'][0]['disposition'], 'fixed')
+
+    def test_unfinished_review_does_not_become_complete_when_call_budget_ends(self):
+        context = self.root / 'review-context'
+        context.mkdir()
+        write_json(context / 'request.json', {'before_commit': 'before', 'after_commit': 'after', 'issue_ids': ['F1']})
+        class UnfinishedReview(ScriptedAudit):
+            def turn(client, *args):
+                (client.root / 'work/report.md').write_text('Still investigating')
+                return {'status': 'completed', 'session_id': 'same-session'}
+        config = self.config.model_copy(update={'task_mode': 'review', 'review_context': str(context)})
+        result = run(config, self.target, client_factory=UnfinishedReview)
+        self.assertEqual(result['stop'], 'agent_call_limit')
+        self.assertEqual(len(json.loads((Path(result['run_dir']) / 'run.json').read_text())['turns']), 2)
+
+    def test_budget_plan_keeps_short_investigations_available_after_long_turns(self):
         self.assertEqual(continuation_plan(1200, 37, [300], True)['work_mode'], 'retain_report')
-        self.assertEqual(continuation_plan(1200, 146, [300, 200, 250], True)['work_mode'], 'wrap_up')
+        self.assertEqual(continuation_plan(1200, 146, [300, 200, 250], True)['work_mode'], 'investigate')
         self.assertEqual(continuation_plan(1200, 146, [10, 12, 11], True)['work_mode'], 'investigate')
-        self.assertEqual(continuation_plan(1200, 11, [], False)['work_mode'], 'investigate')
+        self.assertEqual(continuation_plan(1200, 120, [10, 12, 11], True)['work_mode'], 'wrap_up')
+        self.assertEqual(continuation_plan(1200, 11, [], False)['work_mode'], 'wrap_up')
         self.assertEqual(continuation_plan(30, 10, [.1], True)['work_mode'], 'investigate')
+        self.assertEqual(continuation_plan(900, 112, [788], False)['work_mode'], 'investigate')
+        self.assertEqual(continuation_plan(900, 80, [820], False)['work_mode'], 'wrap_up')
+        self.assertEqual(continuation_plan(900, 20, [880], False)['work_mode'], 'wrap_up')
+        self.assertEqual(continuation_plan(1800, 1012, [788], False)['work_mode'], 'investigate')
+        # The observed baseline run had 622s left after a 575s first turn.
+        for has_report in (True, False):
+            plan = continuation_plan(1200, 622.3, [574.7], has_report)
+            self.assertEqual(plan['work_mode'], 'investigate')
+            self.assertAlmostEqual(plan['investigation_seconds'], 562.3)
+
+    def test_first_timeout_wraps_up_without_promoting_an_unfinished_report(self):
+        for first_duration, final_status in ((820., 'completed'), (880., 'completed'), (820., 'timeout')):
+            with self.subTest(first_duration=first_duration, final_status=final_status):
+                clock = [10000.0]
+                class ResumableAudit(ScriptedAudit):
+                    def turn(inner, folder, prompt, timeout, session_id):
+                        inner.prompts.append(prompt)
+                        first = len(inner.prompts) == 1
+                        work = inner.root / 'work'
+                        if first:
+                            self.assertIsNone(session_id)
+                            self.assertEqual(timeout, 600.)
+                            (work / 'witness.txt').write_text('Evidence retained before timeout.')
+                        else:
+                            self.assertEqual(session_id, 'fixture-session')
+                            self.assertEqual(timeout, 900. - first_duration)
+                            self.assertIn('final planned turn', prompt)
+                            record = json.loads((inner.root / 'run.json').read_text())
+                            self.assertIsNone(record.get('last_completed_report'))
+                        status = 'timeout' if first else final_status
+                        clock[0] += first_duration if first else (timeout if status == 'timeout' else 5.)
+                        (work / 'report.md').write_text(f'Fixture report {len(inner.prompts)}: {status}')
+                        if status == 'completed':
+                            write_json(work / 'findings.json', {'candidate_commit': self.commit,
+                                'coverage': 'Fixture only', 'issues': []})
+                        return {'status': status, 'session_id': 'fixture-session',
+                                'continuable_timeout': status == 'timeout'}
+                config = self.config.model_copy(update={'budget': self.config.budget.model_copy(
+                    update={'total_seconds': 900., 'agent_turn_timeout': 600., 'agent_calls': 6})})
+                with patch('auditor.runner.time.monotonic', side_effect=lambda: clock[0]):
+                    result = run(config, self.target, client_factory=ResumableAudit)
+                self.assertEqual(result['stop'], 'budget_wrap_up' if final_status == 'completed' else 'total_deadline')
+                root = Path(result['run_dir'])
+                record = json.loads((root / 'run.json').read_text())
+                self.assertEqual([turn['status'] for turn in record['turns']], ['timeout', final_status])
+                second = json.loads((root / 'turns/0002/result.json').read_text())
+                self.assertEqual(second['budget_plan']['work_mode'], 'wrap_up')
+                self.assertEqual(second['budget_plan']['recent_turn_seconds'], first_duration)
+                candidate = {'path': self.config.repo_path, 'commit': self.commit}
+                feedback = self.root / f'feedback-{first_duration}-{final_status}'
+                if final_status == 'completed':
+                    handoff = prepare_handoff(root, candidate, feedback)
+                    self.assertEqual(handoff['last_completed_turn'], 2)
+                    self.assertEqual((feedback / handoff['report']).read_text(), 'Fixture report 2: completed')
+                    self.assertEqual((feedback / 'audit-work/witness.txt').read_text(), 'Evidence retained before timeout.')
+                else:
+                    self.assertIsNone(record.get('last_completed_report'))
+                    self.assertTrue((root / 'turns/0002/changes/files/report.md').is_file())
+                    with self.assertRaisesRegex(ValueError, 'no completed report'):
+                        prepare_handoff(root, candidate, feedback)
 
     def test_wrap_up_finishes_once_or_retains_report_without_tiny_new_turn(self):
-        for durations, expected_stop, last_completed in (([630, 15], 'budget_wrap_up', 2),
-                ([100, 1045], 'budget_wrap_up', 2), ([630, 570], 'total_deadline', 1)):
+        for durations, expected_stop, last_completed in (([575, 102, 430, 15], 'budget_wrap_up', 4),
+                ([100, 1045], 'budget_wrap_up', 2), ([1090, 110], 'total_deadline', 1)):
             with self.subTest(durations=durations):
                 clock = [10000.0]
                 clients = []
@@ -168,12 +293,20 @@ class AuditorTests(unittest.TestCase):
                     result = run(config, self.target, client_factory=factory)
                 self.assertEqual(result['stop'], expected_stop)
                 self.assertTrue(result['ok'])
-                self.assertEqual(len(clients[0].prompts), 2)
-                if durations[0] == 630:
+                self.assertEqual(len(clients[0].prompts), len(durations))
+                for prompt in clients[0].prompts[:-1]:
+                    self.assertNotIn('final planned turn', prompt)
+                if durations[0] != 100:
                     self.assertIn('final planned turn', clients[0].prompts[-1])
                 else:
                     self.assertNotIn('final planned turn', clients[0].prompts[-1])
                 root = Path(result['run_dir'])
+                if durations[0] == 575:
+                    # Returning after a shorter follow-up must leave room for a
+                    # third investigation, rather than ending after turn two.
+                    for number in (2, 3):
+                        plan = json.loads((root / f'turns/{number:04d}/result.json').read_text())['budget_plan']
+                        self.assertEqual(plan['work_mode'], 'investigate')
                 handoff = prepare_handoff(root, {'path': self.config.repo_path, 'commit': self.commit},
                                           self.root / f'feedback-{durations[0]}-{durations[1]}')
                 self.assertEqual(handoff['last_completed_turn'], last_completed)

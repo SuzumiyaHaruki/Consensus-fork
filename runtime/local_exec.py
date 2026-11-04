@@ -31,7 +31,10 @@ DESCRIPTION = ('Run an ordinary local test in a private network and PID namespac
                'No background service survives an invocation. Complete raw logs are retained read-only. '
                'Calls in the same run serialize across tool processes, including native subagents; queue waiting consumes the run budget. '
                'Optionally select source from the captured sources listed in the run brief and overlays of relative test/helper files from work. '
-               'This starts from a private candidate copy; overlays and the starting commit are retained. Without source, work is mutable and no exact candidate binding is claimed.')
+               'This starts from a private candidate copy; overlays and the starting commit are retained. Without source, work is mutable and no exact candidate binding is claimed. '
+               'Use outputs to retain selected relative files/directories from the execution workspace before cleanup, including on test failure/timeout. '
+               'Read result.artifacts for saved files and exclusions; unselected files in a source copy are deleted. '
+               'Output collection excludes links, credentials, executables and private/cache directories; limits are 16 MB per file, 64 MiB total and 1024 entries.')
 
 
 class Arguments(BaseModel):
@@ -41,6 +44,7 @@ class Arguments(BaseModel):
     timeout_seconds: float | None = Field(default=None, gt=0)
     source: str | None = None
     overlays: list[str] = Field(default_factory=list)
+    outputs: list[str] = Field(default_factory=list)
 
 
 def tool():
@@ -165,11 +169,13 @@ async def execute_locked(control, arguments, request_id):
     record = {'execution_id': execution_id, 'turn': control['turn'], 'mcp_request_id': request_id,
               'argv': args.argv, 'cwd': str(work / args.cwd), 'requested_source': args.source,
               'requested_overlays': args.overlays, 'requested_timeout_seconds': args.timeout_seconds,
+              'requested_outputs': args.outputs,
               'timeout_seconds': limit, 'timeout_limit': basis, 'started_at': timestamp(),
               'status': 'running', 'exit_code': None, 'service_pid': os.getpid()}
     started = time.monotonic()
     write_json(folder/'result.json', record)
     child = None
+    execution_work = None
     pumps = []
     clock_path = Path(control['execution_clock_path']) if control.get('execution_clock_path') else None
     clock = None
@@ -232,6 +238,11 @@ async def execute_locked(control, arguments, request_id):
                                 'truncated': path.stat().st_size > len(preview), 'bytes': path.stat().st_size}
             if record['status'] == 'completed' and record['exit_code'] and record['stderr']['preview'].startswith('bwrap:'):
                 record['status'] = 'launch_error'
+            try:
+                if args.outputs and execution_work is not None:
+                    record['artifacts'] = replay.retain_outputs(execution_work, args.outputs, folder)
+            except (OSError, ValueError) as exc:
+                record['artifacts'] = {'files': [], 'excluded': [{'path': '.', 'reason': str(exc)}]}
             try:
                 replay.cleanup(folder)
             except OSError as exc:

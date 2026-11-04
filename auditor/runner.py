@@ -245,16 +245,17 @@ def brief(root, source, target, deadline, timeout, calls_left):
 
 
 def continuation_plan(total_seconds, remaining, durations, has_report):
-    """A short invocation floor and an adaptive final turn, not a coverage verdict."""
+    """Reserve a short final window; earlier turns do not set an investigation minimum."""
     reserve = min(60.0, total_seconds * .05)
     recent = median(durations[-3:]) if durations else None
     mode = 'investigate'
     if has_report and remaining < reserve:
         mode = 'retain_report'
-    elif has_report and recent is not None and remaining < recent + reserve:
+    elif remaining <= 2 * reserve:
         mode = 'wrap_up'
     return {'work_mode': mode, 'remaining_seconds': max(0.0, remaining),
-            'reporting_reserve_seconds': reserve, 'recent_turn_seconds': recent}
+            'reporting_reserve_seconds': reserve, 'recent_turn_seconds': recent,
+            'investigation_seconds': max(0.0, remaining - reserve) if mode == 'investigate' else 0.0}
 
 
 def loop(config, root, source, target, client, deadline, record):
@@ -285,9 +286,16 @@ def loop(config, root, source, target, client, deadline, record):
                        'existing evidence, updating the report/index and finishing delegated work. You may '
                        'complete a small bounded check if useful; do not start a broad investigation merely '
                        'to consume the remaining time. State unfinished work and uncertainty explicitly.')
+        else:
+            prompt += ('\n\nChoose investigations that fit the remaining investigation time, allowing for reporting. '
+                       'A follow-up investigation may be shorter than earlier turns; their duration is context, '
+                       'not a minimum required to continue.')
         prompt += '\n\nBudget guidance (time planning, not a required test plan):\n' + json.dumps(plan)
         if feedback:
-            fresh = [item for item in feedback['observations'] if json.dumps(item, sort_keys=True) not in delivered][:12]
+            errors = feedback['delivery_errors'] if config.task_mode == 'review' else []
+            if errors:
+                prompt += '\n\nReview delivery is incomplete; correct these record errors or retain unchecked issues as unresolved:\n' + json.dumps(errors, ensure_ascii=False, indent=2)
+            fresh = [item for item in feedback['observations'] if item not in errors and json.dumps(item, sort_keys=True) not in delivered][:12]
             if fresh:
                 prompt += '\n\nEvidence follow-up (observations, not verdicts or mandatory extra tests):\n' + json.dumps(fresh, ensure_ascii=False, indent=2)
                 delivered.update(json.dumps(item, sort_keys=True) for item in fresh)
@@ -320,19 +328,23 @@ def loop(config, root, source, target, client, deadline, record):
             record['last_completed_report'] = report_version
         if result['status'] == 'completed':
             expected = {'candidate_commit': source['commit']}
+            expected_ids = None
             if config.task_mode == 'review':
                 request = json.loads((root/'context/request.json').read_text())
                 expected = {key: request[key] for key in ('before_commit', 'after_commit')}
-            feedback = report_feedback(root, 'review.json' if config.task_mode == 'review' else 'findings.json', expected)
+                expected_ids = request['issue_ids']
+            feedback = report_feedback(root, 'review.json' if config.task_mode == 'review' else 'findings.json', expected, expected_ids)
             write_json(folder/'evidence-feedback.json', feedback)
         previous = actual
-        if result['status'] == 'completed':
+        # A resumable timeout still consumed wall time, including tool execution.
+        # Use it for planning without treating its draft as a completed report.
+        if result['status'] == 'completed' or result.get('continuable_timeout'):
             durations.append(time.monotonic() - turn_start)
         write_json(folder / "result.json", result)
         session = result.get("session_id")
         write_json(root / "run.json", record)
-        if config.task_mode == 'review' and result['status'] == 'completed':
-            # A finite verification task. The controller validates its structured result separately.
+        if config.task_mode == 'review' and result['status'] == 'completed' and not feedback['delivery_errors']:
+            # Complete delivery is distinct from an agent turn ending or a correctness verdict.
             record['stop'] = 'review_complete'
             break
         if result['status'] == 'completed' and plan['work_mode'] == 'wrap_up':

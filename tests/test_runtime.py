@@ -2,6 +2,7 @@
 import ast
 import asyncio
 import json
+import os
 from pathlib import Path
 import select
 import subprocess
@@ -55,6 +56,57 @@ class RuntimeTests(unittest.TestCase):
         for source, overlays in [(None, ['test.py']), ('unknown', [])]:
             with self.assertRaises(ValueError):
                 replay.prepare(self.control, source, overlays, self.folder)
+
+    def test_selected_outputs_survive_cleanup_and_link_to_execution(self):
+        work, _, context = replay.prepare(self.control, 'candidate', [], self.folder)
+        (work/'observations').mkdir()
+        (work/'observations/history.json').write_text('[{"result": "observed"}]')
+        (work/'discard.txt').write_text('not selected')
+        artifacts = replay.retain_outputs(work, ['observations', 'observations/history.json', 'missing'], self.folder)
+        replay.cleanup(self.folder)
+        self.assertFalse(work.exists())
+        self.assertEqual(len(artifacts['files']), 1)
+        self.assertEqual(artifacts['excluded'][0]['path'], 'missing')
+        self.assertFalse((self.folder/'artifacts/discard.txt').exists())
+        item = self.record(source_context=context, artifacts=artifacts)
+        details = inspect_item(item, self.root)
+        output = details['execution_records'][0]['outputs']['artifact:observations/history.json']
+        self.assertEqual((self.root/output).read_text(), '[{"result": "observed"}]')
+        self.assertEqual(details['evidence_feedback'][0]['code'], 'output_excluded')
+        (self.root/output).unlink()
+        self.assertIn('output_missing', {entry['code'] for entry in inspect_item(item, self.root)['evidence_feedback']})
+
+    def test_output_selection_preserves_private_file_and_link_exclusions(self):
+        folder = self.work/'results'
+        folder.mkdir()
+        (folder/'good.txt').write_text('visible')
+        (folder/'.env').write_text('private fixture')
+        (folder/'binary').write_bytes(b'\x7fELFcompiled')
+        (folder/'link').symlink_to(self.source/'value.txt')
+        (folder/'dirlink').symlink_to(self.source, target_is_directory=True)
+        (folder/'.runtime').mkdir()
+        (folder/'.runtime/private.txt').write_text('private')
+        os.link(self.source/'value.txt', folder/'hardlink')
+        os.mkfifo(folder/'fifo')
+        artifacts = replay.retain_outputs(self.work, ['results', '../source', '.', str(self.source)], self.folder)
+        self.assertEqual([entry['path'] for entry in artifacts['files']], ['results/good.txt'])
+        excluded = {entry['path'] for entry in artifacts['excluded']}
+        self.assertTrue({'results/.env', 'results/binary', 'results/link', 'results/dirlink',
+                         'results/.runtime', 'results/hardlink', 'results/fifo', '../source', '.', str(self.source)} <= excluded)
+
+    def test_output_limits_report_partial_collection(self):
+        folder = self.work/'results'
+        folder.mkdir()
+        for n in range(6):
+            (folder/str(n)).write_text('1234')
+        with patch.object(replay, 'MAX_OUTPUT_BYTES', 8):
+            artifacts = replay.retain_outputs(self.work, ['results'], self.folder)
+        self.assertEqual(sum(entry['bytes'] for entry in artifacts['files']), 8)
+        self.assertEqual(len(artifacts['excluded']), 4)
+        with patch.object(replay, 'MAX_OUTPUT_FILES', 3):
+            artifacts = replay.retain_outputs(self.work, ['results'], self.folder)
+        self.assertLessEqual(len(artifacts['files']), 2)
+        self.assertTrue(any('partial' in entry['reason'] for entry in artifacts['excluded']))
 
     def test_replay_inputs_cannot_escape_or_copy_private_files(self):
         (self.work/'link').symlink_to(self.source/'value.txt')

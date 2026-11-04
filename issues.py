@@ -1,22 +1,11 @@
 """Small, ordinary JSON issue records linking versions, reports and review evidence."""
 import json
-import re
 from pathlib import Path
 
 from artifacts import inside, copy_tree, require_description
 from generator.runner import read_json, write_json
-from runtime.evidence import inspect_item, retained_path
-
-CLOSED = {'fixed', 'not_substantiated'}
-DISPOSITIONS = CLOSED | {'unresolved', 'needs_specification', 'environment_blocked'}
-FINDING_DETAILS = ('legality', 'reachability', 'impact', 'causal_explanation', 'variants')
-
-
-def nonempty(value, name):
-    if not isinstance(value, str) or not value.strip():
-        raise ValueError(f'{name} must be a nonempty string')
-    return value
-
+from runtime.evidence import (CLOSED, inspect_item, retained_path, validate_findings,
+                              validate_review, require_fix_execution)
 
 def evidence(bundle, refs):
     """Map agent paths to the reconstructed completed turn, not its mutable worktree."""
@@ -27,7 +16,7 @@ def evidence(bundle, refs):
 
 def rebase_evidence(item, prefix):
     return {**item, 'evidence_bundle': str(prefix),
-            'evidence': [str(prefix / name) for name in item['evidence']],
+            'evidence': [str(prefix / name) for name in item.get('evidence', [])],
             'trace_files': [str(prefix / name) for name in item.get('trace_files', [])],
             'trace_checks': [{**check, 'path': str(prefix / check['path'])}
                              for check in item.get('trace_checks', [])],
@@ -38,22 +27,82 @@ def rebase_evidence(item, prefix):
                                   for entry in item.get('execution_records', [])]}
 
 
-def feedback_overview(candidate, issues):
+def short_description(value, limit=360):
+    text = value if isinstance(value, str) else json.dumps(value, ensure_ascii=False)
+    text = ' '.join(text.split())
+    return text if len(text) <= limit else text[:limit] + '… (see full record)'
+
+
+def feedback_overview(candidate, issues, history, catalog=()):
     lines = ['# Repair evidence overview', '',
              'Navigation only. Descriptions below are copied from retained records, not independently established facts. Read the original reports, traces, commands and outputs. PASS can mean a defect was observed.', '',
              'For each execution record, restore maps workspace destinations to retained input files; outputs points to original logs. cwd_relative is the execution directory within the selected source, or null if not recorded. argv and original cwd are unchanged: inspect absolute paths, rebuild temporary binaries and adapt only with an explanation. Use isolated_exec; no command is automatically run by this handoff.', '',
-             f"Current candidate: `{candidate['commit']}`. Full issue and review records: `issues.json`.", '']
+             f"Current candidate: `{candidate['commit']}`. Full issue and review records: [issues.json](issues.json).", '']
+    if history:
+        lines.extend(['Closed history and review-added evidence are in `history.json`. Select relevant regression checks; historical closure does not verify the current candidate.', '',
+                      '| Issue | Agent disposition | Version supporting closure |', '| --- | --- | --- |'])
+        for item in history:
+            lines.append(f"| {item['id']} | {item['state']} | {item['reviews'][-1]['after_commit']} |")
+        lines.append('')
     for issue in issues:
         lines.extend([f"## {issue['id']}", '',
                       f"State: `{issue['state']}`; origin: `{issue['source_commit']}`; original bundle: `{issue['evidence_bundle']}`.", ''])
-        fields = ('summary', 'property', 'assumptions', *FINDING_DETAILS, 'reproduction', 'polarity',
-                  'evidence', 'trace_files', 'execution_records', 'evidence_feedback', 'reviews')
-        for field in fields:
+        for field in ('summary', 'property', 'reproduction', 'polarity'):
             if field in issue:
-                # JSON preserves nested values and line breaks without a lossy prose summary.
-                lines.extend([f'**{field}**', '', '```json',
-                              json.dumps(issue[field], ensure_ascii=False, indent=2), '```', ''])
+                lines.extend([f'{field}: {short_description(issue[field])}', ''])
+        records = [('Original evidence', issue)]
+        if issue.get('reviews'):
+            review = issue['reviews'][-1]
+            lines.extend([f"Latest review: `{review['disposition']}` on `{review['after_commit']}`. {short_description(review['reason'])}", ''])
+            records.append(('Latest review evidence', review))
+        for label, record in records:
+            lines.append(label + ':')
+            lines.append('')
+            for execution in record.get('execution_records', []):
+                version = execution['source_context'].get('commit', 'source not captured')
+                command = execution.get('argv', execution.get('command'))
+                lines.append(f"- [{execution['execution_id']}]({execution['path']}): `{version}`, {execution['status']}, exit {execution.get('exit_code')}; {short_description(command, 180)}")
+            for ref in dict.fromkeys(record.get('evidence', []) + record.get('trace_files', [])):
+                lines.append(f'- [Retained evidence]({ref})')
+            lines.append('')
+    if catalog:
+        lines.extend(['Reusable cases and open questions: [evidence-index.json](evidence-index.json). These are agent observations for recorded versions, not current-version verification or extra repair assignments.', ''])
+        for entry in catalog:
+            lines.append(f"- [{entry['id']}]({entry['report']}), recorded for `{entry['candidate_commit']}`: {len(entry['cases'])} cases; open questions {'present' if entry['open_questions'] else 'none'}.")
+        lines.append('')
     return '\n'.join(lines)
+
+
+def catalog_entry(bundle, candidate, name, filename):
+    """Optional agent-selected cases/questions; malformed notes never close or block issues."""
+    data = read_json(inside(bundle, 'audit-work/' + filename))
+    entry = {'id': name, 'candidate_commit': candidate['commit'], 'evidence_bundle': str(bundle),
+             'report': 'audit-work/report.md', 'cases': [], 'open_questions': [], 'warnings': []}
+    questions = data.get('open_questions', [])
+    if questions:
+        try:
+            entry['open_questions'] = require_description(questions, 'open_questions')
+        except ValueError as exc:
+            entry['warnings'].append(str(exc))
+    cases = data.get('cases', [])
+    if not isinstance(cases, list):
+        entry['warnings'].append('Optional cases must be a list; original field remains in the source index')
+        cases = []
+    for number, case in enumerate(cases):
+        try:
+            if not isinstance(case, dict):
+                raise ValueError('Case must be an object')
+            require_description(case.get('summary'), 'case summary')
+            require_description(case.get('reproduction'), 'case reproduction')
+            refs = evidence(bundle, case.get('evidence'))
+            details = inspect_item(case, bundle, work_name='audit-work', raw_name='raw',
+                                   expected_commits=(candidate['commit'],))
+            entry['cases'].append({**case, 'id': f'{name}-c{number:03d}', 'local_id': case.get('id'),
+                                   'recorded_for_commit': candidate['commit'], 'evidence_bundle': str(bundle),
+                                   'evidence': refs, **details})
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            entry['warnings'].append(f'Case {number}: {exc}; original entry remains in the source index')
+    return entry if entry['cases'] or entry['open_questions'] or entry['warnings'] else None
 
 
 def findings(bundle, candidate, number):
@@ -66,18 +115,10 @@ def findings(bundle, candidate, number):
 
 def index_findings(items, bundle, candidate, prefix):
     """Use the same evidence and identity handling for discovery and review findings."""
-    if not isinstance(items, list):
-        raise ValueError('Finding index needs an explicit issue list, including when empty')
-    seen, result = set(), []
+    validate_findings(items)
+    result = []
     for issue in items:
-        if not isinstance(issue, dict):
-            raise ValueError('Finding must be an object')
-        ident = nonempty(issue.get('id'), 'issue id')
-        if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.-]{0,63}', ident) or ident in seen:
-            raise ValueError('Duplicate or invalid finding id')
-        seen.add(ident)
-        for name in ('summary', 'property', 'assumptions', 'reproduction', 'polarity'):
-            require_description(issue.get(name), name)
+        ident = issue['id']
         result.append({**issue, 'id': f'{prefix}-{ident}', 'local_id': ident,
                        'source_commit': candidate['commit'], 'candidate_version': candidate['version'],
                        'evidence_bundle': str(bundle), 'evidence': evidence(bundle, issue.get('evidence')),
@@ -95,71 +136,53 @@ def repairable(issues):
     return [issue for issue in pending(issues) if issue['state'] != 'needs_specification']
 
 
-def feedback_bundle(destination, latest, candidate, issues):
+def feedback_bundle(destination, latest, candidate, issues, catalog=()):
     copy_tree(latest, destination)
     brief = read_json(destination / 'handoff.json')
-    delivered = []
-    origins = {}
-    for issue in pending(issues):
-        origin = issue['evidence_bundle']
+    delivered, history, origins = [], [], {}
+
+    def retain(item, *, catalog=False):
+        origin = item['evidence_bundle']
         if origin == str(latest):
             prefix = Path('.')
         else:
             if origin not in origins:
-                prefix = Path('previous') / f'{len(origins):03d}'
-                copy_tree(Path(origin), destination / prefix)
-                origins[origin] = prefix
+                origins[origin] = Path('previous') / f'{len(origins):03d}'
+                copy_tree(Path(origin), destination / origins[origin])
             prefix = origins[origin]
-        reviews = []
-        for review in issue['reviews']:
-            origin = review['evidence_bundle']
-            if origin not in origins:
-                review_prefix = Path('previous') / f'{len(origins):03d}'
-                copy_tree(Path(origin), destination / review_prefix)
-                origins[origin] = review_prefix
-            review_prefix = origins[origin]
-            reviews.append(rebase_evidence(review, review_prefix))
-        delivered.append({**rebase_evidence(issue, prefix), 'reviews': reviews})
+        retained = rebase_evidence(item, prefix)
+        if catalog:
+            retained.update(report=str(prefix / item['report']),
+                            cases=[rebase_evidence(case, prefix) for case in item['cases']])
+        return retained
+
+    for issue in issues:
+        item = retain(issue)
+        item['reviews'] = [retain(review) for review in issue['reviews']]
+        (history if issue['state'] in CLOSED else delivered).append(item)
     write_json(destination / 'issues.json', {'candidate_commit': candidate['commit'], 'issues': delivered})
-    (destination / 'overview.md').write_text(feedback_overview(candidate, delivered), encoding='utf-8')
+    write_json(destination / 'history.json', {'candidate_commit': candidate['commit'], 'issues': history})
+    notes = [retain(entry, catalog=True) for entry in catalog]
+    write_json(destination / 'evidence-index.json', {'current_candidate_commit': candidate['commit'], 'entries': notes,
+               'scope': 'Agent-selected cases and questions. Recorded versions and actual execution source contexts remain separate; no automatic current-version verdict.'})
+    (destination / 'overview.md').write_text(feedback_overview(candidate, delivered, history, notes), encoding='utf-8')
     brief.update(issues_file='issues.json', candidate_commit=candidate['commit'],
-                 overview_file='overview.md',
+                 overview_file='overview.md', history_file='history.json',
+                 evidence_index_file='evidence-index.json',
                  repair_issue_ids=[issue['id'] for issue in repairable(issues)],
-                 note='Repair only repair_issue_ids. Other pending issues are retained as specification context, not closed. Original source_commit remains explicit.')
+                 note='Repair only repair_issue_ids. Other pending issues are specification context. Closed history is available for selective regression checks, not new repair assignments or current-version verification.')
     write_json(destination / 'handoff.json', brief)
 
 
 def review_result(bundle, before, after, expected_ids):
     result = read_json(inside(bundle, 'audit-work/review.json'))
-    if result.get('before_commit') != before['commit'] or result.get('after_commit') != after['commit']:
-        raise ValueError('Review refers to different before/after candidates')
-    require_description(result.get('summary'), 'review summary')
-    if not isinstance(result.get('issues'), list):
-        raise ValueError('Review needs an issue list')
-    seen = set()
+    validate_review(result, {'before_commit': before['commit'], 'after_commit': after['commit']}, expected_ids)
     for issue in result['issues']:
-        if not isinstance(issue, dict):
-            raise ValueError('Review issue must be an object')
-        ident = nonempty(issue.get('id'), 'review issue id')
-        disposition = nonempty(issue.get('disposition'), 'review disposition')
-        if ident in seen or disposition not in DISPOSITIONS:
-            raise ValueError('Duplicate review id or invalid disposition')
-        seen.add(ident)
-        for name in ('reason', 'before_observation', 'after_observation'):
-            require_description(issue.get(name), name)
-        method = nonempty(issue.get('method'), 'review method')
-        if method not in {'executed', 'source_review', 'blocked'}:
-            raise ValueError('Review method must distinguish execution, source review and blocked work')
-        if method == 'blocked' and disposition in CLOSED:
-            raise ValueError('A blocked verification cannot close a finding; retain it unresolved or environment_blocked')
-        if issue['disposition'] == 'fixed' and issue['method'] != 'executed':
-            raise ValueError('Closing a fix needs independent execution; otherwise retain unresolved')
         details = inspect_item(issue, bundle, work_name='audit-work', raw_name='raw',
                                expected_commits=(before['commit'], after['commit']))
+        require_fix_execution(issue, details, after['commit'])
         issue['evidence'] = evidence(bundle, issue.get('evidence'))
         issue.update(details)
-    if seen != set(expected_ids):
-        raise ValueError('Review must cover exactly the supplied issue IDs')
     # Validate new observations before applying any closures. Missing field remains compatible.
     result['new_issues'] = index_findings(result.get('new_issues', []), bundle, after,
                                          f"r{after['version']:03d}")

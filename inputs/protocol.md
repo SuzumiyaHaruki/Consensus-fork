@@ -6,7 +6,9 @@
 
 There is a fixed member set `Pi`, with `n = 2*f + 1`. At most `f` members suffer crash-stop failures cumulatively: once a replica crashes, it never restarts or rejoins the protocol. Messages it sent before crashing may still arrive afterward, as specified below. All participants follow the protocol. Message identities can be authenticated. Byzantine behavior is outside the model.
 
-The known one-way communication bound is `Delta`. A completed point-to-point send must reach a continuously surviving recipient within `Delta`, even if the sender subsequently crashes. A broadcast sends to its targets individually and may be interrupted by a sender crash. Partial and complete broadcasts are distinct.
+The cluster configuration specifies the fixed members and operating parameters, including `Delta`. The `configuration` field in a command identifies that configuration, for example `local-demo-1`; it need not contain the whole configuration document. Clients and replicas use the same configured identifier, and replicas reject commands belonging to a different configuration. This keeps command identities and protocol state from different configurations separate. The identifier stays unchanged throughout this fixed-configuration run, including coordinator takeover; it does not provide a membership-change protocol.
+
+The known effective one-way communication bound is `Delta`. In the ideal model, local processing is instantaneous. In a real system, the configured bound must budget the communication and necessary protocol processing described below, rather than only network transit. A completed point-to-point send must reach a continuously surviving recipient within `Delta`, even if the sender subsequently crashes. A broadcast sends to its targets individually and may be interrupted by a sender crash. Partial and complete broadcasts are distinct.
 
 A command has `CommandID = (ClientID, RequestSeq)`, scoped to its configuration. `ClientID` identifies one lifetime of a client's command-number allocator, called an allocation session; `RequestSeq` identifies one logical operation allocated during that lifetime. Different sessions have distinct client identities, and a session never allocates the same sequence number to different operations. Section 14 explains allocation, single submission, and the checks performed before accepting a command. This client integration is an explicit extension of the supplied protocol design.
 
@@ -16,7 +18,9 @@ Command identities, protocol request IDs, probe nonces, and coordinator generati
 
 Each node maintains a monotonically growing set `F` of members it has accurately confirmed crashed. The words "dead" and "confirmed dead" refer to these crash-stop failures. Sending to members not yet confirmed dead means sending to `Pi - F` using the sender's own `F`; this set can include a crashed member whose failure the sender has not yet detected. Death facts in `F` can be reused across commands. The essential assumptions are synchronous bounds, immutable first observations, and at most one legal live coordinator per command.
 
-The stated bounds assume instantaneous local processing. Real execution must include bounded processing, sending, and saving costs in its timing assumptions. Any timer relying on complete propagation starts after the relevant complete send. Before a timeout concludes that a reply is missing, process valid replies to that request that arrived within the stated bound, including exactly at the deadline. For example, an on-time matching `ALIVE` must not be ignored merely because its processing was queued behind the timeout callback. This is an ordering requirement, not a prescribed queue or thread implementation; real processing delays still need a justified bound. Reliable elapsed-time measurement is required; shared wall clocks are not.
+The ideal timing derivations assume instantaneous local processing. Real execution uses an effective `Delta` that accounts for necessary encoding, queueing, scheduling, decoding and protocol processing under its stated operating conditions. In particular, the `2*Delta` request/reply wait must cover handling the request, sending the required reply and registering that reply at the requesting node; the `Delta` Seal wait must cover delivery and saving the candidate. Time spent reaching complete send, and local timer-dispatch delay, must also be bounded and reported when discussing actual elapsed latency. Dependency readiness and end-to-end client completion are separate; they have no universal bound here. `system.md` defines the runtime boundaries used to apply these assumptions.
+
+Any timer relying on complete propagation starts after the relevant complete send. For timeout ordering, reception is the atomic registration of a complete, decoded message with validated source/configuration at the Node intake, with its local monotonic reception time and, where applicable, request identity or nonce. The protocol owner still checks whether it is a valid reply for the relevant flow; intake registration alone does not make it valid. Before concluding that a reply is missing, account for valid replies registered no later than the deadline, including exactly at it. A matching `ALIVE` cannot be ignored merely because its handler was queued behind the timeout callback. Continuing arrivals must not indefinitely defer expired work. These are timing and ordering requirements, not a prescribed queue or thread implementation. Reliable elapsed-time measurement is required; shared wall clocks are not.
 
 ## 2. Notation and message vocabulary
 
@@ -24,6 +28,7 @@ The tables below define notation and message vocabulary; they do not prescribe a
 
 | Name | Meaning |
 | --- | --- |
+| `configuration` | Identifier of the fixed cluster configuration to which a command and its protocol state belong |
 | `ClientID` | Unique identity for one lifetime of a client's command-number allocator, within the configuration |
 | `RequestSeq` | Positive unsigned 64-bit sequence allocated once within that session |
 | `CommandID` | Structured pair `(ClientID, RequestSeq)`, interpreted within its configuration |
@@ -48,9 +53,14 @@ The tables below define notation and message vocabulary; they do not prescribe a
 | `PROBE` | Probe a target using a scoped nonce |
 | `ALIVE` | Reply to the matching probe nonce |
 
-There are eight protocol message types. `READ_STATE` and `STATE` serve two purposes: discovery queries one candidate to learn its state and wake its flow (section 6); a formal recovery read collects member states after a successor becomes eligible to take over (section 9). Earlier discovery replies cannot replace the successor's new formal read. The same message types therefore have different reply-selection and collection-completion rules in these two uses.
+There are eight protocol message types. Local retirement in section 12.1 needs no execution-report message. `READ_STATE` asks for a command's state, and `STATE` returns it. These messages are used in two different situations:
 
-`SEALED` means a candidate has been saved; `COMMITTED` means the final result has been decided. A saved candidate alone is not a final decision. There is no extra protocol message such as `SEAL_ACK` confirming that a recipient saved a candidate. Section 5 instead uses a bounded wait after complete SEAL sending. This does not prohibit transport-level acknowledgements such as TCP ACKs or specify a disk-storage implementation.
+- Discovery (section 6): a node still waiting for the final decision queries one candidate coordinator. The query asks about progress, supplies the original command if needed, and prompts the candidate to start its normal or recovery flow if it should do so and has not started. Sending this query does not give the querying node takeover rights. An ordinary observed or sealed reply does not finish recovery; the querying node continues waiting for the final decision and probing the candidate.
+- Formal recovery read (section 9): a successor that has confirmed every earlier candidate crashed starts a new read request to all members it has not confirmed dead, including its own state locally. To select a candidate, it needs every member either to have replied to this read or to have been accurately confirmed dead. The collected states determine whether to inherit an existing seal or construct a dependency set from observations.
+
+Ordinary discovery replies cannot replace the new formal read: they may describe state from before the predecessor's last actions. For example, A can answer a discovery query before sealing, then seal and crash; its old reply would miss that seal. A legal complete final decision is different: it can be learned immediately in either situation, even from an old request, because it is already final. Section 9 gives the detailed handling rules.
+
+`SEALED` means a candidate has been saved; `COMMITTED` means the final result has been decided. A saved candidate alone is not a final decision. There is no extra protocol message such as `SEAL_ACK` saying "I have saved the candidate." Instead, after sending SEAL to all targets, the coordinator waits long enough for every still-live recipient to receive and save it under the stated timing bounds. This wait is `Delta` in the ideal model; section 5 explains when it starts and when a decision can follow. Transport acknowledgements such as TCP ACKs are still allowed. Saving protocol state here does not prescribe a disk-storage implementation.
 
 ## 3. First knowledge and normal observation
 
@@ -58,39 +68,43 @@ Perform the admission checks in section 14 before first observation or registrat
 
 The first time node i learns the complete command c, it atomically reads the currently visible conflicting commands, fixes `Obs_i(c)`, and registers c as visible to subsequent commands. Observation and registration must not interleave with another command's first observation. Learning a complete command from an attachment to another message performs the same operation. `Obs_i(c)` never changes afterward. A legal `OBSERVE` request returns this existing observation.
 
-Retain observations, seals, decisions, and execution deduplication state. Executed commands remain visible for later conflict observations. Safe history reclamation is not defined in this version.
+Every admitted command remains visible to later conflict observations until this node has actually executed it and retained its outcome. It then leaves this node's conflict index under section 12.1. This local retirement is coupled with the complete-collection rule in section 4; do not combine it with the PDF's early Seal selection. Retain the original value, observations, seals, decisions, execution state and result in history. Leaving the index does not delete that history or rewrite an existing observation. Safe history deletion is not defined in this version.
 
 The original coordinator creates a new request identity and sends `OBSERVE(c)` to all members it has not confirmed dead. Count its own observation in `R`. Count only valid replies for this request, deduplicated by member; duplicate replies do not add support. Ordinary observations from older requests do not enter `R`. Once a reply has entered `R`, keep it even if its sender is later added to `F`.
 
-After OBSERVE has been completely sent to every target, call that time `t0` and set the deadline to `t0 + 2*Delta`. A reply from an early target may arrive while sending to other targets is still unfinished. Retain such replies, but do not choose Fast or Seal until the entire OBSERVE send is complete. Completing the send does not mean that all replies have arrived. Reevaluate after complete sending, each valid reply, new death facts, and deadline expiry. Serialize each command's local flow.
+After OBSERVE has been completely sent to every target, call that time `t0` and set the deadline to `t0 + 2*Delta`.
+
+Broadcasting takes time: for example, the coordinator may finish sending to B, receive B's reply, and still be sending to C. This can happen with sequential or concurrent sends. Retain such valid replies, but do not choose Fast or Seal until sending to every target is complete. "All sends complete" does not mean "all replies received"; section 4 separately defines the replies needed for each choice. Reevaluate after complete sending, each valid reply, new death facts, and deadline expiry. Serialize each command's local flow.
 
 If still collecting at the deadline, add nonresponding members to `F` and reevaluate. This inference depends on every surviving node promptly answering legal requests, including nodes that have already observed, sealed, or decided c.
 
-## 4. Fast Path and early Seal selection
+## 4. Complete collection, then Fast or Seal
 
-While the normal collection is active and its OBSERVE send is complete, apply these rules in order:
+This version deliberately replaces the PDF's early Seal selection. While the normal collection is active, apply these rules in order:
 
-1. If some `d in D_R(c)` has `r - s_R(d) > f`, immediately select Seal. This rule does not require `R union F = Pi`; replies from some members may still be missing.
-2. Otherwise, if `R union F = Pi` and every `d in D_R(c)` satisfies `s_R(d) >= r - f`, immediately Fast Decide with `D(c) = D_R(c)` and broadcast `DECIDE(c, D)`.
-3. Otherwise, continue collecting.
+1. If OBSERVE sending is incomplete or `R union F != Pi`, continue collecting. Do not select either Fast or Seal yet, even if existing replies already make Fast impossible.
+2. Once sending and coverage are complete, if every `d in D_R(c)` satisfies `s_R(d) >= r - f`, immediately Fast Decide with `D(c) = D_R(c)` and broadcast `DECIDE(c, D)`.
+3. Otherwise, select Seal with the same full union `D(c) = D_R(c)`, including low-support dependencies, and follow section 5.
 
 In any flow, if a legal complete final result arrives in DECIDE or STATE.COMMITTED, learn that result instead of selecting or resealing a candidate. For example, an already decided result received during recovery can be learned without waiting for the remaining ordinary read replies. "Complete" means the original command and final dependency set are available, not just a status label or an unresolvable summary. Section 9 specifies the handling of old request IDs and unfinished flows.
 
 Coverage means every member has either replied or been accurately confirmed dead. High support for known dependencies alone does not establish coverage: another live member might introduce a new low-support dependency. Previously confirmed deaths can permit early coverage. For `n=5, f=2`, if two members are already in `F` and the other three have replied, `r-f=1`, so every dependency in the union passes.
 
-Early Seal is allowed when later replies can no longer make Fast succeed: if already `r - s_R(d) > f`, even u additional replies all supporting d leave `s_R(d)+u < r+u-f`. For `n=5, f=2`, four replies with only one supporting d suffice to select Seal after sending is complete. Do not wait for the full observation deadline once this condition holds. Late replies may contain additional dependencies, but they do not change the selected Seal candidate. Preserving conflict relationships in this case relies on the majority-intersection argument in section 11, not on collecting every surviving member's observation.
+An observation from a still-live member must not be omitted from a newly constructed candidate. That member may retain a dependency which other members have already executed and locally retired. For `n=5, f=2`, four replies with only one supporting d show that Fast will fail, but do not authorize Seal while the fifth member remains unaccounted for. Include its valid reply, or accurately confirm its crash, before selecting. Complete coverage can occur before `2*Delta`; do not add a fixed wait when it is already complete. Keep previously collected observations even if their senders subsequently crash.
 
 ## 5. Seal Path
 
-Select `D(c) = D_R(c)` once: take the full union of the observations collected so far, including low-support dependencies. "Full union" does not require replies from every surviving member when early Seal applies. Save the generation's unique candidate locally and completely send `SEAL(c, D, g)` to all members the sender has not confirmed dead.
+In the normal path, select `D(c) = D_R(c)` once, only after the complete collection in section 4. In recovery, use the value selected by section 9: inherit the highest legal seal unchanged, or form the observation union after a complete formal read. Never filter either value using the coordinator's current execution state. Save the generation's unique candidate locally and completely send `SEAL(c, D, g)` to all members the sender has not confirmed dead.
 
 For a successor `p_g`, include the death facts showing that every earlier candidate `p_0 ... p_(g-1)` has crashed, so recipients can check its takeover eligibility. This includes earlier candidates that never actually became coordinator. The original coordinator has `g=0` and no earlier candidates to account for. Use the trusted death facts allowed by sections 7 and 8. Recipients check the sender's position and eligibility, then save the candidate. Recovery uses this same Seal procedure in the successor's generation.
 
-Wait the propagation-and-saving bound from complete sending; this is `Delta` in the ideal model. If still in this seal flow and no existing decision was learned, decide that candidate and broadcast `DECIDE(c, D)`.
+Start the Seal timer only after SEAL has been completely sent to every target, not when it is merely queued or when only some recipients have been sent to. In the ideal model, wait one `Delta`: by then every still-live recipient has received and saved the candidate. This is a one-way propagation-and-saving wait, not a round trip to collect replies. No `SEAL_ACK` is expected. A real implementation must account for bounded processing and saving costs as stated in section 1.
+
+When that timer expires, a surviving coordinator that is still in this Seal flow and has not learned an existing final decision decides the saved candidate and broadcasts `DECIDE(c, D)`. If it has already learned a legal complete final decision, it uses that result instead of making another decision from the pending Seal flow.
 
 After selection, late observations do not change the candidate and the flow does not return to Fast. A recipient retains the highest legal generation's seal; late lower-generation seals cannot overwrite it. One generation has one candidate. An already learned final result cannot be replaced with a different original value or dependency set, including by a higher generation.
 
-The coordinator does not wait for recipients to acknowledge saving the candidate: after complete sending and the bounded save wait, the still-live recipients have saved it, and no competing legal live coordinator can overwrite it. Partial sending cannot start this wait. Selecting Seal early does not remove this wait or establish that recipients have already saved the candidate.
+This works without save acknowledgements because the timing bound ensures that still-live recipients have saved the candidate, and no competing legal live coordinator can overwrite it. In the ideal normal path, up to `2*Delta` completes observation collection and the additional `Delta` saves the Seal candidate: this retains the stated `3*Delta` bound for the coordinator's local metadata decision. DECIDE propagation follows that local decision; dependency execution and the client response are separate later events.
 
 ## 6. Discovery and the recovery watchdog
 
@@ -162,7 +176,7 @@ This matters when a discoverer has already used its one query and keeps probing 
 
 ## 11. Reasoning for preservation and conflicts
 
-These are informal arguments, not a formal proof.
+The following arguments establish decision preservation and the safety of local retirement under the stated model and execution rules. They are protocol reasoning, not a machine-checked verification of an implementation.
 
 The consensus value is `(configuration, CommandID, original value, D)`. Generation, request identity, and decision provenance are attempt metadata.
 
@@ -170,13 +184,19 @@ For a hidden Fast decision made from R, coverage implies members outside R were 
 
 For a completed Seal decision, all still-live members saved the candidate before decision. A later complete read can inherit it. Across legal successive generations, an existing decision's value is preserved; absent a decision, a successor can inherit the highest legal partial seal it reads. The first recovery seal after a hidden Fast decision reconstructs that Fast value, so later seals preserve it as well. A greater generation alone never authorizes changing a final result.
 
-For conflicting commands x and y, every candidate originates in a majority's observation union or inherits such a candidate unchanged. Its associated observer set B has size at least `f+1` for Fast and unsealed formal recovery. Early Seal has `r >= f+2`, from `s_R(d) >= 1` and `r-s_R(d)>f`. Inherited candidates retain their originating B, not necessarily the current read's S. B is proof notation; no new online proof message is required.
+Local retirement does not change an existing observation, so the Fast reconstruction and Seal inheritance arguments above remain valid. In particular, a formal read returns each saved first observation, not a new observation recomputed after some dependencies executed.
 
-The majority sets for x and y intersect at some node p. Its atomic first observations order their visibility, so either `x in Obs_p(y)` or `y in Obs_p(x)`. At least one final conflict-dependency direction is retained.
+Every final dependency value originates in a complete observation collection: either a normal collection, or a formal recovery read that found no seal. Inheritance preserves that originating value. Let `T(c)` denote that origin's selection event, before any execution of c. For every node i still alive at `T(c)`, its first observation has occurred and `Obs_i(c) subseteq D(c)`. These are proof events, not extra timestamps, fields or messages. Crash-stop and accurate death facts are essential to the coverage statement.
+
+Consider conflicting x and y with neither `x in D(y)` nor `y in D(x)`, and suppose `T(x) <= T(y)`. Every node i alive at `T(y)` was also alive at `T(x)`, so both of its first observations contributed. It cannot have first learned y before x: omitting y from its observation of x would require i to have executed y before observing x, hence before `T(x) <= T(y)`, although y cannot execute before its originating selection. Therefore i first learned x before y. Because its observation of y omitted x, i must already have executed x before that observation. Thus every node alive at `T(y)` has executed x before any execution of y is possible; every node that ever executes y executes x first. The reverse order of origin events gives the symmetric result. This also covers replicas that execute commands and subsequently crash: a replica already crashed at `T(y)` cannot later execute y.
+
+For conflicting pairs connected by a dependency, the fixed decided graph and section 12 determine their order: dependencies between SCCs execute first, and a common SCC uses its deterministic internal order. A node may not execute a command with an unresolved transitive dependency. Consequently, a later-discovered incoming edge cannot merge a completed SCC with an unseen command: such a merge would require an outgoing path that should already have been resolved before execution. Local conflict-index retirement does not remove vertices or edges from this historical execution graph. Together with the no-edge argument, this preserves conflict execution order; deterministic application operations and a conflict relation that accounts for results as well as state preserve replicated outcomes.
 
 ## 12. Dependency execution and client outcomes
 
 After metadata decision the dependency set is fixed. `D(y) = {x}` means y depends on x. Before execution, obtain the complete, decided transitive dependency closure. Compute strongly connected components (SCCs). Execute SCCs with dependencies first in a topological order. Inside an SCC, compare `ClientID` as unsigned bytes in its canonical 16-byte representation, then compare `RequestSeq` numerically as an unsigned integer. A cycle's internal edges need not all be obeyed as strict execution precedence. This identity order breaks ties inside an SCC; it does not remove cycles, require a global execution order for independent commands, or imply execution in client sequence order outside that SCC.
+
+Preserve the chosen internal order while executing an SCC. If execution is incremental, retiring a completed member from the conflict index must not cause the unfinished members to be reordered by recomputing SCCs on the remaining vertices. Completed dependencies may be satisfied from retained history; conflict-index membership is not execution-graph membership.
 
 Execute a logical command once per replica and retain its execution state and result. Match the configuration, full CommandID, original coordinator, and full original value when associating command state and results. Repeated knowledge of the same command through delivery, observation, discovery, recovery, or final notification cannot cause another application invocation. An application error is a retained result too. Client cancellation cancels a caller's wait, not an admitted command's protocol or execution obligations. Metadata decision, learning a decision at another replica, closure readiness, and actual execution are different events.
 
@@ -186,19 +206,29 @@ Execution progress requires a finite relevant closure that eventually becomes re
 
 Replica discovery, takeover, and execution progress must operate without another client submission. If no permanently correct replica ever learns the complete original, client submission alone does not guarantee eventual decision. If the contacted replica crashes before replying, the client may never learn the outcome even when surviving replicas decide and execute the command. This missing response alone does not establish a consensus progress failure; check the surviving replicas and the stated progress premises. In normal fault-free operation, the service still returns the execution result to a waiting connected client.
 
+### 12.1 Retiring commands from future conflict observations
+
+This section and the complete-collection rule in section 4 are a joint revision of the supplied PDF. Once a node actually finishes executing c and retains its outcome, remove c from that node's index for future first conflict observations. An executed application error is an outcome too. Admission, commit, dependency readiness, a transport receipt or an intention to execute does not permit retirement. Keep c visible until actual completion; coordinate recording completion, retaining the outcome and removing c with the atomic first-observation operation.
+
+This is a local action. It requires no execution reports, acknowledgements from other replicas or additional failure-detection subscriptions. Other nodes independently retain c until their own execution completes. A node still needing c can report it in a new observation; sections 4 and 9 ensure that new observation unions include every member that remains alive at selection. An inherited seal instead retains its original complete-collection value.
+
+Retirement affects only observations formed afterward. Never recompute an existing `Obs_i(d)`, remove c from an already saved candidate/decision, change SCC execution order, or forget c's execution state or result. `OBSERVED` and formal-read `STATE` return the saved observations even when some entries have since executed. Repeated messages for c use its retained history and do not reactivate it as a new command. Dependencies in old records remain resolvable; local execution history tells the executor which are already satisfied.
+
+This rule does not authorize snapshots or deleting history. It removes the need to wait for other replicas before local retirement, but does not bound the number of locally unfinished commands or total retained memory. Historical originals, observations, decisions and outcomes still accumulate, and an infinite conflicting workload can still leave an unready dependency closure.
+
 ## 13. Timing, complexity, and unfinished work
 
 | Event | Ideal-model bound and start point |
 | --- | --- |
 | Normal Fast metadata decision | At most `2*Delta` after complete OBSERVE sending; original coordinator survives to decision |
-| Normal Seal metadata decision | At most `3*Delta` after complete OBSERVE sending; early Seal can start sooner; original coordinator survives to decision |
+| Normal Seal metadata decision | At most `3*Delta` after complete OBSERVE sending; requires complete observation coverage before selection; original coordinator survives to decision |
 | Successful eligible recovery without a received decision | At most `2*Delta` for the formal read plus `Delta` for sealing, from complete formal READ_STATE sending; successor survives to completion |
 | Receipt of legal complete final result | Immediate local learning |
 | Learning after complete DECIDE sending | At most another `Delta` for surviving recipients |
 
 Recovery's `3*Delta` excludes watchdog, probe, and eligibility waits. The normal decision bounds exclude notification propagation, dependency recovery, closure waiting, application execution, and client communication. Fast metadata decision in one RTT is not an arbitrary conflicting command's end-to-end execution bound.
 
-Normal operation uses `O(n)` messages. With k actual relevant crashes, `k <= f`, the stated conservative per-command recovery bound is `O(n*(k+1) + n^2)`, including helping broadcasts. k includes already-crashed members whose death is not yet known when timing starts. Initial OBSERVE, client traffic, and other commands' traffic are separate. This counts messages, not constant bytes.
+The normal metadata-decision path uses `O(n)` messages. With k actual relevant crashes, `k <= f`, the stated conservative per-command recovery bound is `O(n*(k+1) + n^2)`, including helping broadcasts. k includes already-crashed members whose death is not yet known when timing starts. Initial OBSERVE, client traffic, and other commands' traffic are separate. This counts messages, not constant bytes. Local retirement adds no protocol messages. Compared with early Seal, complete collection can wait longer and retain more dependencies; it preserves the normal worst-case `3*Delta` metadata-decision bound but does not bound execution delay or dependency payload size.
 
 The stated conservative recovery-learning time bound is `O(k+1)` under the scheduling described above, not a strict `k+C` bound. Extra dependency cycles, safe history reclamation, a strict `k+C` recovery bound, complete model verification, execution liveness under infinite conflict streams, and real performance comparisons remain unfinished work. Section 14 prevents identity reuse by conforming clients and specifies local rejection; it does not provide global arbitration or service restoration after contradictory originals were independently admitted. No replica crash-restart or membership-change protocol is supplied; restarting a client with a fresh allocation session is a separate operation.
 
@@ -220,11 +250,13 @@ One allocation owner manages each session. Concurrent callers sharing that owner
 
 ### Submission and uncertain outcomes
 
-Choose the original coordinator and construct `(configuration, ClientID, RequestSeq, original coordinator, complete operation)` before submitting once. Replica forwarding and recovery preserve this original. No client-side persistent request journal, export/import mechanism, or restart recovery is required. Independent allocators must not share an identity accidentally; after a client restart or loss of allocator state, new operations use a fresh session. These client rules do not permit a crashed replica to rejoin.
+Choose the original coordinator and construct `(configuration, ClientID, RequestSeq, original coordinator, complete operation)` before submitting once. Here `configuration` is the fixed configuration identifier from section 1, not the entire configuration document or the coordinator generation. For example, `(local-demo-1, A, 7, r0, Put(k, v))` identifies operation 7 from client session A, submitted to r0 in configuration local-demo-1. Replica forwarding and recovery preserve this original, including its configuration identifier and original coordinator.
+
+No client-side persistent request journal, export/import mechanism, or restart recovery is required. Independent allocators must not share an identity accidentally; after a client restart or loss of allocator state, new operations use a fresh session. These client rules do not permit a crashed replica to rejoin.
 
 A timeout, cancellation, disconnect, or client crash can leave an uncertain outcome. Without a definite outcome, stop waiting and report it as unknown where a caller is still present; do not resubmit or claim that the command was never admitted, committed, or executed. Client waiting deadlines do not establish replica death or takeover authority. The replica obligations described in section 12 continue after the client stops waiting.
 
-Replicas still retain observations, decisions, execution state, and results for the configuration lifetime. Session termination, receipt of a larger sequence, or the absence of client retries does not authorize garbage collection. No exactly-once guarantee for external application side effects or replica crash-restart is added.
+Replicas still retain observations, decisions, execution state, and results for the configuration lifetime, including commands retired from the conflict index under section 12.1. Session termination, receipt of a larger sequence, or the absence of client retries does not authorize garbage collection. The largest completed client sequence is not evidence that gaps below it executed. No exactly-once guarantee for external application side effects or replica crash-restart is added.
 
 ### Checks before accepting a command
 

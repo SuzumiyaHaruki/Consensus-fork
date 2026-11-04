@@ -1,0 +1,7 @@
+{
+  "model": "gpt-6.1-sol",
+  "reasoning_effort": "high",
+  "timeout_seconds": 5400,
+  "action_seconds": 300,
+  "codex": "codex"
+}
