@@ -241,7 +241,7 @@ def brief(root, source, target, deadline, timeout, calls_left):
         "remaining_total_seconds": remaining, "turn_timeout_seconds": timeout, "remaining_agent_calls": calls_left,
         "generated_at": now(),
         "deadline_basis": "Host monotonic clock; preparation, tool work and model waiting all consume total time. "
-                          "Only isolated_exec execution pauses the Agent turn timer; ordinary shell and model waiting count against it."}, indent=2)
+                          "Only isolated_exec execution pauses the Agent turn timer, never the investigation/reporting wall deadline; ordinary shell and model waiting count against both."}, indent=2)
 
 
 def continuation_plan(total_seconds, remaining, durations, has_report):
@@ -272,12 +272,14 @@ def loop(config, root, source, target, client, deadline, record):
             record["stop"] = "total_deadline"
             break
         plan = continuation_plan(config.budget.total_seconds, remaining, durations,
-                                 bool(record.get('last_completed_report')))
+                                 bool(record.get('last_completed_report')) and
+                                 record['turns'][-1]['status'] == 'completed')
         if plan['work_mode'] == 'retain_report':
             record.update(stop='budget_wrap_up', budget_plan=plan,
                           reason='Remaining budget is too short for another invocation; retaining the completed report.')
             break
-        timeout = min(config.budget.agent_turn_timeout, remaining)
+        turn_deadline = deadline - (plan['reporting_reserve_seconds'] if plan['work_mode'] == 'investigate' else 0)
+        timeout = min(config.budget.agent_turn_timeout, turn_deadline - time.monotonic())
         folder = root / "turns" / f"{number:04d}"
         folder.mkdir()
         prompt = task if number == 1 else continuation
@@ -288,6 +290,8 @@ def loop(config, root, source, target, client, deadline, record):
                        'to consume the remaining time. State unfinished work and uncertainty explicitly.')
         else:
             prompt += ('\n\nChoose investigations that fit the remaining investigation time, allowing for reporting. '
+                       'The investigation wall deadline also bounds isolated_exec; a resumable timeout leaves '
+                       'the reporting reserve for consolidation in the same session. '
                        'A follow-up investigation may be shorter than earlier turns; their duration is context, '
                        'not a minimum required to continue.')
         prompt += '\n\nBudget guidance (time planning, not a required test plan):\n' + json.dumps(plan)
@@ -301,15 +305,16 @@ def loop(config, root, source, target, client, deadline, record):
                 delivered.update(json.dumps(item, sort_keys=True) for item in fresh)
         prompt += brief(root, source, target, deadline, timeout, config.budget.agent_calls - number + 1)
         (folder / "request.txt").write_text(prompt)
-        remaining = max(0, deadline - time.monotonic())
+        remaining = max(0, turn_deadline - time.monotonic())
         turn_start = time.monotonic()
         try:
-            result = client.turn(folder, prompt, min(timeout, remaining), session)
+            result = client.turn(folder, prompt, min(timeout, remaining), session, deadline=turn_deadline)
         except KeyboardInterrupt:
             result = {"status": "cancelled", "session_id": session}
         except (ValueError, OSError) as exc:
             result = {"status": "external_blocker_needs_review", "session_id": session, "reason": str(exc)}
-        result.setdefault("timeout_limit", "total_seconds" if remaining <= config.budget.agent_turn_timeout else "agent_turn_timeout")
+        result.setdefault('timeout_limit', ('reporting_reserve' if turn_deadline < deadline else 'total_seconds')
+                          if remaining <= config.budget.agent_turn_timeout else 'agent_turn_timeout')
         result["ended_at"] = now()
         result['budget_plan'] = plan
         result["run_elapsed_seconds"] = time.monotonic() - start
@@ -351,7 +356,7 @@ def loop(config, root, source, target, client, deadline, record):
             record.update(stop='budget_wrap_up', budget_plan=plan,
                           reason='Completed the final planned consolidation turn.')
             break
-        if result.get("continuable_timeout") and result["timeout_limit"] == "agent_turn_timeout":
+        if result.get("continuable_timeout") and result["timeout_limit"] in {'agent_turn_timeout', 'reporting_reserve'}:
             continue
         if result["status"] != "completed":
             record["stop"] = ("total_deadline" if result["status"] == "timeout" and result["timeout_limit"] == "total_seconds"

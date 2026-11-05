@@ -46,4 +46,4 @@
 
 修复复核使用 `task_mode: review`、`review_context` 和 `inputs/VERIFY.md`。上下文包括前后候选、原反馈、修复声明及修复阶段的隔离执行记录，经过原有凭据筛选后复制为只读；新问题审计不接收该上下文。`review.json` 与 `findings.json` 随普通回合增量保留，根目录 `issues.py` 处理版本、ID 与证据关联。生成/修复通过 `generator/execution.py` 注册公共执行服务。
 
-每次运行将公共 `tracecheck.py` 复制到只读的 `tools/`，run brief 给出绝对路径，源码副本与交接包保留当时版本。报告可用 `trace_files` 引用原始轨迹，控制器独立解析；不强制轨迹或固定说明字段。每个完成回合另保存 `evidence-feedback.json`，下一审计回合只提示新的具体问题，agent 可以补充证据、解释限制或收窄结论。完整语义和限制见 [../docs/workflow.md](../docs/workflow.md)。
+每次运行将公共 `tracecheck.py` 复制到只读的 `tools/`，run brief 给出绝对路径，源码副本与交接包保留当时版本。报告可用 `trace_files` 引用符合工具格式的单个 JSON 账本，普通日志和 JSONL 用 `evidence` 引用；控制器区分输入错误、格式不兼容和实际账本矛盾；不强制轨迹或固定说明字段。每个完成回合另保存 `evidence-feedback.json`，下一审计回合只提示新的具体问题，agent 可以补充证据、解释限制或收窄结论。完整语义和限制见 [../docs/workflow.md](../docs/workflow.md)。

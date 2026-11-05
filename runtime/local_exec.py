@@ -27,7 +27,7 @@ from runtime import replay
 DESCRIPTION = ('Run an ordinary local test in a private network and PID namespace. The ordinary shell retains its current restrictions. '
                'Use this tool for TCP or a bounded isolated run; start all communicating processes within the same invocation. '
                'Returns execution output, not an audit verdict. cwd is relative to this run working copy. '
-               'Execution remains bounded by action and total run limits; only the auditor pauses its Agent turn timer. '
+               'Execution remains bounded by action and active run/phase deadlines; only the auditor pauses its Agent turn timer. '
                'No background service survives an invocation. Complete raw logs are retained read-only. '
                'Calls in the same run serialize across tool processes, including native subagents; queue waiting consumes the run budget. '
                'Optionally select source from the captured sources listed in the run brief and overlays of relative test/helper files from work. '
@@ -80,7 +80,7 @@ def timestamp():
 def remaining(control, requested):
     limits = {'requested': requested if requested is not None else control['action_timeout'],
               'action_timeout': control['action_timeout'],
-              'total_seconds': control['run_deadline'] - time.monotonic()}
+              control.get('deadline_kind', 'total_seconds'): control['run_deadline'] - time.monotonic()}
     key = min(limits, key=limits.get)
     return max(0, limits[key]), key
 

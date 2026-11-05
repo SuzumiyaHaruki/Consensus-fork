@@ -47,7 +47,6 @@ import os
 from pathlib import Path
 import runpy
 import signal
-import sys
 import time
 
 MAX_LINE = 4 * 1024 * 1024

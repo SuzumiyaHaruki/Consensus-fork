@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 
 from artifacts import inside, copy_tree, require_description
-from generator.runner import read_json, write_json
+from runtime.storage import read_json, write_json
 from runtime.evidence import (CLOSED, inspect_item, retained_path, validate_findings,
                               validate_review, require_fix_execution)
 
@@ -69,6 +69,8 @@ def feedback_overview(candidate, issues, history, catalog=()):
         lines.extend(['Reusable cases and open questions: [evidence-index.json](evidence-index.json). These are agent observations for recorded versions, not current-version verification or extra repair assignments.', ''])
         for entry in catalog:
             lines.append(f"- [{entry['id']}]({entry['report']}), recorded for `{entry['candidate_commit']}`: {len(entry['cases'])} cases; open questions {'present' if entry['open_questions'] else 'none'}.")
+            for turn in entry.get('supplemental_turns', []):
+                lines.append(f"- Unfinished supplement, turn {turn['number']} ({turn['status']}): [changed files]({turn['path']}/changes/manifest.json). Inspect the retained files and execution logs; these drafts do not replace the completed report or add repair assignments.")
         lines.append('')
     return '\n'.join(lines)
 
@@ -78,6 +80,8 @@ def catalog_entry(bundle, candidate, name, filename):
     data = read_json(inside(bundle, 'audit-work/' + filename))
     entry = {'id': name, 'candidate_commit': candidate['commit'], 'evidence_bundle': str(bundle),
              'report': 'audit-work/report.md', 'cases': [], 'open_questions': [], 'warnings': []}
+    if (bundle / 'handoff.json').is_file():
+        entry['supplemental_turns'] = read_json(bundle / 'handoff.json').get('supplemental_turns', [])
     questions = data.get('open_questions', [])
     if questions:
         try:
@@ -102,7 +106,7 @@ def catalog_entry(bundle, candidate, name, filename):
                                    'evidence': refs, **details})
         except (OSError, ValueError, KeyError, TypeError) as exc:
             entry['warnings'].append(f'Case {number}: {exc}; original entry remains in the source index')
-    return entry if entry['cases'] or entry['open_questions'] or entry['warnings'] else None
+    return entry if entry['cases'] or entry['open_questions'] or entry['warnings'] or entry.get('supplemental_turns') else None
 
 
 def findings(bundle, candidate, number):
@@ -153,7 +157,9 @@ def feedback_bundle(destination, latest, candidate, issues, catalog=()):
         retained = rebase_evidence(item, prefix)
         if catalog:
             retained.update(report=str(prefix / item['report']),
-                            cases=[rebase_evidence(case, prefix) for case in item['cases']])
+                            cases=[rebase_evidence(case, prefix) for case in item['cases']],
+                            supplemental_turns=[{**turn, 'path': str(prefix / turn['path'])}
+                                                for turn in item.get('supplemental_turns', [])])
         return retained
 
     for issue in issues:

@@ -119,7 +119,9 @@ class TraceTests(unittest.TestCase):
                 self.assertEqual(json.loads(completed.stdout)['status'], status)
             with patch('runtime.tracecheck.MAX_BYTES', 2):
                 self.assertEqual(check_file(path)['status'], 'invalid_trace')
+                self.assertEqual(check_file(path)['error_kind'], 'size_limit')
             self.assertEqual(check_file(path.with_name('missing'))['status'], 'invalid_trace')
+            self.assertEqual(check_file(path.with_name('missing'))['error_kind'], 'read')
 
 
 if __name__ == '__main__':

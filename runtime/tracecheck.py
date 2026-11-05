@@ -88,7 +88,7 @@ def check_trace(data):
     try:
         validate(data)
     except ValueError as exc:
-        return {'status': 'invalid_trace', 'scope': SCOPE, 'errors': [str(exc)]}
+        return {'status': 'invalid_trace', 'error_kind': 'schema', 'scope': SCOPE, 'errors': [str(exc)]}
     sends, dead, deadlines, violations = {}, set(), [], []
 
     def fail(code, index, **details):
@@ -159,11 +159,16 @@ def check_file(path):
     try:
         with Path(path).open('rb') as stream:
             raw = stream.read(MAX_BYTES + 1)
-        if len(raw) > MAX_BYTES:
-            raise ValueError(f'trace exceeds {MAX_BYTES} bytes')
-        return check_trace(json.loads(raw))
-    except (OSError, ValueError, RecursionError) as exc:
-        return {'status': 'invalid_trace', 'scope': SCOPE, 'errors': [str(exc)]}
+    except OSError as exc:
+        return {'status': 'invalid_trace', 'error_kind': 'read', 'scope': SCOPE, 'errors': [str(exc)]}
+    if len(raw) > MAX_BYTES:
+        return {'status': 'invalid_trace', 'error_kind': 'size_limit', 'scope': SCOPE,
+                'errors': [f'trace exceeds {MAX_BYTES} bytes']}
+    try:
+        data = json.loads(raw)
+    except (ValueError, RecursionError) as exc:
+        return {'status': 'invalid_trace', 'error_kind': 'decode', 'scope': SCOPE, 'errors': [str(exc)]}
+    return check_trace(data)
 
 
 def main():

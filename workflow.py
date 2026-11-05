@@ -13,7 +13,8 @@ from artifacts import (candidate_commit, check_materials, copy_regular, copy_tre
 from generator.config import Settings
 from processes import invoke
 from generator.runner import (REQUIRED_INPUTS, Terminated, doctor as generation_doctor, execute as execute_agent,
-                              exclusive_run, prepare as prepare_agent, read_json, utc_now, write_json)
+                              exclusive_run, prepare as prepare_agent, utc_now)
+from runtime.storage import read_json, write_json
 from workflow_config import ROOT, from_dict
 from issues import findings, pending, repairable, feedback_bundle, review_result, apply_review, catalog_entry
 
@@ -173,7 +174,9 @@ def record_audit_progress(root, entry):
             entry['audit_reason'] = data['reason']
         if data.get('agents'):
             entry['agents'] = {**data['agents'], 'run_dir': str(audit_run)}
-        if entry['status'] in {'running', 'returned', 'not_started'}:
+        last_completed = max((t['number'] for t in data['turns'] if t['status'] == 'completed'), default=0)
+        has_supplement = any(t['number'] > last_completed for t in data['turns'])
+        if entry['status'] in {'running', 'not_started'} or entry['status'] == 'returned' and not has_supplement:
             return
         index = 'review.json' if entry['kind'] == 'repair_verification' else 'findings.json'
         paths = {key: str(path) for key, name in (('report', 'report.md'), ('index', index))
@@ -182,6 +185,7 @@ def record_audit_progress(root, entry):
             source = read_json(inside(audit_run, 'inputs/source.json'))
             entry['pending_report'] = {
                 'status': 'needs_review', 'candidate_commit': source['commit'],
+                'last_completed_turn': last_completed,
                 'audit_run': str(audit_run), **paths,
                 'turns': str(inside(audit_run, 'turns')),
                 'executions': str(inside(audit_run, 'executions')),
@@ -308,7 +312,8 @@ def execute(root, runtime=None):
             candidate = capture(stage, 0)
             repairs, number, forced_stop = 0, 0, None
             while True:
-                can_repair = remaining() >= (settings.audit_seconds + settings.minimum_repair_seconds
+                audit_seconds = settings.initial_audit_seconds if number == 0 else settings.audit_seconds
+                can_repair = remaining() >= (audit_seconds + settings.minimum_repair_seconds
                     + settings.repair_verification_seconds + reserve + 60)
                 final = bool(forced_stop) or repairs >= settings.max_repairs or not can_repair
                 folder = root / 'audits' / f'{number:03d}'
@@ -317,7 +322,10 @@ def execute(root, runtime=None):
                             'status': 'pending', 'issue_count': None}
                 entry['finding_import'] = imported
                 save()
-                seconds = min(settings.verification_seconds if final else settings.audit_seconds, remaining() - 10)
+                # The first audit keeps its own budget even in a generation-only run.
+                if final and number > 0:
+                    audit_seconds = settings.verification_seconds
+                seconds = min(audit_seconds, remaining() - 10)
                 entry['allocated_seconds'] = seconds
                 if seconds <= 0:
                     raise StopWorkflow('budget_exhausted', 'Insufficient time to start another audit')
@@ -469,9 +477,9 @@ def execute(root, runtime=None):
 def inspect(root):
     root = Path(root).resolve()
     record = read_json(root / 'experiment.json')
-    # Also expose old failed runs read-only; never rewrite their archived experiment.
+    # Also expose old failed runs and unfinished supplements without rewriting archives.
     for entry in record['stages']:
-        if entry['status'] not in {'running', 'returned', 'not_started'}:
+        if entry['status'] not in {'running', 'not_started'}:
             record_audit_progress(root, entry)
     return {'experiment_dir': str(root), 'status': record['status'],
             'issue_index_status': record.get('issue_index_status',

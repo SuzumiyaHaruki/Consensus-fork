@@ -1,19 +1,6 @@
 """Neutral Codex options and top-level failure interpretation from CA."""
 import json
 import re
-from enum import Enum
-
-
-class ExecutionStatus(str, Enum):
-    NOT_SCHEDULED = "not_scheduled"
-    RUNNING = "running"
-    COMPLETED = "completed"
-    ERROR = "error"
-    TIMEOUT = "timeout"
-    TOOL_MISSING = "tool_missing"
-    LOGIN_REQUIRED = "login_required"
-    QUOTA_EXHAUSTED = "quota_exhausted"
-    CANCELLED = "cancelled"
 
 
 DISABLED_FEATURES = (
@@ -49,37 +36,22 @@ def common_settings(provider=None):
     return settings
 
 
-def classify_failure(text: str) -> ExecutionStatus:
+def classify_failure(text: str) -> str:
     low = text.lower()
     if any(s in low for s in ["insufficient_quota", "quota exceeded", "usage limit", "rate limit", "quota exhausted", "credits exhausted"]):
-        return ExecutionStatus.QUOTA_EXHAUSTED
+        return 'quota_exhausted'
     if (any(s in low for s in ["login required", "not logged in", "please log in", "authentication required", "unauthorized", "run codex login"])
             or re.search(r"\b(?:http(?:/\d(?:\.\d)?)?|status(?: code)?)\s*[:=]?\s*401\b", low)):
-        return ExecutionStatus.LOGIN_REQUIRED
-    return ExecutionStatus.ERROR
+        return 'login_required'
+    return 'error'
 
 
 def codex_diagnostic(events):
-    """Only top-level failures authorize transport recovery; mixed/unknown errors do not."""
+    """Retain top-level failures, without interpreting tool output as a native error."""
     from .storage import redact
     errors = [e.get('error') if e.get('type') == 'turn.failed' else e.get('message')
         for e in events if e.get('type') in {'turn.failed','error'}]
     messages = [' '.join(str(error[k]) for k in ('code','message') if error.get(k))
         if isinstance(error,dict) else str(error or '') for error in errors]
-    def restricted(low):
-        restrictive = ('cybersecurity','safety','policy','flagged','refus','permission','denied','cancel',
-            'forbidden','authentication','quota','rate_limit','billing','credential','account')
-        return (classify_failure(low) != ExecutionStatus.ERROR or any(s in low for s in restrictive)
-            or re.search(r'\b(?:http(?:/\d(?:\.\d)?)?|status(?: code)?)\s*[:=]?\s*(?:403|429)\b',low))
-    def missing(low):
-        return any(s in low for s in ('session not found','thread not found','no session found'))
-    def transport(low):
-        return (not restricted(low) and not missing(low)
-            and any(s in low for s in ('request timed out','stream disconnected','connection reset',
-                'connection closed','tls handshake','unexpected eof','error sending request')))
     messages = [m if m.strip() else 'Unspecified Codex failure' for m in messages]
-    normalized = [m.lower() for m in messages]
-    return {'message':redact('\n'.join(messages)),
-        'transport_failure':bool(messages) and all(map(transport,normalized)),
-        'session_unavailable':any(map(missing,normalized)) and
-            all(not restricted(m) and (missing(m) or transport(m)) for m in normalized)}
+    return {'message': redact('\n'.join(messages))}

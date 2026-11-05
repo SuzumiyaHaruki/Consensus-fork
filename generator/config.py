@@ -44,12 +44,10 @@ def settings_from_dict(values: dict, base: Path) -> Settings:
         raise ValueError("Unrecognized reasoning_effort; use a level supported by your model")
     if merged["web_search"] not in ("disabled", "cached", "live"):
         raise ValueError("web_search must be disabled, cached, or live")
-    seconds = merged["timeout_seconds"]
-    if isinstance(seconds, bool) or not isinstance(seconds, (int, float)) or not math.isfinite(seconds) or seconds <= 0:
-        raise ValueError("timeout_seconds must be finite and positive")
-    seconds = merged['action_seconds']
-    if isinstance(seconds, bool) or not isinstance(seconds, (int, float)) or not math.isfinite(seconds) or seconds <= 0:
-        raise ValueError('action_seconds must be finite and positive')
+    for name in ('timeout_seconds', 'action_seconds'):
+        seconds = merged[name]
+        if isinstance(seconds, bool) or not isinstance(seconds, (int, float)) or not math.isfinite(seconds) or seconds <= 0:
+            raise ValueError(f'{name} must be finite and positive')
     merged['execution_python'] = os.path.abspath(base / Path(merged['execution_python']).expanduser())
     for name in ("output_root", "inputs_dir"):
         path = Path(merged[name]).expanduser()

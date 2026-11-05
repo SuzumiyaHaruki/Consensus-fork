@@ -18,6 +18,7 @@ from . import execution
 from .client import Client
 from runtime import agent_records
 from runtime.codex_support import codex_options
+from runtime.storage import read_json, write_json
 
 
 __version__ = "0.2.0"
@@ -30,20 +31,6 @@ REQUIRED_INPUTS = (
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
-
-
-def write_json(path: Path, data: dict) -> None:
-    # Atomic replacement avoids truncated metadata on interruption.
-    temporary = path.with_name(path.name + ".tmp")
-    temporary.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    temporary.replace(path)
-
-
-def read_json(path: Path) -> dict:
-    data = json.loads(path.read_text(encoding="utf-8"))
-    if not isinstance(data, dict):
-        raise ValueError(f"Expected a JSON object: {path}")
-    return data
 
 
 def version_info(executable: str, *arguments: str) -> dict:

@@ -229,10 +229,13 @@ def inspect_item(item, root, *, work_name='work', raw_name='.', expected_commits
         path = retained_path(root, ref, work_name, raw_name)
         check = {'path': path, **check_file(inside(root, path))}
         traces.append(check)
-        if check['status'] != 'consistent_prefix':
-            detail = check.get('errors') or check.get('violations', [])[:3]
-            ask('trace_inconsistent', f"{path}: {check['status']}; {json.dumps(detail, ensure_ascii=False)}",
+        if check['status'] == 'violations':
+            ask('trace_inconsistent', f"{path}: violations; {json.dumps(check['violations'][:3], ensure_ascii=False)}",
                 'Determine whether the cause is instrumentation, the external schedule, assumptions or implementation. Correct the evidence or narrow the claim; do not silently correct implementation behavior.')
+        elif check['status'] == 'invalid_trace':
+            code = 'trace_format_unsupported' if check['error_kind'] == 'schema' else 'trace_input_error'
+            ask(code, f"{path}: invalid_trace ({check['error_kind']}); {json.dumps(check['errors'], ensure_ascii=False)}",
+                'No ledger consistency check was performed. This helper accepts one JSON ledger in its documented format. Cite ordinary logs or JSONL as evidence instead; inspect the input error or provide a ledger if useful. Neither consistency nor inconsistency follows from this failure.')
     return {'trace_files': [entry['path'] for entry in traces], 'trace_checks': traces,
             'execution_records': executions, 'evidence_feedback': feedback,
             'evidence_notes': [entry['observation'] + ' ' + entry['request'] for entry in feedback]}

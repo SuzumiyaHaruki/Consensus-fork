@@ -41,7 +41,7 @@ def process(command, cwd, folder, timeout, *, env, stdin="", secrets=(), executi
                 if control:
                     clock = json.loads(Path(control['execution_clock_path']).read_text())
                     now = time.monotonic()
-                    limits = {'total_seconds': control['run_deadline'] - now,
+                    limits = {control.get('deadline_kind', 'total_seconds'): control['run_deadline'] - now,
                               'agent_turn_timeout': timeout - (now - started) + local_exec.execution_seconds(clock, now)}
                     basis = min(limits, key=limits.get)
                     remaining = limits[basis]
@@ -125,7 +125,7 @@ def decode(folder, result, session_id=None):
     if (result["exit_code"] != 0 or any(e.get("type") == "turn.failed" for e in events)
             or (not completed and any(e.get("type") == "error" for e in events))):
         failure = diagnostic["message"] or (folder / "stderr.log").read_text(errors="replace")
-        result.update(status="external_error", failure_kind=classify_failure(failure).value,
+        result.update(status="external_error", failure_kind=classify_failure(failure),
                       reason=failure or "Native turn failed; inspect retained output")
         return result
     if not isinstance(identity, str) or not identity.strip():
@@ -477,7 +477,7 @@ print('PERMISSIONS_VERIFIED')
             self.execution_control['allow_experiments'] = self.config.allow_agent_materials and self.config.allow_experiments
             write_json(self.control_path, self.execution_control)
 
-    def turn(self, folder, prompt, timeout, session_id):
+    def turn(self, folder, prompt, timeout, session_id, *, deadline=None):
         # rmdir removes only real empty sandbox residue; it never follows links.
         for name in (".codex", ".agents"):
             path = self.work / name
@@ -496,7 +496,10 @@ print('PERMISSIONS_VERIFIED')
         # Late cleanup from a previous service can only update that turn's private clock.
         clock_path = self.home / ('execution-clock-' + folder.name + '.json')
         write_json(clock_path, {'elapsed_seconds': 0.0})
-        self.execution_control.update(turn=folder.name, execution_clock_path=str(clock_path),
+        turn_deadline = min(self.deadline, deadline if deadline is not None else self.deadline)
+        self.execution_control.update(run_deadline=turn_deadline,
+                                      deadline_kind='reporting_reserve' if turn_deadline < self.deadline else 'total_seconds',
+                                      turn=folder.name, execution_clock_path=str(clock_path),
                                       allow_experiments=True)
         write_json(self.control_path, self.execution_control)
         command = [*self.prefix(), "exec", *(["resume"] if session_id else []), "--strict-config",

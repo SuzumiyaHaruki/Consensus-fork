@@ -3,7 +3,8 @@ import signal
 import subprocess
 import time
 
-from generator.runner import Terminated, terminate_group, utc_now, write_json
+from generator.runner import Terminated, terminate_group, utc_now
+from runtime.storage import write_json
 
 
 def invoke(argv, folder, timeout, cwd):

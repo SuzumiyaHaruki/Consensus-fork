@@ -216,9 +216,11 @@ class WorkflowTests(unittest.TestCase):
         self.assertNotIn('assessment', index)
         self.assertEqual([item['state'] for item in index['issues']], ['fixed', 'fixed'])
         evidence = read_json(root/'feedback/001/evidence-index.json')
-        self.assertEqual([entry['id'] for entry in evidence['entries']], ['a000', 'r001'])
+        self.assertEqual([entry['id'] for entry in evidence['entries']], ['a000', 'r001', 'a001'])
         self.assertEqual([entry['candidate_commit'] for entry in evidence['entries']],
-                         [item['commit'] for item in result['candidates'][:2]])
+                         [result['candidates'][i]['commit'] for i in (0, 1, 1)])
+        self.assertEqual(evidence['entries'][-1]['cases'], [])
+        self.assertEqual(evidence['entries'][-1]['supplemental_turns'][0]['status'], 'timeout')
         for entry in evidence['entries']:
             self.assertTrue((root/'feedback/001'/entry['report']).is_file())
             for case in entry['cases']:
@@ -353,6 +355,7 @@ class WorkflowTests(unittest.TestCase):
         self.assertEqual(result['status'], 'cycle_complete')
         self.assertEqual(result['stop_reason'], 'repair_limit')
         self.assertEqual(runtime.calls, ['generation', 'audit'] + ['repair', 'verify', 'audit'] * 3)
+        self.assertEqual(runtime.budgets, [('audit', 3600)] + [('verify', 900), ('audit', 1800)] * 3)
         self.assertEqual(len(result['candidates']), 4)
         self.assertEqual(result['open_issues'], ['a003-F1'])
         issues = read_json(root / 'issues.json')['issues']
@@ -501,18 +504,19 @@ class WorkflowTests(unittest.TestCase):
         self.assertEqual(runtime.calls, ['generation', 'audit', 'repair', 'verify', 'audit'])
         self.assertEqual(result['open_issues'], ['a000-F1'])
         self.assertEqual(read_json(root / 'issues.json')['issues'][0]['state'], 'open')
-        draft, = result['pending_audit_reports']
+        draft, = [item for item in result['pending_audit_reports']
+                  if item.get('index', '').endswith('/work/review.json')]
         self.assertTrue(draft['index'].endswith('/work/review.json'))
         self.assertEqual(Path(draft['index']).read_text(), '{"issues": [{"disposition": "fixed"')
 
     def test_budget_reserves_final_audit_instead_of_starting_short_repair(self):
         runtime = OfflineRuntime()
-        root, result = self.run_fixture(runtime, total_seconds=2000, max_repairs=3)
+        root, result = self.run_fixture(runtime, total_seconds=5000, max_repairs=3)
         self.assertEqual(result['stop_reason'], 'insufficient_repair_budget')
         self.assertEqual(runtime.calls, ['generation', 'audit'])
         generation = Path(result['stages'][0]['path'])
-        self.assertLessEqual(read_json(generation / 'run.json')['settings']['timeout_seconds'], 790)
-        self.assertEqual(runtime.budgets, [('audit', 1200)])
+        self.assertLessEqual(read_json(generation / 'run.json')['settings']['timeout_seconds'], 3190)
+        self.assertEqual(runtime.budgets, [('audit', 3600)])
 
     def test_slow_feedback_copy_rechecks_minimum_repair_budget(self):
         runtime = OfflineRuntime()
@@ -522,13 +526,14 @@ class WorkflowTests(unittest.TestCase):
             original(source, destination, *args, **kwargs)
             if destination.name == 'feedback' and destination.parent.name == '.forge':
                 # Leave 200 s for repair after reserving verification, final audit and capture.
-                clock[0] = 100.0 + self.settings.total_seconds - 2070
+                reserve = self.settings.verification_seconds + 10 + self.settings.repair_verification_seconds + 60
+                clock[0] = 100.0 + self.settings.total_seconds - reserve - 200
         with patch('workflow.copy_tree', side_effect=slow_copy), \
              patch('workflow.time.monotonic', side_effect=lambda: clock[0]):
             _, result = self.run_fixture(runtime, max_repairs=3)
         self.assertEqual(runtime.calls.count('repair'), 0)
         self.assertEqual(result['stop_reason'], 'insufficient_repair_budget')
-        self.assertEqual(runtime.budgets[-1], ('audit', 1200))
+        self.assertEqual(runtime.budgets[-1], ('audit', 1800))
         skipped = [stage for stage in result['stages'] if stage['kind'] == 'repair']
         self.assertEqual(skipped[0]['status'], 'not_started')
 
@@ -553,7 +558,7 @@ class WorkflowTests(unittest.TestCase):
             _, result = self.run_fixture(runtime, max_repairs=3)
         self.assertEqual(runtime.calls.count('repair'), 2)
         self.assertEqual(result['stop_reason'], 'insufficient_repair_budget')
-        self.assertEqual(runtime.budgets[-1], ('audit', 1200))
+        self.assertEqual(runtime.budgets[-1], ('audit', 1800))
         self.assertLessEqual(result['elapsed_seconds'], self.settings.total_seconds)
 
     def test_zero_repairs_still_audits_generation(self):
@@ -561,6 +566,7 @@ class WorkflowTests(unittest.TestCase):
         _, result = self.run_fixture(runtime, max_repairs=0)
         self.assertEqual(result['status'], 'cycle_complete')
         self.assertEqual(runtime.calls, ['generation', 'audit'])
+        self.assertEqual(runtime.budgets, [('audit', 3600)])
 
     def test_specification_claim_requires_review_even_without_code_changes(self):
         for action in ('needs_specification', 'no_change'):
@@ -683,7 +689,7 @@ class WorkflowTests(unittest.TestCase):
         self.assertEqual(signal.getsignal(signal.SIGTERM), previous)
 
     def test_configuration_is_strict_and_preserves_virtualenv_path(self):
-        for values in ({'total_seconds': True}, {'audit_seconds': float('nan')}, {'max_repairs': -1},
+        for values in ({'total_seconds': True}, {'audit_seconds': float('nan')}, {'initial_audit_seconds': 0}, {'max_repairs': -1},
                        {'audit_calls': 1.2}, {'extra': 1}, {'audit_reasoning_effort': 'typo'}):
             with self.subTest(values=values), self.assertRaises(ValueError):
                 from_dict(values, self.root)
@@ -695,6 +701,9 @@ class WorkflowTests(unittest.TestCase):
         config = self.root / 'settings.json'
         config.write_text('{"output_root":"relative-output"}')
         self.assertEqual(load(config).output_root, str(self.root / 'relative-output'))
+
+        self.assertEqual(from_dict({'audit_seconds': 1200}, self.root).initial_audit_seconds, 1200)
+        self.assertEqual(load().initial_audit_seconds, 3600)
 
     def test_prepared_audit_prompt_survives_later_edits(self):
         prompt = self.root / 'AUDIT.md'
@@ -747,7 +756,7 @@ class HandoffTests(unittest.TestCase):
         self.root = Path(self.temp.name)
         put(self.root / 'candidate/go.mod', 'module example.com/syncepaxos\n')
         self.candidate = {'path': str(self.root / 'candidate'), 'commit': 'fixture-commit'}
-        self.audit = fixture_audit(self.root / 'audit', self.candidate)
+        self.audit = fixture_audit(self.root / 'audit/runs/fixture', self.candidate)
 
     def tearDown(self):
         self.temp.cleanup()
@@ -757,9 +766,24 @@ class HandoffTests(unittest.TestCase):
         result = prepare_handoff(self.audit, self.candidate, destination)
         self.assertEqual(result['last_completed_turn'], 1)
         self.assertEqual(result['incomplete_turns'], [2])
+        self.assertEqual(result['supplemental_turns'], [
+            {'number': 2, 'status': 'timeout', 'path': 'raw/turns/0002'}])
         self.assertEqual((destination / 'audit-work/tests/witness.bin').read_bytes(), b'\x01\x00\xff')
         self.assertEqual((destination / 'raw/turns/0002/changes/files/tests/witness.bin').read_bytes(), b'\x02\x00\xff')
         self.assertIn('PASS may mean', result['test_polarity'])
+
+        entry = {'kind': 'audit', 'status': 'returned', 'path': str(self.root / 'audit')}
+        workflow.record_audit_progress(self.root, entry)
+        self.assertEqual(entry['pending_report']['status'], 'needs_review')
+        self.assertEqual(entry['pending_report']['last_completed_turn'], 1)
+        self.assertEqual(entry['pending_report']['report'], str(self.audit / 'work/report.md'))
+        self.assertNotIn('finding_import', entry)
+        data = read_json(self.audit / 'run.json')
+        data['turns'][1]['status'] = 'completed'
+        write_json(self.audit / 'run.json', data)
+        fresh = {'kind': 'audit', 'status': 'returned', 'path': str(self.root / 'audit')}
+        workflow.record_audit_progress(self.root, fresh)
+        self.assertNotIn('pending_report', fresh)
 
     def test_failed_output_navigation_rejects_links_without_masking_stage_failure(self):
         folder = self.root / 'failed'

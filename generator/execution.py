@@ -5,6 +5,8 @@ import subprocess
 import sys
 import time
 
+from runtime.storage import read_json, write_json
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -29,7 +31,7 @@ def prepare(settings, stage, deadline):
 
 def reconcile(stage):
     # Called after the entire Codex process group has terminated, including the MCP server.
-    from .runner import read_json, write_json, utc_now
+    from .runner import utc_now
     for path in (stage / 'executions').glob('*/result.json'):
         record = read_json(path)
         if record['status'] == 'running':
@@ -40,7 +42,6 @@ def reconcile(stage):
 def configure(stage, deadline, action_seconds):
     from runtime import local_exec
     from runtime.codex_support import codex_options
-    from runtime.storage import write_json
     from runtime.toolchains import go_environment
     stage = stage.resolve()
     work = stage / 'workspace'

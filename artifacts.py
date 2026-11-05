@@ -5,7 +5,7 @@ import shutil
 import stat
 import subprocess
 
-from generator.runner import read_json, write_json
+from runtime.storage import read_json, write_json
 from runtime.evidence import inside, require_description
 
 
@@ -91,6 +91,9 @@ def prepare_handoff(audit_run, candidate, destination):
         'report': 'audit-work/report.md', 'reproductions': 'audit-work/', 'raw_records': 'raw/',
         'test_polarity': 'Read each test: PASS may mean a violating witness was observed.',
         'incomplete_turns': [t['number'] for t in record['turns'] if t['number'] > last],
+        'supplemental_turns': [{'number': t['number'], 'status': t['status'],
+                               'path': str(Path('raw') / inside(audit_run, t['path']).relative_to(audit_run))}
+                              for t in record['turns'] if t['number'] > last],
     }
     write_json(destination / 'handoff.json', handoff)
     return handoff

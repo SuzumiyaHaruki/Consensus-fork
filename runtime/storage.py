@@ -6,7 +6,6 @@ import re
 import subprocess
 from pathlib import Path
 from uuid import uuid4
-from pydantic import BaseModel
 
 
 def digest(data: bytes) -> str:
@@ -21,11 +20,18 @@ def redact(text: str) -> str:
 
 
 def write_json(path: Path, value):
+    """Atomically replace a JSON record; callers serialize their own model types."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    data = value.model_dump(mode="json") if isinstance(value, BaseModel) else value
     temporary = path.with_name(path.name + "." + uuid4().hex + ".tmp")
-    temporary.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    temporary.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     os.replace(temporary, path)
+
+
+def read_json(path: Path) -> dict:
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        raise ValueError(f"Expected a JSON object: {path}")
+    return data
 
 
 EXCLUDED_DIRS = {".git", ".codex", ".agents", ".ssh", ".aws", ".venv", "runs", "__pycache__"}

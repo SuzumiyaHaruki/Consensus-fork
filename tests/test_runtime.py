@@ -186,6 +186,23 @@ class RuntimeTests(unittest.TestCase):
         self.assertEqual({item['code'] for item in result['observations']}, {'version_reference', 'evidence_reference'})
         self.assertEqual(path.read_text(), raw)
 
+    def test_trace_input_failure_is_not_an_inconsistent_event_ledger(self):
+        ledger = {'clock': 'controlled', 'members': ['A'], 'fault_limit': 0,
+                  'delivery_bound_ns': 10, 'end_ns': 0, 'events': []}
+        cases = [('{}\n{}\n', 'decode', 'trace_input_error'),
+                 (json.dumps({'observations': []}), 'schema', 'trace_format_unsupported'),
+                 (json.dumps(ledger | {'events': [{'at_ns': 0, 'kind': 'deliver', 'id': 'missing'}]}),
+                  None, 'trace_inconsistent'), (json.dumps(ledger), None, None)]
+        for raw, error_kind, code in cases:
+            with self.subTest(code=code):
+                path = self.work / 'trace.json'
+                path.write_text(raw)
+                result = inspect_item({'method': 'source_review', 'evidence': ['work/trace.json'],
+                                       'trace_files': ['work/trace.json']}, self.root)
+                self.assertEqual(result['trace_checks'][0].get('error_kind'), error_kind)
+                self.assertEqual([entry['code'] for entry in result['evidence_feedback']], [code] if code else [])
+                self.assertEqual(path.read_text(), raw)
+
     def test_shared_modules_have_no_dependency_on_agent_roles(self):
         root = Path(__file__).resolve().parents[1]
         for path in (root/'runtime').glob('*.py'):

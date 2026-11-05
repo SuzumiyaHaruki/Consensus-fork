@@ -71,19 +71,8 @@ def read_yaml(path):
     return value
 
 
-def relative_path(value, directory, *, resolve=True):
-    path = Path(directory) / Path(value).expanduser()
-    return str(path.resolve() if resolve else path.absolute())
-
-
-def read_target(path):
-    raw = read_yaml(path)
-    backend = raw.get('execution_backend')
-    if backend not in {'go_module', 'cargo', 'maven', 'python', 'none'}:
-        raise ValueError('Unknown target execution_backend')
-    target = TargetConfig.model_validate(raw.get('target', {}))
-    return {'execution_backend': backend, 'target': target.model_dump()}
-
+def relative_path(value, directory):
+    return str((Path(directory) / Path(value).expanduser()).resolve())
 
 
 class Budget(BaseModel):
@@ -153,12 +142,10 @@ def load_config(path):
 
 
 def load_target(config):
-    raw = read_target(config.target_config)
+    raw = read_yaml(config.target_config)
     if raw.get("execution_backend") not in {"go_module", "cargo", "maven"}:
         raise ValueError("Only go_module, cargo and maven targets are supported")
-    fields = {k: v for k, v in raw.get("target", {}).items()
-              if k in {"variant", "expected_module", "execution_package", "analysis_roots"}}
-    target = TargetConfig.model_validate(fields)
+    target = TargetConfig.model_validate(raw.get('target', {}))
     return {"execution_backend": raw["execution_backend"], **target.model_dump(exclude={"harness_path"})}
 
 

@@ -155,6 +155,16 @@ class IssueTests(unittest.TestCase):
         record = read_json(folder/'result.json')
         record['artifacts'] = {'files': [{'path': 'history.json', 'retained_path': 'artifacts/history.json'}], 'excluded': []}
         write_json(folder/'result.json', record)
+        draft = self.bundle / 'raw/turns/0002/changes'
+        (draft / 'files/tests').mkdir(parents=True)
+        (draft / 'files/tests/new.txt').write_text('Unfinished reproduction fixture')
+        write_json(draft / 'manifest.json', {'changed': {'tests/new.txt': {}}, 'deleted': []})
+        write_json(self.bundle / 'handoff.json', {'supplemental_turns': [
+            {'number': 2, 'status': 'timeout', 'path': 'raw/turns/0002'}]})
+        self.find(issues=[])
+        note = catalog_entry(self.bundle, self.before, 'a000', 'findings.json')
+        self.assertEqual(note['cases'], [])  # Supplements alone must enter the catalog.
+        self.assertEqual(note['supplemental_turns'][0]['status'], 'timeout')
         questions = [{'question': 'Unsettled timing interpretation', 'context': 'Report explains the alternatives'}]
         cases = [{'summary': 'No defect observed', 'reproduction': 'Run the retained command; finite scope only',
                   'evidence': ['executions/checked/result.json']}]
@@ -180,6 +190,12 @@ class IssueTests(unittest.TestCase):
             execution = retained['cases'][0]['execution_records'][0]
             self.assertEqual((dest/execution['outputs']['artifact:history.json']).read_text(), '["observation"]')
             self.assertEqual(read_json(dest/'history.json')['issues'], [])
+            turn = retained['supplemental_turns'][0]
+            self.assertEqual(turn['path'], 'previous/000/raw/turns/0002')
+            self.assertEqual((dest / turn['path'] / 'changes/files/tests/new.txt').read_text(),
+                             'Unfinished reproduction fixture')
+            self.assertEqual(read_json(dest / 'issues.json')['issues'], [])
+            self.assertIn(turn['path'] + '/changes/manifest.json', (dest / 'overview.md').read_text())
 
     def test_malformed_optional_cases_are_warnings_not_findings_or_closures(self):
         for cases in ('wrong type', [None], [{'summary': 'No files', 'reproduction': 'Not run', 'evidence': ['work/missing']} ]):
