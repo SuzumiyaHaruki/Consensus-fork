@@ -76,11 +76,11 @@ class RuntimeTests(unittest.TestCase):
         (self.root/output).unlink()
         self.assertIn('output_missing', {entry['code'] for entry in inspect_item(item, self.root)['evidence_feedback']})
 
-    def test_output_selection_preserves_private_file_and_link_exclusions(self):
+    def test_output_selection_keeps_examples_and_excludes_private_directories_and_links(self):
         folder = self.work/'results'
         folder.mkdir()
-        (folder/'good.txt').write_text('visible')
-        (folder/'.env').write_text('private fixture')
+        (folder/'good.txt').write_text('{"password": "test-password"}')
+        (folder/'.env').write_text('LOCAL_TEST=1')
         (folder/'binary').write_bytes(b'\x7fELFcompiled')
         (folder/'link').symlink_to(self.source/'value.txt')
         (folder/'dirlink').symlink_to(self.source, target_is_directory=True)
@@ -89,9 +89,10 @@ class RuntimeTests(unittest.TestCase):
         os.link(self.source/'value.txt', folder/'hardlink')
         os.mkfifo(folder/'fifo')
         artifacts = replay.retain_outputs(self.work, ['results', '../source', '.', str(self.source)], self.folder)
-        self.assertEqual([entry['path'] for entry in artifacts['files']], ['results/good.txt'])
+        self.assertEqual({entry['path'] for entry in artifacts['files']}, {'results/good.txt', 'results/.env'})
+        self.assertEqual((self.folder/'artifacts/results/good.txt').read_bytes(), (folder/'good.txt').read_bytes())
         excluded = {entry['path'] for entry in artifacts['excluded']}
-        self.assertTrue({'results/.env', 'results/binary', 'results/link', 'results/dirlink',
+        self.assertTrue({'results/binary', 'results/link', 'results/dirlink',
                          'results/.runtime', 'results/hardlink', 'results/fifo', '../source', '.', str(self.source)} <= excluded)
 
     def test_output_limits_report_partial_collection(self):
@@ -108,11 +109,12 @@ class RuntimeTests(unittest.TestCase):
         self.assertLessEqual(len(artifacts['files']), 2)
         self.assertTrue(any('partial' in entry['reason'] for entry in artifacts['excluded']))
 
-    def test_replay_inputs_cannot_escape_or_copy_private_files(self):
+    def test_replay_inputs_cannot_escape_or_copy_private_directories(self):
         (self.work/'link').symlink_to(self.source/'value.txt')
         (self.work/'dirlink').symlink_to(self.source, target_is_directory=True)
-        (self.work/'.env').write_text('private fixture')
-        for name in ('', '.', '../source/value.txt', str(self.source/'value.txt'), 'link', 'dirlink/value.txt', '.env'):
+        (self.work/'.codex').mkdir()
+        (self.work/'.codex/auth.json').write_text('private fixture')
+        for name in ('', '.', '../source/value.txt', str(self.source/'value.txt'), 'link', 'dirlink/value.txt', '.codex/auth.json'):
             with self.subTest(name=name), self.assertRaises(ValueError):
                 replay.regular_file(self.work, name)
 

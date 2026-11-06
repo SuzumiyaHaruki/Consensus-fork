@@ -81,7 +81,7 @@ def prepare(settings, label='system'):
         'settings': settings.to_dict(), 'stages': [], 'candidates': [],
         'generation_environment': {'mode': 'host', 'read_isolation': False, 'sandbox': 'workspace-write'},
         'audit_environment': {'engine': 'auditor/codex_plain', 'isolation': 'CA-derived permission profile and Bubblewrap'},
-        'verification': 'Independent agent before/after repair verification followed by fresh discovery.',
+        'verification': 'Independent agent before/after repair verification; further discovery only within remaining budget and repair rounds.',
     })
     return root
 
@@ -234,6 +234,12 @@ def execute(root, runtime=None):
                 raise StopWorkflow('budget_exhausted', 'Total experiment budget exhausted')
             return value
 
+        def finish(reason):
+            status = reason if reason in {'needs_specification', 'verification_incomplete',
+                                         'verification_failed', 'environment_blocked'} else 'cycle_complete'
+            record.update(status=status, stop_reason=reason,
+                          reason=f'Stopped: {reason}; candidate, issue states and independent review evidence retained.')
+
         def phase(kind, path):
             entry = {'kind': kind, 'path': str(path), 'status': 'running', 'started_at': utc_now()}
             record['stages'].append(entry)
@@ -303,19 +309,20 @@ def execute(root, runtime=None):
             save()
             if not record['environment']['ready']:
                 raise StopWorkflow('environment_blocked', 'Local tool/dependency checks failed; no generation started')
-            # Every new generation/repair reserves an independent final discovery window.
+            # Generation leaves time for discovery. Repairs reserve review, not
+            # another mandatory discovery round after the last modification.
             reserve = settings.verification_seconds + 10
             available = remaining() - reserve
             if available <= 0:
-                raise StopWorkflow('budget_exhausted', 'Total budget cannot cover generation and final audit reserve')
+                raise StopWorkflow('budget_exhausted', 'Total budget cannot cover generation and discovery reserve')
             stage = run_agent('generation', min(settings.generation_seconds, available), reserve_seconds=reserve + 60)
             candidate = capture(stage, 0)
             repairs, number, forced_stop = 0, 0, None
             while True:
                 audit_seconds = settings.initial_audit_seconds if number == 0 else settings.audit_seconds
-                can_repair = remaining() >= (audit_seconds + settings.minimum_repair_seconds
+                can_search_again = remaining() >= (audit_seconds + settings.minimum_repair_seconds
                     + settings.repair_verification_seconds + reserve + 60)
-                final = bool(forced_stop) or repairs >= settings.max_repairs or not can_repair
+                final = repairs + 1 >= settings.max_repairs or not can_search_again
                 folder = root / 'audits' / f'{number:03d}'
                 entry = phase('final_audit' if final else 'audit', folder)
                 imported = {'audit_number': number, 'candidate_commit': candidate['commit'],
@@ -325,7 +332,11 @@ def execute(root, runtime=None):
                 # The first audit keeps its own budget even in a generation-only run.
                 if final and number > 0:
                     audit_seconds = settings.verification_seconds
-                seconds = min(audit_seconds, remaining() - 10)
+                available = remaining() - 10
+                repair_reserve = settings.minimum_repair_seconds + settings.repair_verification_seconds + 60
+                if repairs < settings.max_repairs and available > repair_reserve:
+                    available -= repair_reserve
+                seconds = min(audit_seconds, available)
                 entry['allocated_seconds'] = seconds
                 if seconds <= 0:
                     raise StopWorkflow('budget_exhausted', 'Insufficient time to start another audit')
@@ -358,32 +369,28 @@ def execute(root, runtime=None):
                 imported.update(status='imported', issue_count=len(discovered))
                 entry.update(handoff=str(handoff_path / 'handoff.json'),
                              last_completed_turn=handoff['last_completed_turn'], coverage=coverage,
-                             discovered_issues=[issue['id'] for issue in discovered])
+                             discovered_issues=[issue['id'] for issue in discovered], final_discovery=final)
                 save()
-                if forced_stop or not repairable(issues) or final:
+                if not repairable(issues) or repairs >= settings.max_repairs:
                     entry['final_discovery'] = True
-                    reason = (forced_stop or ('no_open_findings' if not pending(issues) else
+                    reason = ('no_open_findings' if not pending(issues) else
                               'needs_specification' if not repairable(issues) else
-                              'repair_limit' if repairs >= settings.max_repairs else 'insufficient_repair_budget'))
-                    status = reason if reason in {'needs_specification', 'verification_incomplete', 'verification_failed', 'environment_blocked'} else 'cycle_complete'
-                    record.update(status=status, stop_reason=reason,
-                                  reason=f'Stopped: {reason}; final discovery and independent agent review evidence retained.')
+                              'repair_limit')
+                    finish(reason)
                     break
                 # Recompute after actual audit/archival time, not its original nominal allocation.
-                seconds = min(settings.repair_seconds, remaining() - reserve - settings.repair_verification_seconds - 60)
+                seconds = min(settings.repair_seconds, remaining() - settings.repair_verification_seconds - 60)
                 if seconds < settings.minimum_repair_seconds:
-                    forced_stop = 'insufficient_repair_budget'
-                    number += 1
-                    continue
+                    finish('insufficient_repair_budget')
+                    break
                 feedback = root / 'feedback' / f'{repairs:03d}'
                 feedback_bundle(feedback, handoff_path, candidate, issues, catalog)
                 expected_ids = [issue['id'] for issue in repairable(issues)]
                 stage = run_agent('repair', seconds, candidate, feedback,
-                                  reserve_seconds=reserve + settings.repair_verification_seconds + 60)
+                                  reserve_seconds=settings.repair_verification_seconds + 60)
                 if stage is None:
-                    forced_stop = 'insufficient_repair_budget'
-                    number += 1
-                    continue
+                    finish('insufficient_repair_budget')
+                    break
                 repair = read_repair_result(stage / 'workspace', candidate['commit'], expected_ids)
                 record['stages'][-1]['repair_claim'] = repair
                 save()
@@ -411,16 +418,16 @@ def execute(root, runtime=None):
                            'repair_executions': 'repair-executions/' if (context/'repair-executions').is_dir() else None})
                 review_folder = root / 'reviews' / f'{repairs:03d}' / 'audit'
                 entry = phase('repair_verification', review_folder)
-                seconds = min(settings.repair_verification_seconds, remaining() - reserve - 10)
+                seconds = min(settings.repair_verification_seconds, remaining() - 10)
                 entry['allocated_seconds'] = max(0, seconds)
                 if seconds <= 0:
                     forced_stop = 'verification_incomplete'
-                    entry.update(status='not_started', reason='Final audit reserve', ended_at=utc_now())
+                    entry.update(status='not_started', reason='No review budget remains', ended_at=utc_now())
                 else:
                     bundle = root / 'reviews' / f'{repairs:03d}' / 'handoff'
                     try:
                         review_run = runtime.verify(settings, candidate, review_folder, context, seconds,
-                                                    min(seconds + 10, remaining() - reserve))
+                                                    min(seconds + 10, remaining()))
                         agents = read_json(review_run / 'run.json').get('agents')
                         if agents:
                             entry['agents'] = {**agents, 'run_dir': str(review_run)}
@@ -449,6 +456,15 @@ def execute(root, runtime=None):
                         and not any(issue['id'] in expected_ids and issue['state'] == 'needs_specification' for issue in issues)):
                     forced_stop = 'no_change'
                 save()
+                # The final discovery may be repaired. Its independent review
+                # ends the run, including any unresolved or newly found issues.
+                if (forced_stop or final or repairs >= settings.max_repairs
+                        or pending(issues) and not repairable(issues)
+                        or remaining() < settings.audit_seconds + repair_reserve + 10):
+                    finish(forced_stop or ('needs_specification' if pending(issues) and not repairable(issues) else
+                           'repair_limit' if repairs >= settings.max_repairs else
+                           'insufficient_repair_budget' if pending(issues) else 'final_review_complete'))
+                    break
                 number += 1
         except StopWorkflow as exc:
             record.update(status=exc.status, stop_reason=exc.status, reason=str(exc))

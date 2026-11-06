@@ -4,7 +4,7 @@ from pathlib import Path
 import shutil
 import stat
 
-from .storage import EXCLUDED_DIRS, MAX_SOURCE_BYTES, sensitive_file
+from .storage import EXCLUDED_DIRS, MAX_SOURCE_BYTES
 
 MAX_OUTPUT_BYTES = 64 * 1024 * 1024
 MAX_OUTPUT_FILES = 1024
@@ -35,8 +35,8 @@ def regular_file(root, name):
         os.close(directory)
     if len(data) > MAX_SOURCE_BYTES:
         raise ValueError('Replay input grew beyond its size limit while reading')
-    if sensitive_file(path, data) or data.startswith(b'\x7fELF'):
-        raise ValueError('Replay input contains private data or a compiled executable')
+    if data.startswith(b'\x7fELF'):
+        raise ValueError('Replay input contains a compiled executable')
     return data, stat.S_IMODE(info.st_mode) & 0o111
 
 

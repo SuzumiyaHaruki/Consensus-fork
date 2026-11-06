@@ -2,5 +2,3 @@ pydantic==2.13.5
 PyYAML==6.0.3
 mcp==1.26.0
 anyio==4.15.1
-tree-sitter==0.25.2
-tree-sitter-java==0.23.5

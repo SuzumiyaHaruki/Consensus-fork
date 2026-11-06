@@ -5,6 +5,7 @@ import asyncio
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 import os
+import re
 import shutil
 import signal
 import subprocess
@@ -116,9 +117,14 @@ def decode(folder, result, session_id=None):
                     and (session_id is None or identity == session_id))
     refusal = any(e.get("type") == "refusal" or e.get("item", {}).get("type") == "refusal"
                   for e in events if isinstance(e.get("item", {}), dict))
+    errors = [(n, e) for n, e in enumerate(events) if e.get('type') in {'turn.failed', 'error'}]
+    recovered_transport = bool(errors) and all(e.get('type') == 'error' and re.fullmatch(
+        r'Reconnecting\.\.\. \d+/\d+ \(stream disconnected before completion: tls handshake eof\)',
+        str(e.get('message', ''))) for _, e in errors) and any(
+            e.get('type') == 'item.completed' and isinstance(e.get('item'), dict) and e['item'].get('type') in
+            {'command_execution', 'file_change', 'mcp_tool_call'} for e in events[errors[-1][0] + 1:])
     result["continuable_timeout"] = bool(result["status"] == "timeout" and same_session
-        and not diagnostic["message"] and not refusal and not final.lstrip().startswith("RUN_BLOCKED:")
-        and not any(e.get("type") in {"turn.failed", "error"} for e in events))
+        and (not errors or recovered_transport) and not refusal and not final.lstrip().startswith("RUN_BLOCKED:"))
     if result["status"] != "completed":
         return result
     # Match src: native retries can emit error notifications before successful completion.

@@ -11,7 +11,7 @@
 | `codex.py` | Codex CLI 调用、私有配置和认证、会话身份检查、权限探测、超时与子进程清理 |
 | `../runtime/local_exec.py` | 公共 `isolated_exec` MCP 工具，提供受限文件系统、私有网络与进程空间；生成与审计都使用它 |
 | `config.py` | 审计参数、目标范围、认证与预算的类型和校验，以及独立审计命令入口 |
-| `../runtime/storage.py` | 公共凭据筛选、子模块检查、增量记录所需的内容识别和原子 JSON 写入 |
+| `../runtime/storage.py` | 日志脱敏、子模块检查、增量记录所需的内容摘要和原子 JSON 写入 |
 | `../runtime/agent_records.py` | 在私有 home 清理前保留主/子会话关系、实际模型、回合时间和逐响应去重用量，排除指令正文与认证内容 |
 | `../runtime/codex_support.py` | 公共 Codex 配置序列化、自动能力关闭项和顶层错误分类 |
 | `../runtime/toolchains.py` | 公共离线工具环境，保留原普通审计的 Cargo/Maven 辅助函数；Forge 当前选择 Go |
@@ -26,7 +26,7 @@
 
 ## 保留的行为与边界
 
-审计 agent 自主选择读代码、构造测试和继续调查的方法；提示给出共识交互边界的调查方向，要求区分合法性、可达性、实测影响与推断，不规定必须完成的测试清单。没有加入确定性的共识正确性裁判；独立修复复核仍由审计模型完成。新问题审计根据剩余时间和近期回合耗时安排收尾，也会在总时间、调用次数或实际中断边界停止，修复复核在首个完成回复后交由控制器检查结果，报告不自动代表缺陷已确认。保留私有 Codex 配置、凭据筛选、源码与日志只读、无外网执行、隔离测试、进程清理和未完成回合记录；不能因为 fork 而绕过这些限制。
+审计 agent 自主选择读代码、构造测试和继续调查的方法；提示给出共识交互边界的调查方向，要求区分合法性、可达性、实测影响与推断，不规定必须完成的测试清单。没有加入确定性的共识正确性裁判；独立修复复核仍由审计模型完成。新问题审计根据剩余时间和近期回合耗时安排收尾，也会在总时间、调用次数或实际中断边界停止，修复复核在首个完成回复后交由控制器检查结果，报告不自动代表缺陷已确认。保留私有 Codex 配置、认证值日志脱敏、源码与日志只读、无外网执行、隔离测试、进程清理和未完成回合记录。
 
 首次审计、独立修复复核和修复后的新问题审计各自启动新会话；一次审计内部的续审保持同一会话。交接仍按原格式处理完成回合，超时回合的半成品不会覆盖最后完整报告。配置字段 `baseline_id: codex_plain` 和权限配置名 `codex_plain` 沿用源实现的标识，不表示新增实验条件。
 
@@ -36,7 +36,7 @@
 
 辅助代码取自原 `src/consensus_assurance/` 的 `core/config.py`、`core/types.py`、`adapters/agents/backend.py`、`adapters/storage/{configuration,files,snapshot}.py` 和 `adapters/runners/{go_module,toolchains}.py`，只保留普通审计实际用到的定义。没有迁入 CA 高级研究工作流、协议目标库或历史运行。
 
-迁移调整了包导入、MCP 服务的可信源码路径、提示位置和临时目录位置；实现身份记录支持尚未初始化 Git 的 Forge 目录。原实现用于敏感内容筛选、执行源码变更检测和增量证据的内容摘要继续保留，没有另建候选哈希体系。
+迁移调整了包导入、MCP 服务的可信源码路径、提示位置和临时目录位置；实现身份记录支持尚未初始化 Git 的 Forge 目录。执行源码变更检测和增量证据使用的内容摘要继续保留，没有另建候选哈希体系。候选与证据交接已删除敏感内容扫描及文件名猜测规则，认证模块、测试密码、证书样例和引用它们的报告按原字节保留。
 
 ## 本地验证
 
@@ -44,6 +44,6 @@
 
 已有独立审计配置时，可执行 `.venv/bin/python -m auditor check-env --config /absolute/path/to/config.json` 检查源码捕获、权限、离线依赖和 MCP 私有 TCP 执行；它不会登录或调用模型。配置须包含实际目标仓库与输出目录，示例字段可查看 `workflow.py` 的 `Runtime.audit`。`.venv/bin/python -m auditor run --config /absolute/path/to/config.json` 才会启动真实审计，需要配置中明确允许模型材料传递和本地实验。
 
-修复复核使用 `task_mode: review`、`review_context` 和 `inputs/VERIFY.md`。上下文包括前后候选、原反馈、修复声明及修复阶段的隔离执行记录，经过原有凭据筛选后复制为只读；新问题审计不接收该上下文。`review.json` 与 `findings.json` 随普通回合增量保留，根目录 `issues.py` 处理版本、ID 与证据关联。生成/修复通过 `generator/execution.py` 注册公共执行服务。
+修复复核使用 `task_mode: review`、`review_context` 和 `inputs/VERIFY.md`。上下文包括前后候选、原反馈、修复声明及修复阶段的隔离执行记录，复制为只读；新问题审计不接收该上下文。`review.json` 与 `findings.json` 随普通回合增量保留，根目录 `issues.py` 处理版本、ID 与证据关联。生成/修复通过 `generator/execution.py` 注册公共执行服务。
 
 每次运行将公共 `tracecheck.py` 复制到只读的 `tools/`，run brief 给出绝对路径，源码副本与交接包保留当时版本。报告可用 `trace_files` 引用符合工具格式的单个 JSON 账本，普通日志和 JSONL 用 `evidence` 引用；控制器区分输入错误、格式不兼容和实际账本矛盾；不强制轨迹或固定说明字段。每个完成回合另保存 `evidence-feedback.json`，下一审计回合只提示新的具体问题，agent 可以补充证据、解释限制或收窄结论。完整语义和限制见 [../docs/workflow.md](../docs/workflow.md)。

@@ -14,7 +14,7 @@ from runtime import local_exec
 from auditor.codex import Codex, decode, process
 from auditor.config import Config, load_config, validate_selection
 from auditor.runner import continuation_plan, run
-from runtime.storage import sensitive_file, write_json
+from runtime.storage import write_json
 
 
 class ScriptedAudit:
@@ -56,6 +56,7 @@ class AuditorTests(unittest.TestCase):
         repo.mkdir()
         (repo / 'go.mod').write_text('module example.com/syncepaxos\n\ngo 1.22\n')
         (repo / 'main.go').write_text('package main\nfunc main() {}\n')
+        (repo / 'auth.go').write_text('package main\nfunc authenticated() bool { return false }\n')
         (repo / 'AGENTS.md').write_text('Untrusted target instructions.\n')
         (repo / '.env').write_text('fixture-private-data\n')
         (repo / 'outside').symlink_to('/etc/hostname')
@@ -95,8 +96,10 @@ class AuditorTests(unittest.TestCase):
         self.assertEqual((root / 'inputs/task.md').read_bytes(), self.prompt.read_bytes())
         source = json.loads((root / 'inputs/source.json').read_text())
         self.assertEqual(source['commit'], self.commit)
-        self.assertEqual(set(source['excluded']), {'AGENTS.md', '.env', 'outside'})
+        self.assertEqual(set(source['excluded']), {'AGENTS.md', 'outside'})
+        self.assertEqual((root / 'source/.env').read_bytes(), (Path(self.config.repo_path) / '.env').read_bytes())
         self.assertEqual((root / 'source/main.go').stat().st_mode & 0o222, 0)
+        self.assertEqual((root / 'source/auth.go').read_bytes(), (Path(self.config.repo_path) / 'auth.go').read_bytes())
         identity = json.loads((root / 'inputs/implementation.json').read_text())
         for name in ('auditor/runner.py', 'runtime/storage.py', 'runtime/tracecheck.py', 'runtime/schedule.py', 'audit_bridge.py', 'requirements.txt'):
             self.assertTrue((root / identity['retained_source'][name]['record']).is_file())
@@ -112,6 +115,7 @@ class AuditorTests(unittest.TestCase):
         feedback = self.root / 'feedback'
         handoff = prepare_handoff(root, {'path': self.config.repo_path, 'commit': self.commit}, feedback)
         self.assertEqual(handoff['last_completed_turn'], 1)
+        self.assertEqual((feedback / 'audit-work/auth.go').read_bytes(), (root / 'source/auth.go').read_bytes())
         self.assertEqual(handoff['incomplete_turns'], [2])
         self.assertEqual((feedback / 'audit-work/tests/witness.bin').read_bytes(), b'\x01\x00\xff')
         self.assertIn('Completed fixture', (feedback / handoff['report']).read_text())
@@ -486,9 +490,45 @@ class ExecutionBoundaryTests(unittest.TestCase):
             self.assertEqual((result['status'], result['timeout_limit']), ('timeout', 'reporting_reserve'))
             self.assertLess(result['elapsed_seconds'], 2.)
 
-    def test_java_credential_screening_keeps_original_parser_dependency(self):
-        self.assertFalse(sensitive_file('Token.java', b'public class Token {}'))
-        self.assertTrue(sensitive_file('config.txt', b'password = "fixture-sensitive-value"'))
+    def test_report_examples_survive_incremental_archive_replay_and_cleanup(self):
+        from auditor.runner import file_inventory, save_changes, scrub_work
+        from runtime.replay import regular_file
+        temporary = tempfile.TemporaryDirectory(prefix='forge-evidence-test-')
+        self.addCleanup(temporary.cleanup)
+        root = Path(temporary.name)
+        work = root / 'work'
+        work.mkdir(parents=True)
+        report = work / 'report.md'
+        report.write_text('Initial investigation.\n')
+        previous, _ = file_inventory(work)
+        content = b'Public reproduction fixture: {"password": "test-password"}\n'
+        report.write_bytes(content)
+        save_changes(work, root / 'changes', previous)
+        manifest = json.loads((root / 'changes/manifest.json').read_text())
+        self.assertFalse(manifest['deleted'])
+        self.assertFalse(manifest['excluded'])
+        self.assertEqual((root / 'changes/files/report.md').read_bytes(), content)
+        self.assertEqual(regular_file(work, 'report.md')[0], content)
+        scrub_work(root)
+        self.assertEqual(report.read_bytes(), content)
+
+    def test_recovered_transport_error_allows_timeout_wrap_up_only(self):
+        error = {'type': 'error', 'message': 'Reconnecting... 5/5 (stream disconnected before completion: tls handshake eof)'}
+        progress = {'type': 'item.completed', 'item': {'type': 'command_execution', 'exit_code': 0}}
+        cases = [([error, progress], True), ([error], False),
+                 ([progress, error], False), ([error, progress, {'type': 'refusal'}], False),
+                 ([error, progress, {'type': 'turn.failed', 'error': 'failed'}], False),
+                 ([{'type': 'error', 'message': 'security refusal'}, progress], False)]
+        with tempfile.TemporaryDirectory() as temp:
+            folder = Path(temp)
+            for events, expected in cases:
+                for session in ('same', 'different'):
+                    with self.subTest(events=events, session=session):
+                        (folder / 'stdout.jsonl').write_text('\n'.join(json.dumps(e) for e in
+                            [{'type': 'thread.started', 'thread_id': session}, *events]))
+                        result = decode(folder, {'status': 'timeout'}, 'same')
+                        self.assertEqual(result['continuable_timeout'], expected and session == 'same')
+                        self.assertTrue(result['diagnostic']['message'])
 
 
 if __name__ == '__main__':

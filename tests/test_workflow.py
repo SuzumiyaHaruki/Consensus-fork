@@ -7,6 +7,7 @@ import signal
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from unittest.mock import patch
 
@@ -206,8 +207,8 @@ class WorkflowTests(unittest.TestCase):
         runtime = ReviewDiscovery()
         runtime.empty_after = 1
         root, result = self.run_fixture(runtime, max_repairs=2)
-        self.assertEqual(result['stop_reason'], 'no_open_findings')
-        self.assertEqual(runtime.calls, ['generation', 'audit', 'repair', 'verify', 'audit', 'repair', 'verify', 'audit'])
+        self.assertEqual(result['stop_reason'], 'repair_limit')
+        self.assertEqual(runtime.calls, ['generation', 'audit', 'repair', 'verify', 'audit', 'repair', 'verify'])
         delivered = read_json(root / 'feedback/001/issues.json')['issues']
         self.assertEqual([item['id'] for item in delivered], ['r001-REGRESSION'])
         self.assertEqual(delivered[0]['source_commit'], result['candidates'][1]['commit'])
@@ -230,6 +231,12 @@ class WorkflowTests(unittest.TestCase):
         self.assertEqual(workflow.inspect(root)['evidence_index'], str(root/'evidence-index.json'))
         # Fresh discovery gets only the candidate, not the accumulated context.
         self.assertFalse((root/'audits/001/feedback').exists())
+        # A new finding in the last allowed review remains open at shutdown.
+        runtime = ReviewDiscovery()
+        root, result = self.run_fixture(runtime, max_repairs=1)
+        self.assertEqual(runtime.calls, ['generation', 'audit', 'repair', 'verify'])
+        self.assertEqual(result['open_issues'], ['r001-REGRESSION'])
+        self.assertEqual(read_json(root / 'issues.json')['issues'][0]['state'], 'fixed')
 
     def test_inspect_omits_legacy_assessment_without_rewriting_archive(self):
         root = workflow.prepare(self.settings, 'legacy')
@@ -240,7 +247,7 @@ class WorkflowTests(unittest.TestCase):
         self.assertNotIn('assessment', workflow.inspect(root))
         self.assertEqual(path.read_bytes(), before)
 
-    def test_full_cycle_versions_exact_feedback_models_and_fresh_audit(self):
+    def test_full_cycle_versions_exact_feedback_models_and_final_review(self):
         runtime = OfflineRuntime()
         root, result = self.run_fixture(runtime)
         self.assertEqual(result['status'], 'cycle_complete')
@@ -248,7 +255,7 @@ class WorkflowTests(unittest.TestCase):
         self.assertEqual((root / 'inputs/REPAIR.md').read_bytes(), Path(self.settings.repair_prompt).read_bytes())
         self.assertEqual((root / 'inputs/AUDIT.md').read_bytes(), Path(self.settings.audit_prompt).read_bytes())
         self.assertFalse((root / 'prompts').exists())
-        self.assertEqual(runtime.calls, ['generation', 'audit', 'repair', 'verify', 'audit'])
+        self.assertEqual(runtime.calls, ['generation', 'audit', 'repair', 'verify'])
         old, new = result['candidates']
         self.assertNotEqual(old['commit'], new['commit'])
         self.assertEqual(new['changes'], {'added': ['tests/regression_test.go'], 'deleted': [], 'modified': ['server.go']})
@@ -268,7 +275,7 @@ class WorkflowTests(unittest.TestCase):
         self.assertEqual(request['repair_executions'], 'repair-executions/')
         receipt = read_json(root / 'reviews/001/context/repair-executions/fixture/result.json')
         self.assertEqual(receipt['source_context']['base_commit'], old['commit'])
-        self.assertEqual(read_json(root / 'handoffs/001/handoff.json')['candidate_commit'], new['commit'])
+        self.assertEqual(read_json(root / 'reviews/001/handoff/handoff.json')['candidate_commit'], new['commit'])
         for stage in result['stages']:
             if stage['kind'] in {'generation', 'repair'}:
                 args = json.loads((Path(stage['path']) / 'workspace/received-args.json').read_text())
@@ -288,7 +295,7 @@ class WorkflowTests(unittest.TestCase):
             workflow.execute(root, runtime)
         self.assertEqual(before, (root / 'experiment.json').read_bytes())
 
-    def test_real_finding_shape_completes_repair_review_and_final_discovery(self):
+    def test_real_finding_shape_completes_repair_and_final_review(self):
         runtime = OfflineRuntime()
         runtime.empty_after = 1
         original_audit, original_agent, original_verify = runtime.audit, runtime.agent, runtime.verify
@@ -331,37 +338,37 @@ class WorkflowTests(unittest.TestCase):
              patch.object(runtime, 'verify', side_effect=verify):
             root, result = self.run_fixture(runtime)
         self.assertEqual(result['status'], 'cycle_complete')
-        self.assertEqual(result['stop_reason'], 'no_open_findings')
-        self.assertEqual(runtime.calls, ['generation', 'audit', 'repair', 'verify', 'audit'])
+        self.assertEqual(result['stop_reason'], 'repair_limit')
+        self.assertEqual(runtime.calls, ['generation', 'audit', 'repair', 'verify'])
         index = read_json(root / 'issues.json')
         self.assertEqual(index['import_status'], 'imported')
-        self.assertEqual([item['issue_count'] for item in index['imports']], [1, 0])
+        self.assertEqual([item['issue_count'] for item in index['imports']], [1])
         self.assertEqual(index['issues'][0]['id'], 'a000-F-001')
         self.assertEqual(index['issues'][0]['state'], 'fixed')
         self.assertIsInstance(index['issues'][0]['assumptions'], list)
         self.assertIsInstance(index['issues'][0]['reproduction'], dict)
         self.assertEqual(index['issues'][0]['reviews'][0]['after_observation']['premature_deaths'], 0)
 
-    def test_no_change_still_gets_final_audit_without_using_all_repair_rounds(self):
+    def test_no_change_ends_after_review_without_using_all_repair_rounds(self):
         runtime = OfflineRuntime(action='no_change')
         _, result = self.run_fixture(runtime, max_repairs=3)
         self.assertEqual(result['status'], 'cycle_complete')
-        self.assertEqual(runtime.calls, ['generation', 'audit', 'repair', 'verify', 'audit'])
+        self.assertEqual(runtime.calls, ['generation', 'audit', 'repair', 'verify'])
         self.assertEqual(result['candidates'][-1]['changes'], {'added': [], 'deleted': [], 'modified': []})
 
-    def test_three_repairs_each_get_independent_review_and_new_search(self):
+    def test_three_repairs_end_with_review_instead_of_another_search(self):
         runtime = OfflineRuntime()
         root, result = self.run_fixture(runtime, max_repairs=3)
         self.assertEqual(result['status'], 'cycle_complete')
         self.assertEqual(result['stop_reason'], 'repair_limit')
-        self.assertEqual(runtime.calls, ['generation', 'audit'] + ['repair', 'verify', 'audit'] * 3)
-        self.assertEqual(runtime.budgets, [('audit', 3600)] + [('verify', 900), ('audit', 1800)] * 3)
+        self.assertEqual(runtime.calls, ['generation'] + ['audit', 'repair', 'verify'] * 3)
+        self.assertEqual(runtime.budgets, [('audit', 3600), ('verify', 900)] + [('audit', 1800), ('verify', 900)] * 2)
         self.assertEqual(len(result['candidates']), 4)
-        self.assertEqual(result['open_issues'], ['a003-F1'])
+        self.assertEqual(result['open_issues'], [])
         issues = read_json(root / 'issues.json')['issues']
-        self.assertEqual([x['state'] for x in issues], ['fixed'] * 3 + ['open'])
+        self.assertEqual([x['state'] for x in issues], ['fixed'] * 3)
         self.assertTrue(all(x['reviews'][0]['before_commit'] == result['candidates'][n]['commit']
-                            for n, x in enumerate(issues[:-1])))
+                            for n, x in enumerate(issues)))
         history = read_json(root / 'feedback/002/history.json')['issues']
         self.assertEqual([item['id'] for item in history], ['a000-F1', 'a001-F1'])
         self.assertTrue(all((root / 'feedback/002' / item['reviews'][-1]['evidence'][-1]).is_file()
@@ -405,24 +412,25 @@ class WorkflowTests(unittest.TestCase):
         self.assertEqual(later['id'], 'a000-F1')
         self.assertTrue((root / 'feedback/001' / later['reviews'][0]['evidence'][0]).is_file())
 
-    def test_malformed_review_never_closes_issue_and_still_runs_final_search(self):
+    def test_malformed_review_never_closes_issue_or_launches_another_search(self):
         runtime = OfflineRuntime()
         runtime.review_invalid = True
         runtime.empty_after = 1
         root, result = self.run_fixture(runtime, max_repairs=3)
         self.assertEqual(result['status'], 'verification_incomplete')
         self.assertEqual(result['open_issues'], ['a000-F1'])
-        self.assertEqual(runtime.calls, ['generation', 'audit', 'repair', 'verify', 'audit'])
+        self.assertEqual(runtime.calls, ['generation', 'audit', 'repair', 'verify'])
         self.assertEqual(read_json(root / 'issues.json')['issues'][0]['state'], 'open')
 
-    def test_review_worker_timeout_uses_reserved_final_audit_and_preserves_open_issue(self):
+    def test_review_worker_timeout_stops_and_preserves_open_issue(self):
         runtime = OfflineRuntime()
         runtime.empty_after = 1
         with patch.object(runtime, 'verify', side_effect=workflow.StopWorkflow('budget_exhausted', 'review worker timeout')):
             _, result = self.run_fixture(runtime, max_repairs=3)
         self.assertEqual(result['status'], 'verification_incomplete')
         self.assertEqual(result['open_issues'], ['a000-F1'])
-        self.assertEqual(runtime.calls[-1], 'audit')
+        self.assertEqual(runtime.calls[-1], 'repair')
+        self.assertEqual(result['stages'][-1]['kind'], 'repair_verification')
         self.assertEqual(runtime.calls.count('repair'), 1)
 
     def test_missing_findings_is_incomplete_not_empty(self):
@@ -501,7 +509,7 @@ class WorkflowTests(unittest.TestCase):
         with patch.object(runtime, 'verify', side_effect=fail):
             root, result = self.run_fixture(runtime)
         self.assertEqual(result['status'], 'verification_failed')
-        self.assertEqual(runtime.calls, ['generation', 'audit', 'repair', 'verify', 'audit'])
+        self.assertEqual(runtime.calls, ['generation', 'audit', 'repair', 'verify'])
         self.assertEqual(result['open_issues'], ['a000-F1'])
         self.assertEqual(read_json(root / 'issues.json')['issues'][0]['state'], 'open')
         draft, = [item for item in result['pending_audit_reports']
@@ -509,14 +517,31 @@ class WorkflowTests(unittest.TestCase):
         self.assertTrue(draft['index'].endswith('/work/review.json'))
         self.assertEqual(Path(draft['index']).read_text(), '{"issues": [{"disposition": "fixed"')
 
-    def test_budget_reserves_final_audit_instead_of_starting_short_repair(self):
+    def test_final_audit_can_be_repaired_with_review_reserved(self):
         runtime = OfflineRuntime()
-        root, result = self.run_fixture(runtime, total_seconds=5000, max_repairs=3)
-        self.assertEqual(result['stop_reason'], 'insufficient_repair_budget')
-        self.assertEqual(runtime.calls, ['generation', 'audit'])
-        generation = Path(result['stages'][0]['path'])
-        self.assertLessEqual(read_json(generation / 'run.json')['settings']['timeout_seconds'], 3190)
-        self.assertEqual(runtime.budgets, [('audit', 3600)])
+        clock = [100.0]
+        agent, audit, verify = runtime.agent, runtime.audit, runtime.verify
+        def timed_agent(stage):
+            result = agent(stage)
+            meta = read_json(stage / 'run.json')
+            clock[0] += 100 if meta['workflow_role'] == 'generation' else meta['settings']['timeout_seconds']
+            return result
+        def timed(call, *args):
+            result = call(*args)
+            clock[0] += args[-2]
+            return result
+        with patch.object(runtime, 'agent', side_effect=timed_agent), \
+             patch.object(runtime, 'audit', side_effect=lambda *args: timed(audit, *args)), \
+             patch.object(runtime, 'verify', side_effect=lambda *args: timed(verify, *args)), \
+             patch('workflow.time.monotonic', side_effect=lambda: clock[0]):
+            _, result = self.run_fixture(runtime, total_seconds=5000, max_repairs=3)
+        self.assertEqual(result['stop_reason'], 'final_review_complete')
+        self.assertEqual(runtime.calls, ['generation', 'audit', 'repair', 'verify'])
+        self.assertEqual([s['kind'] for s in result['stages']],
+                         ['generation', 'final_audit', 'repair', 'repair_verification'])
+        self.assertEqual(result['stages'][2]['allocated_seconds'], 340)
+        self.assertEqual(runtime.budgets, [('audit', 3600), ('verify', 900)])
+        self.assertEqual(result['elapsed_seconds'], 4940)
 
     def test_slow_feedback_copy_rechecks_minimum_repair_budget(self):
         runtime = OfflineRuntime()
@@ -525,19 +550,19 @@ class WorkflowTests(unittest.TestCase):
         def slow_copy(source, destination, *args, **kwargs):
             original(source, destination, *args, **kwargs)
             if destination.name == 'feedback' and destination.parent.name == '.forge':
-                # Leave 200 s for repair after reserving verification, final audit and capture.
-                reserve = self.settings.verification_seconds + 10 + self.settings.repair_verification_seconds + 60
+                # Leave 200 s for repair after reserving independent review and capture.
+                reserve = self.settings.repair_verification_seconds + 60
                 clock[0] = 100.0 + self.settings.total_seconds - reserve - 200
         with patch('workflow.copy_tree', side_effect=slow_copy), \
              patch('workflow.time.monotonic', side_effect=lambda: clock[0]):
             _, result = self.run_fixture(runtime, max_repairs=3)
         self.assertEqual(runtime.calls.count('repair'), 0)
         self.assertEqual(result['stop_reason'], 'insufficient_repair_budget')
-        self.assertEqual(runtime.budgets[-1], ('audit', 1800))
+        self.assertEqual(runtime.budgets, [('audit', 3600)])
         skipped = [stage for stage in result['stages'] if stage['kind'] == 'repair']
         self.assertEqual(skipped[0]['status'], 'not_started')
 
-    def test_early_generation_finish_leaves_time_for_extra_repair_without_using_final_reserve(self):
+    def test_early_generation_finish_leaves_time_for_repairs_and_ends_at_review(self):
         runtime = OfflineRuntime()
         clock = [100.0]
         original_agent, original_audit, original_verify = runtime.agent, runtime.audit, runtime.verify
@@ -557,8 +582,8 @@ class WorkflowTests(unittest.TestCase):
              patch.object(runtime, 'verify', side_effect=verify), patch('workflow.time.monotonic', side_effect=lambda: clock[0]):
             _, result = self.run_fixture(runtime, max_repairs=3)
         self.assertEqual(runtime.calls.count('repair'), 2)
-        self.assertEqual(result['stop_reason'], 'insufficient_repair_budget')
-        self.assertEqual(runtime.budgets[-1], ('audit', 1800))
+        self.assertEqual(result['stop_reason'], 'final_review_complete')
+        self.assertEqual(runtime.budgets[-1], ('verify', 900))
         self.assertLessEqual(result['elapsed_seconds'], self.settings.total_seconds)
 
     def test_zero_repairs_still_audits_generation(self):
@@ -579,7 +604,7 @@ class WorkflowTests(unittest.TestCase):
                 self.assertEqual(result['status'], 'needs_specification')
                 self.assertEqual(result['open_issues'], ['a000-F1'])
                 self.assertEqual(workflow.inspect(root)['awaiting_specification'], ['a000-F1'])
-                self.assertEqual(runtime.calls, ['generation', 'audit', 'repair', 'verify', 'audit'])
+                self.assertEqual(runtime.calls, ['generation', 'audit', 'repair', 'verify'])
                 self.assertEqual(result['candidates'][-1]['changes'], {'added': [], 'deleted': [], 'modified': []})
                 self.assertEqual(read_json(root / 'issues.json')['issues'][0]['reviews'][0]['disposition'], 'needs_specification')
 
@@ -835,22 +860,42 @@ class HandoffTests(unittest.TestCase):
 
 
 class BridgeIntegrationTests(unittest.TestCase):
-    def test_real_export_screening_git_identity_and_local_config_without_model(self):
+    def test_real_export_preserves_candidate_materials_and_git_identity_without_model(self):
+        from auditor.runner import capture_source, file_inventory
+        from runtime.replay import regular_file
         settings = WorkflowSettings()
         with tempfile.TemporaryDirectory(prefix='forge-bridge-') as temp:
             root = Path(temp)
             workspace = root / 'workspace'
             put(workspace / 'go.mod', 'module example.com/syncepaxos\n\ngo 1.22\n')
             put(workspace / 'main.go', 'package main\nfunc main() {}\n')
-            put(workspace / '.env', 'fixture=not-a-real-credential\n')
+            retained = {'wire/auth.go': 'package wire\nfunc Authenticate() bool { return false }\n',
+                        'wire/auth.zig': '// Source language is not a capture policy.\n',
+                        'docs/secret-key.md': 'Authentication implementation notes.\n',
+                        'tests/token.txt': 'Ordinary parser test input.\n',
+                        'auth.json': '{"access_token": "public-test-token"}\n',
+                        '.env.example': 'PORT=8080\n', '.env': 'LOCAL_TEST=1\n',
+                        'fixtures/credentials.json': '{"password": "test-password"}\n',
+                        'wire/credentials.go': 'package wire\nvar Password = "test-password"\n',
+                        'tests/tls_test.go': 'package tests\nvar Marker = "-----BEGIN PRIVATE KEY-----"\n'}
+            for name, content in retained.items():
+                put(workspace / name, content)
+            put(workspace / '.codex/auth.json', 'Framework private directory fixture.\n')
             put(workspace / '.forge/feedback/report.md', 'Old report must not reach fresh audit.\n')
             put(workspace / 'AGENTS.md', 'Instructions must not become audit instructions.\n')
             (workspace / 'outside').symlink_to('/etc/hostname')
             git(workspace, 'init', '--quiet', '--template=')
             candidate = workflow.Runtime().export(settings, workspace, root / 'candidate', root / 'export', 20)
-            self.assertEqual(candidate['files'], ['go.mod', 'main.go'])
+            self.assertEqual(candidate['files'], sorted(['go.mod', 'main.go', *retained]))
             self.assertEqual(candidate_commit(root / 'candidate'), candidate['commit'])
-            self.assertEqual(set(candidate['excluded']), {'.env', '.forge/feedback/report.md', 'AGENTS.md', 'outside'})
+            self.assertEqual(set(candidate['excluded']), {'.codex/auth.json', '.forge/feedback/report.md', 'AGENTS.md', 'outside'})
+            captured = capture_source(root / 'candidate', root / 'captured', time.monotonic() + 20)
+            self.assertFalse(captured['excluded'])
+            inventory, excluded = file_inventory(root / 'captured')
+            self.assertFalse(excluded)
+            for name in candidate['files']:
+                self.assertIn(name, inventory)
+                self.assertEqual(regular_file(root / 'captured', name)[0], (workspace / name).read_bytes())
             # Generate the actual audit config, but replace process execution before any model call.
             folder = root / 'audit'
             def fake_invoke(argv, logs, timeout, cwd):

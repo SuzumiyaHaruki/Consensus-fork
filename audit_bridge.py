@@ -17,7 +17,7 @@ def git(root, *args):
 
 
 def export(workspace, destination):
-    from runtime.storage import EXCLUDED_DIRS, sensitive_file
+    from runtime.storage import EXCLUDED_DIRS
     excluded_dirs = EXCLUDED_DIRS | {'.forge', '.runtime', '.execution', '.pytest_cache', '.cache'}
     names = git(workspace, 'ls-files', '--cached', '--others', '--exclude-standard', '-z').decode().split('\0')
     destination.mkdir(parents=True, exist_ok=False)
@@ -43,9 +43,6 @@ def export(workspace, destination):
             excluded[name] = 'oversized artifact; inspect original generation output'
             continue
         data = path.read_bytes()
-        if sensitive_file(path, data):
-            excluded[name] = 'credential-like name or content'
-            continue
         if data.startswith(b'\x7fELF'):
             excluded[name] = 'compiled executable'
             continue

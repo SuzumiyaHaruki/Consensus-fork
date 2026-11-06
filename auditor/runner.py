@@ -13,10 +13,7 @@ from statistics import median
 from datetime import datetime, timezone
 from pathlib import Path
 
-from runtime.storage import digest, write_json
-from runtime.storage import (
-    EXCLUDED_DIRS, sensitive_file, fixed_submodules, screened_digest,
-)
+from runtime.storage import EXCLUDED_DIRS, digest, file_digest, fixed_submodules, write_json
 
 from .codex import Codex
 from runtime.evidence import report_feedback
@@ -41,13 +38,10 @@ def implementation_identity(root):
         pass  # A source checkout need not have been initialized as a Git repository.
     retained = {}
     for name, path in sources.items():
-        if (path.is_symlink() or set(Path(name).parts) & EXCLUDED or sensitive_file(path)):
+        if path.is_symlink() or set(Path(name).parts) & EXCLUDED:
             retained[name] = {'source': str(path), 'record': None, 'reason': 'private or excluded file'}
             continue
         data = path.read_bytes()
-        if sensitive_file(path,data):
-            retained[name] = {'source': str(path), 'record': None, 'reason': 'credential-like content excluded'}
-            continue
         destination = root/'inputs/implementation-source'/name
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_bytes(data)
@@ -112,13 +106,12 @@ def capture_source(repo, destination, deadline):
         if path.is_absolute() or ".." in path.parts:
             raise ValueError("Unsafe Git tree path")
         if (mode == '160000' and not (set(path.parts) & EXCLUDED)
-                and path.name not in {'AGENTS.md', 'SKILL.md'} and not sensitive_file(path)):
+                and path.name not in {'AGENTS.md', 'SKILL.md'}):
             nested = capture_source(repo/path, destination/path, deadline)
             files.update({str(path/key):value for key,value in nested['files'].items()})
             excluded.update({str(path/key):value for key,value in nested['excluded'].items()})
             continue
         if (set(path.parts) & EXCLUDED or path.name in {"AGENTS.md", "SKILL.md"}
-                or sensitive_file(path)
                 or mode not in {"100644", "100755"} or kind != "blob"):
             excluded[name] = "instruction, private, excluded directory, link, or submodule"
         else:
@@ -137,9 +130,6 @@ def capture_source(repo, destination, deadline):
         size = int(header[2])
         data = payload[end + 1:end + 1 + size]
         offset = end + size + 2
-        if sensitive_file(name,data):
-            excluded[name] = "credential-like content"
-            continue
         path = destination / name
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(data)
@@ -166,15 +156,10 @@ def file_inventory(root, *, exclude=WORK_EXCLUDED):
             if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
                 excluded[rel] = "symlink, hardlink, or nonregular file"
                 continue
-            if (sensitive_file(path)
-                    or name.endswith(".lock.tmp")):
-                excluded[rel] = "private or transient file"
+            if name.endswith(".lock.tmp"):
+                excluded[rel] = "transient file"
                 continue
-            identity = screened_digest(path)
-            if isinstance(identity, str):
-                excluded[rel] = identity
-                continue
-            checksum, size = identity
+            checksum, size = file_digest(path)
             files[rel] = {"digest": checksum, "mode": stat.S_IMODE(info.st_mode), "size": size}
     return files, excluded
 
@@ -210,6 +195,7 @@ def freeze(root):
 
 
 def scrub_work(root):
+    """Remove runtime directories, links and transient files, not candidate or evidence content."""
     work = root / "work"
     _, excluded = file_inventory(work)
     write_json(root / "inputs/work-exclusions.json", excluded)

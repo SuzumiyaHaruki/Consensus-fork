@@ -34,7 +34,7 @@ DESCRIPTION = ('Run an ordinary local test in a private network and PID namespac
                'This starts from a private candidate copy; overlays and the starting commit are retained. Without source, work is mutable and no exact candidate binding is claimed. '
                'Use outputs to retain selected relative files/directories from the execution workspace before cleanup, including on test failure/timeout. '
                'Read result.artifacts for saved files and exclusions; unselected files in a source copy are deleted. '
-               'Output collection excludes links, credentials, executables and private/cache directories; limits are 16 MB per file, 64 MiB total and 1024 entries.')
+               'Output collection excludes links, executables and private/cache directories; limits are 16 MB per file, 64 MiB total and 1024 entries.')
 
 
 class Arguments(BaseModel):
