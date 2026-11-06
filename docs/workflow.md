@@ -62,38 +62,17 @@
 
 审计或复核交付失败，或已返回阶段还包含最后完成回合之后的未完成调查时，控制器在 `experiment.json.pending_audit_reports` 和 `issues.json.pending_reports` 中列出已有报告、索引及原始回合和执行记录的路径，标为 `needs_review`。这些是待复核材料，不是已导入的问题；正文和索引可能不同步，索引甚至可能损坏，空索引不能说明没有发现。控制器不从正文自动提取问题，不因此关闭旧问题或启动修复，原停止状态保持不变。失败阶段的模型用量和具体停止原因也从原始运行记录汇入。`inspect` 可以只读地补充旧实验的这些路径和元数据，不改写历史文件。若没有报告或索引，仍只报告原失败，不凭空产生待复核成果。
 
-## 有限轨迹检查
+## 调度、重放与协议模型边界
 
-需要实际控制事件顺序时，可以在现有 `isolated_exec` 中使用 `runtime/schedule.py`，用薄适配器连接候选实现。它与下面的静态轨迹检查互补，详见 [scheduling.md](scheduling.md)。`runtime/replay.py` 负责从候选源码准备临时工作副本、保留测试覆盖文件和所选输出；事件重放由 `schedule.py` 完成。没有增加模型阶段或强制测试清单。
+在现有 `isolated_exec` 中使用可选 `runtime/schedule.py`，通过候选适配器控制实际事件并记录、重放交互。生成/修复收到 `inputs/schedule.py`，审计/复核收到只读 `tools/schedule.py`；工具与执行记录进入原有交接包。`runtime/replay.py` 负责准备指定源码副本和保留测试覆盖文件。没有新增模型阶段、固定测试清单或协议判断器，具体接口见 [scheduling.md](scheduling.md)。
 
-`runtime/tracecheck.py` 是标准库命令行工具，`python3 runtime/tracecheck.py --help` 给出完整格式与边界。生成/修复阶段得到 `inputs/tracecheck.py` 副本，从 workspace 可执行 `python3 ../inputs/tracecheck.py --help`；审计与复核得到运行目录下只读的 `tools/tracecheck.py`，绝对路径在 run brief 中。审计源码记录与交接包的 `raw/tools/` 保留当时的工具，普通 shell 与隔离执行均可读取；没有扩大对其他框架目录或认证信息的权限。
+旧 `runtime/tracecheck.py` 仍能独立检查逐消息有界交付的旧账本，但不适用于混合协议 W/s 的完整广播窗口。新实验不注入它，调度结束和证据导入也不调用它。原始实验保存的工具和结果不改写，当前审计实现源码快照仍可能包含该历史文件，这不代表它被提供为适用的检查工具。
 
-测试适配器可以把实际观察转换为 JSON 事件记录，不需要候选采用固定事件格式。顶层字段为 `clock`（`controlled` 或 `single_observer`）、`members`、`fault_limit`、`delivery_bound_ns`、`end_ns` 和 `events`。时间都是同一时钟上的非负整数纳秒；不能直接拼接不同机器的墙钟。以下仅演示格式，不代表真实共识执行：
-
-```json
-{
-  "clock": "controlled",
-  "members": ["A", "B", "C"],
-  "fault_limit": 1,
-  "delivery_bound_ns": 100000000,
-  "end_ns": 140000000,
-  "events": [
-    {"at_ns": 0, "kind": "send", "id": "tx1", "src": "A", "dst": "B"},
-    {"at_ns": 50000000, "kind": "send_complete", "id": "tx1"},
-    {"at_ns": 130000000, "kind": "deliver", "id": "tx1"}
-  ]
-}
-```
-
-`send` 是实际发起的单次传输，不能用入队事件替代；`id` 是传输尝试 ID，重试要用不同 ID，不能直接用命令 ID。`send_complete` 对应单个接收者。消息可以在完成回调前交付，已完成传输的交付义务不会因发送者崩溃消失，接收者在截止时刻前或恰在该时刻崩溃则解除这项义务。`crash` 用 `node` 表示真实 crash-stop，不能把实现推断的死亡事实直接当作真实崩溃；后者可以记为不解释语义的 `observe`。同一时刻按列表顺序处理。重复交付允许，但工具不检查载荷；未完成的发送不被自动赋予交付期限。
-
-返回状态只有 `consistent_prefix`、`violations`、`invalid_trace`，退出码分别为 0、1、2。`invalid_trace.error_kind` 区分读取失败、JSON 解码失败、文件大小上限和账本格式不兼容；这些情况下没有完成事件账本一致性检查。在有限前缀结束时刚好到达截止界且尚未收到消息，结果列为 `pending`，因为同一时刻可能还有后续事件；时间推进超过截止界才报告缺失交付。此工具不检查完整广播、计时器优先级、处理耗时、载荷一致性、仲裁集合、状态机语义、安全性或活性，也无法检测被遗漏或编造的事件、错误的完成埋点及不真实的上界。空轨迹也只能说明所提供记录没有矛盾。
-
-审计和复核可以在每个问题里添加 `trace_files`，指向保留的 JSON 轨迹，路径格式沿用 `evidence`。控制器用可信代码重新解析，覆盖输入中自称的 `trace_checks`，保存具体观察和后续问题；没有轨迹本身不产生缺项提示。导入阶段不会执行复现程序。普通日志或 JSONL 应作为 `evidence` 引用；`trace_files` 只接受工具格式的单个 JSON 账本。读取、解码或大小限制错误产生 `trace_input_error`，账本格式不兼容产生 `trace_format_unsupported`，只有事件账本检查实际发现矛盾才产生 `trace_inconsistent`。前两类仍保存 `invalid_trace` 和原始错误，不会丢弃原问题；路径越界、符号链接或缺少被引用文件仍按已有证据规则拒收。检查结果不影响关闭条件，不自动归因：矛盾可能来自非法测试调度、错误埋点、前提不成立，也可能来自实现未履行自己承诺的交付义务。
+新报告将轨迹、普通日志和 JSONL 放在 `evidence`。旧格式 `trace_files` 引用继续校验路径、保留和映射，但不解析为时间模型；新导入的 `trace_checks` 为空，不能将 agent 自报的检查结果当作控制器判定。路径越界、符号链接和不存在文件继续按原证据规则处理。控制器仍检查执行关联和显式版本不符，解释断言及其性质含义仍属于审阅工作。
 
 ## 指定版本执行与具体反馈
 
-公共能力位于 `runtime/`，生成和审计都依赖它，公共模块不依赖两个 agent 角色。`local_exec.py` 保留执行隔离与清理，`replay.py` 准备候选副本，`evidence.py` 负责关联记录与提出具体问题，`storage.py` 提供日志脱敏和证据存储辅助，工具链、Codex 辅助和轨迹检查也在此处。审计的私有认证、配置与连续会话仍留在 `auditor/`。
+公共能力位于 `runtime/`，生成和审计都依赖它，公共模块不依赖两个 agent 角色。`local_exec.py` 保留执行隔离与清理，`replay.py` 准备候选副本，`evidence.py` 负责关联记录与提出具体问题，`storage.py` 提供日志脱敏和证据存储辅助，工具链、Codex 辅助和调度重放也在此处。审计的私有认证、配置与连续会话仍留在 `auditor/`。
 
 当前 Go 实验的 `isolated_exec` 可用 `source` 选择 run brief 列出的候选别名，`overlays` 是当前 work 下的相对测试/辅助文件路径列表，`outputs` 选择执行后需归档的文件或目录。审计提供 `candidate`，复核提供 `candidate`（修复后）与 `before`（紧邻的修复前），修复提供 `candidate`（本轮输入）；初次生成尚无候选可选。其他工具链保留原有工作区执行方式。这不是固定测试清单，agent 仍自行选择命令、测试内容和是否使用重放。
 

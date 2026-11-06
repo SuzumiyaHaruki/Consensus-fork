@@ -77,7 +77,10 @@ class RunnerTests(unittest.TestCase):
         self.assertTrue((first / "workspace" / ".git").is_dir())
         self.assertFalse((first / "events.jsonl").exists())
         self.assertFalse((first / "workspace" / "evaluation").exists())
-        self.assertEqual((first / 'inputs/tracecheck.py').read_bytes(), (ROOT / 'runtime/tracecheck.py').read_bytes())
+        self.assertFalse((first / 'inputs/tracecheck.py').exists())
+        self.assertNotIn('trace_helper', read_json(first / 'run.json'))
+        for folder in ('inputs', 'workspace'):
+            self.assertEqual((first / folder / 'pseudocode.md').read_bytes(), (ROOT / 'inputs/pseudocode.md').read_bytes())
         self.assertFalse((first / 'workspace/tracecheck.py').exists())
         self.assertEqual((first / 'inputs/schedule.py').read_bytes(), (ROOT / 'runtime/schedule.py').read_bytes())
         self.assertFalse((first / 'workspace/schedule.py').exists())

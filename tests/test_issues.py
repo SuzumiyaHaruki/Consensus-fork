@@ -68,7 +68,7 @@ class IssueTests(unittest.TestCase):
                 apply_review(items, result, self.bundle, self.after)
             self.assertEqual(items[0]['state'], 'open')
 
-    def test_trace_checks_are_computed_and_bad_trace_does_not_erase_finding(self):
+    def test_legacy_trace_is_retained_without_importing_a_timing_verdict(self):
         path = self.bundle / 'audit-work/trace.json'
         path.write_text('{bad JSON')
         self.finding.update(trace_files=['work/trace.json'], trace_checks=[{'status': 'forged'}],
@@ -77,10 +77,11 @@ class IssueTests(unittest.TestCase):
                             variants=['Proposed, not executed'])
         item = self.find()[0]
         self.assertEqual(item['trace_files'], ['audit-work/trace.json'])
-        self.assertEqual(item['trace_checks'][0]['status'], 'invalid_trace')
+        self.assertEqual(item['trace_checks'], [])
+        self.assertEqual(path.read_text(), '{bad JSON')
         self.assertEqual(item['legality'], self.finding['legality'])
         self.assertEqual(item['state'], 'open')
-        self.assertTrue(any('invalid_trace' in note for note in item['evidence_notes']))
+        self.assertFalse(any('trace_' in note['code'] for note in item['evidence_feedback']))
         self.assertFalse(any('No substantive' in note for note in item['evidence_notes']))
         self.finding['trace_files'] = ['work/../trace.json']
         with self.assertRaises(ValueError):
@@ -281,7 +282,7 @@ class IssueTests(unittest.TestCase):
             item = read_json(dest / 'issues.json')['issues'][0]
             for record in (item, item['reviews'][0]):
                 self.assertEqual(record['trace_files'], ['previous/000/audit-work/trace.json'])
-                self.assertEqual(record['trace_checks'][0]['path'], record['trace_files'][0])
+                self.assertEqual(record['trace_checks'], [])
                 self.assertTrue((dest / record['trace_files'][0]).is_file())
             self.assertEqual(item['source_commit'], 'before')
             self.assertEqual(item['causal_explanation'], self.finding['causal_explanation'])

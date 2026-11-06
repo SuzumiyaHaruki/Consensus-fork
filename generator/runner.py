@@ -25,7 +25,7 @@ __version__ = "0.2.0"
 
 
 REQUIRED_INPUTS = (
-    "AGENTS.md", "TASK.md", "protocol.md", "system.md",
+    "AGENTS.md", "TASK.md", "protocol.md", "pseudocode.md", "system.md",
 )
 
 
@@ -129,10 +129,8 @@ def prepare(settings: Settings, label: str = "native") -> Path:
                 path = destination / relative
                 path.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copyfile(source / relative, path)
-        for name in ('tracecheck.py', 'schedule.py'):
-            helper = Path(__file__).resolve().parent.parent / 'runtime' / name
-            shutil.copyfile(helper, run_dir / 'inputs' / name)
-        metadata['trace_helper'] = 'inputs/tracecheck.py'
+        helper = Path(__file__).resolve().parent.parent / 'runtime/schedule.py'
+        shutil.copyfile(helper, run_dir / 'inputs/schedule.py')
         metadata['schedule_helper'] = 'inputs/schedule.py'
         prompt = (run_dir / "inputs" / "TASK.md").read_text(encoding="utf-8")
         (run_dir / "prompt.txt").write_text(prompt, encoding="utf-8")

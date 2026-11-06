@@ -106,16 +106,16 @@ class ScheduleTests(unittest.TestCase):
             with self.assertRaises(ProcessLookupError):
                 os.kill(int(path.read_text()), 0)
 
-    def test_completed_schedule_does_not_hide_illegal_delivery_ledger(self):
+    def test_schedule_retains_events_without_applying_old_delivery_bounds(self):
         setup = {'trace_model': {'clock': 'controlled', 'members': ['a', 'b', 'c'],
                                 'fault_limit': 1, 'delivery_bound_ns': 10}}
         events = [{'kind': 'send', 'at_ns': 0, 'id': 'a:1', 'src': 'a', 'dst': 'b'},
                   {'kind': 'send_complete', 'at_ns': 0, 'id': 'a:1'},
                   {'kind': 'crash', 'at_ns': 1, 'node': 'a'}]
-        result, _ = self.exercise([{'do': 'record', 'args': {'now_ns': 11, 'events': events}}], setup)
+        result, rows = self.exercise([{'do': 'record', 'args': {'now_ns': 11, 'events': events}}], setup)
         self.assertEqual(result['status'], 'completed')
-        self.assertEqual(result['trace_check']['status'], 'violations')
-        self.assertEqual(result['trace_check']['violations'][0]['code'], 'delivery_deadline_missed')
+        self.assertNotIn('trace_check', result)
+        self.assertEqual(rows[-2]['response']['events'], events)
 
     def test_sigterm_preserves_partial_record_and_stops_adapter(self):
         with tempfile.TemporaryDirectory() as temp:

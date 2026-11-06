@@ -4,7 +4,6 @@ import math
 import re
 from pathlib import Path
 
-from .tracecheck import check_file
 
 CLOSED = {'fixed', 'not_substantiated'}
 DISPOSITIONS = CLOSED | {'unresolved', 'needs_specification', 'environment_blocked'}
@@ -123,7 +122,7 @@ def inspect_item(item, root, *, work_name='work', raw_name='.', expected_commits
     A missing link does not imply no execution, and execution does not prove a claim.
     Agent-written copies in work/ are ordinary evidence, never trusted tool receipts.
     """
-    feedback, traces, executions = [], [], []
+    feedback, executions = [], []
 
     def ask(code, observation, request):
         feedback.append({'code': code, 'observation': observation, 'request': request})
@@ -225,18 +224,9 @@ def inspect_item(item, root, *, work_name='work', raw_name='.', expected_commits
     trace_refs = item.get('trace_files', [])
     if not isinstance(trace_refs, list):
         raise ValueError('trace_files must be a list')
-    for ref in trace_refs:
-        path = retained_path(root, ref, work_name, raw_name)
-        check = {'path': path, **check_file(inside(root, path))}
-        traces.append(check)
-        if check['status'] == 'violations':
-            ask('trace_inconsistent', f"{path}: violations; {json.dumps(check['violations'][:3], ensure_ascii=False)}",
-                'Determine whether the cause is instrumentation, the external schedule, assumptions or implementation. Correct the evidence or narrow the claim; do not silently correct implementation behavior.')
-        elif check['status'] == 'invalid_trace':
-            code = 'trace_format_unsupported' if check['error_kind'] == 'schema' else 'trace_input_error'
-            ask(code, f"{path}: invalid_trace ({check['error_kind']}); {json.dumps(check['errors'], ensure_ascii=False)}",
-                'No ledger consistency check was performed. This helper accepts one JSON ledger in its documented format. Cite ordinary logs or JSONL as evidence instead; inspect the input error or provide a ledger if useful. Neither consistency nor inconsistency follows from this failure.')
-    return {'trace_files': [entry['path'] for entry in traces], 'trace_checks': traces,
+    # Preserve legacy trace references as evidence; no protocol-specific time verdict.
+    traces = [retained_path(root, ref, work_name, raw_name) for ref in trace_refs]
+    return {'trace_files': traces, 'trace_checks': [],
             'execution_records': executions, 'evidence_feedback': feedback,
             'evidence_notes': [entry['observation'] + ' ' + entry['request'] for entry in feedback]}
 

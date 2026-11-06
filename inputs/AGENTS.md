@@ -1,6 +1,6 @@
 # Workspace instructions
 
-Build the runnable Go consensus system requested by `TASK.md`. The protocol is defined by `protocol.md`; engineering deliverables are defined by `system.md`.
+Build the runnable Go consensus system requested by `TASK.md`. Read `protocol.md` together with its operational expansion `pseudocode.md`; engineering deliverables are defined by `system.md`.
 
 Choose your own implementation plan and organization. Use this Codex session to implement, run tests, and fix problems. Delegate independent work to native Codex subagents when useful, using the same model and reasoning effort within the existing permissions and stage budget. Coordinate shared-file edits, integrate their results, and finish or stop delegated work before completing your reply. Internal delegation does not replace the separate audit and repair-review stages. Do not start nested Codex CLI sessions or invoke external model services. You may write your own local scripts and test tools.
 

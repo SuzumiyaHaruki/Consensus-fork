@@ -10,7 +10,7 @@ from workflow_config import DEFAULT, load
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description='Generate, audit, repair, and re-audit a synchronous consensus system')
+    parser = argparse.ArgumentParser(description='Generate, audit, repair, and re-audit a mixed EPaxos consensus system')
     sub = parser.add_subparsers(dest='action', required=True)
     for name in ('prepare', 'run', 'doctor'):
         child = sub.add_parser(name)

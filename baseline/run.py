@@ -16,7 +16,7 @@ sys.path.insert(0, str(PROJECT))
 from generator.config import settings_from_dict
 from generator import runner
 
-INPUTS = ('AGENTS.md', 'TASK.md', 'protocol.md')
+INPUTS = ('AGENTS.md', 'TASK.md', 'protocol.md', 'pseudocode.md')
 CONDITION = 'native-codex-system-generation'
 OPTIONS = {'model', 'reasoning_effort', 'timeout_seconds', 'action_seconds', 'codex'}
 
@@ -57,9 +57,8 @@ def prepare(settings, label='sol-high-generation'):
             for target in (root/'inputs', root/'workspace'):
                 target.mkdir(parents=True, exist_ok=True)
                 shutil.copyfile(source/name, target/name)
-        for name in ('tracecheck.py', 'schedule.py'):
-            shutil.copyfile(PROJECT/'runtime'/name, root/'inputs'/name)
-        record.update(trace_helper='inputs/tracecheck.py', schedule_helper='inputs/schedule.py')
+        shutil.copyfile(PROJECT/'runtime/schedule.py', root/'inputs/schedule.py')
+        record.update(schedule_helper='inputs/schedule.py')
         (root/'prompt.txt').write_bytes((root/'inputs/TASK.md').read_bytes())
         (root/'workspace/.gitignore').write_text('*.test\ncoverage.out\n.runtime/\n')
         subprocess.run(['git', 'init', '--quiet', '--template=', str(root/'workspace')],

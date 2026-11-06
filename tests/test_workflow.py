@@ -83,8 +83,8 @@ class OfflineRuntime(workflow.Runtime):
         if self.failure:
             return result | {'status': self.failure}
         if role == 'generation':
-            put(workspace / 'go.mod', 'module example.com/syncepaxos\n\ngo 1.22\n')
-            put(workspace / 'server.go', 'package syncepaxos\nconst Version = 0\n')
+            put(workspace / 'go.mod', 'module example.com/mixepaxos\n\ngo 1.22\n')
+            put(workspace / 'server.go', 'package mixepaxos\nconst Version = 0\n')
             put(workspace / 'README.md', 'Generated service documentation.\n')
             if self.change_material:
                 put(workspace / 'protocol.md', 'The fixture changed the protocol.\n')
@@ -106,14 +106,14 @@ class OfflineRuntime(workflow.Runtime):
                            if issue['id'] in handoff['repair_issue_ids']],
             })
             if self.action == 'repaired':
-                put(workspace / 'server.go', f'package syncepaxos\nconst Version = {self.calls.count("repair")}\n')
+                put(workspace / 'server.go', f'package mixepaxos\nconst Version = {self.calls.count("repair")}\n')
                 put(workspace / 'tests/regression_test.go', 'package tests\n')
         return result
 
     def export(self, settings, workspace, destination, logs, timeout):
         # A small fixture export keeps state-machine tests independent of audit dependencies.
         destination.mkdir(parents=True)
-        names = ['go.mod', 'server.go', 'README.md', 'protocol.md', 'system.md']
+        names = ['go.mod', 'server.go', 'README.md', 'protocol.md', 'pseudocode.md', 'system.md']
         if (workspace / 'tests/regression_test.go').exists():
             names.append('tests/regression_test.go')
         for name in names:
@@ -263,12 +263,12 @@ class WorkflowTests(unittest.TestCase):
         self.assertNotIn('unfinished', runtime.delivered_report)
         self.assertFalse((Path(new['path']) / '.forge').exists())
         delivered = read_json(root / 'feedback/000/issues.json')['issues'][0]
-        self.assertEqual(delivered['trace_checks'][0]['status'], 'consistent_prefix')
+        self.assertEqual(delivered['trace_checks'], [])
         self.assertEqual(delivered['causal_explanation'], {'fixture': 'No protocol cause'})
         self.assertTrue((root / 'feedback/000' / delivered['trace_files'][0]).is_file())
         self.assertIn(delivered['id'], (root / 'feedback/000/overview.md').read_text())
         reviewed = read_json(root / 'issues.json')['issues'][0]['reviews'][0]
-        self.assertEqual(reviewed['trace_checks'][0]['status'], 'consistent_prefix')
+        self.assertEqual(reviewed['trace_checks'], [])
         self.assertEqual(reviewed['variant_checks'], ['Fixture only'])
         request = read_json(root / 'reviews/001/context/request.json')
         self.assertEqual(request['repair_claim']['issues'][0]['before_check'], {'fixture': 'Not a consensus replay'})
@@ -282,7 +282,8 @@ class WorkflowTests(unittest.TestCase):
                 self.assertEqual(args[args.index('--model') + 1], 'gpt-6.1-sol')
                 self.assertIn('model_reasoning_effort="high"', args)
                 stage_path = Path(stage['path'])
-                self.assertTrue((stage_path / 'inputs/tracecheck.py').is_file())
+                self.assertFalse((stage_path / 'inputs/tracecheck.py').exists())
+                self.assertEqual((stage_path / 'workspace/pseudocode.md').read_bytes(), (root / 'inputs/pseudocode.md').read_bytes())
                 self.assertFalse((stage_path / 'workspace/AUDIT.md').exists())
                 if stage['kind'] == 'generation':
                     self.assertFalse((stage_path / 'workspace/REPAIR.md').exists())
@@ -779,7 +780,7 @@ class HandoffTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix='forge-handoff-')
         self.root = Path(self.temp.name)
-        put(self.root / 'candidate/go.mod', 'module example.com/syncepaxos\n')
+        put(self.root / 'candidate/go.mod', 'module example.com/mixepaxos\n')
         self.candidate = {'path': str(self.root / 'candidate'), 'commit': 'fixture-commit'}
         self.audit = fixture_audit(self.root / 'audit/runs/fixture', self.candidate)
 
@@ -867,9 +868,11 @@ class BridgeIntegrationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix='forge-bridge-') as temp:
             root = Path(temp)
             workspace = root / 'workspace'
-            put(workspace / 'go.mod', 'module example.com/syncepaxos\n\ngo 1.22\n')
+            put(workspace / 'go.mod', 'module example.com/mixepaxos\n\ngo 1.22\n')
             put(workspace / 'main.go', 'package main\nfunc main() {}\n')
-            retained = {'wire/auth.go': 'package wire\nfunc Authenticate() bool { return false }\n',
+            retained = {'protocol.md': (ROOT / 'inputs/protocol.md').read_text(),
+                        'pseudocode.md': (ROOT / 'inputs/pseudocode.md').read_text(),
+                        'wire/auth.go': 'package wire\nfunc Authenticate() bool { return false }\n',
                         'wire/auth.zig': '// Source language is not a capture policy.\n',
                         'docs/secret-key.md': 'Authentication implementation notes.\n',
                         'tests/token.txt': 'Ordinary parser test input.\n',
@@ -911,7 +914,7 @@ class BridgeIntegrationTests(unittest.TestCase):
             code = ('import sys; '
                     'from auditor.config import load_config,validate_selection; '
                     'c=load_config(sys.argv[1]); t=validate_selection(c); '
-                    'assert t["expected_module"]=="example.com/syncepaxos"; print("config valid; no model call")')
+                    'assert t["expected_module"]=="example.com/mixepaxos"; print("config valid; no model call")')
             process = subprocess.run([settings.audit_python, '-c', code, str(folder / 'config.json')],
                                      cwd=ROOT, capture_output=True, text=True, timeout=20)
             self.assertEqual(process.returncode, 0, process.stderr)

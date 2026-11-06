@@ -52,8 +52,8 @@ def export(workspace, destination):
         target.chmod(0o755 if os.access(path, os.X_OK) else 0o644)
         files.append(name)
     module = destination / 'go.mod'
-    if not module.is_file() or not any(line.split() == ['module', 'example.com/syncepaxos'] for line in module.read_text().splitlines()):
-        raise ValueError('Candidate must provide module example.com/syncepaxos')
+    if not module.is_file() or not any(line.split() == ['module', 'example.com/mixepaxos'] for line in module.read_text().splitlines()):
+        raise ValueError('Candidate must provide module example.com/mixepaxos')
     git(destination, 'init', '--quiet', '--template=')
     git(destination, 'add', '--force', '--', *files)
     git(destination, 'commit', '--quiet', '--no-verify', '-m', 'Capture generated candidate')

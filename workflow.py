@@ -108,7 +108,7 @@ class Runtime:
     def _audit(self, settings, candidate, folder, seconds, timeout, context=None):
         folder.mkdir(parents=True)
         write_json(folder / 'target.json', {'execution_backend': 'go_module', 'target': {
-            'variant': 'syncepaxos_system', 'expected_module': 'example.com/syncepaxos',
+            'variant': 'mixepaxos_system', 'expected_module': 'example.com/mixepaxos',
             'analysis_roots': [], 'execution_package': '.',
         }})
         write_json(folder / 'config.json', {

@@ -12,8 +12,8 @@ now_ns (monotonic integer), pending (enabled actions), and optional incremental
 events/observations. Init also supplies scope: what code runs and what is bypassed.
 Pending entries have unique string id, actions:[string,...], and arbitrary JSON
 metadata for selection. Events must be actual observations, not planned actions.
-Optional init trace_model uses tracecheck.py's ledger header; events then use its
-finite-ledger vocabulary. Its consistency check is not a correctness certificate.
+Events and extra adapter fields are retained without a protocol-specific timing
+verdict. This helper does not validate the mixed protocol's W/s assumptions.
 
 Plan steps:
   {"do":"submit","args":{"node":"A","command":{...}}}
@@ -45,7 +45,6 @@ import json
 import math
 import os
 from pathlib import Path
-import runpy
 import signal
 import time
 
@@ -175,11 +174,11 @@ async def run(plan, argv, timeout, emit, replay=None):
     validate(plan)
     deadline = time.monotonic() + timeout
     emit({'kind': 'schedule', 'plan': plan, 'adapter_argv': argv, 'strict_replay': replay is not None})
-    process, count, frame, trace_model, events = None, 0, {'now_ns': 0, 'pending': []}, None, []
+    process, count, frame = None, 0, {'now_ns': 0, 'pending': []}
     step_index, status, reason = -1, 'completed', None
 
     async def exchange(request, selected=None):
-        nonlocal count, frame, trace_model
+        nonlocal count, frame
         emit({'kind': 'request', 'index': count, 'step': step_index, 'request': request, 'selected': selected})
         if replay and (count >= len(replay[0]) or not equal(request, replay[0][count][0])):
             raise Stop('replay_diverged', f'Request {count} differs from recorded execution')
@@ -203,8 +202,6 @@ async def run(plan, argv, timeout, emit, replay=None):
         if count == 0:
             if not isinstance(response.get('scope'), str) or not response['scope'].strip():
                 raise ValueError('Init must state the exercised implementation and its limits in scope')
-            trace_model = response.get('trace_model')
-        events.extend(response.get('events', []))
         frame = response
         if replay and not equal(response, replay[0][count][1]):
             raise Stop('replay_diverged', f'Response {count} differs from recorded execution')
@@ -273,9 +270,6 @@ async def run(plan, argv, timeout, emit, replay=None):
     result = {'kind': 'summary', 'status': status, 'reason': reason, 'step': step_index, 'exchanges': count,
               'replay_match': None if replay is None else status == replay[1] and count == len(replay[0]),
               'scope': 'Adapter-reported execution only; schedule completion is not a consensus verdict.'}
-    if trace_model is not None:
-        checker = runpy.run_path(str(Path(__file__).with_name('tracecheck.py')))['check_trace']
-        result['trace_check'] = checker({**trace_model, 'end_ns': frame['now_ns'], 'events': events}) if isinstance(trace_model, dict) else checker(None)
     emit(result)
     return result
 

@@ -1,18 +1,20 @@
 # Consensus Forge
 
-围绕同步 per-command EPaxos 设计，组织“生成系统 → 审计 → 修复 → 独立复核 → 新审计”的实验。Python 负责材料、预算、版本和记录；实现与审计都交给 Codex CLI。生成及修复模型、审计模型均为 `gpt-6.1-sol`，推理强度均为 `high`。
+本分支围绕混合同步 EPaxos 设计，组织“生成系统 → 审计 → 修复 → 独立复核”的实验；预算允许时继续新的审计，最后审计仍可修复并以独立复核收尾。Python 负责材料、预算、版本和记录；实现与审计交给 Codex CLI。生成、修复、审计和复核模型均为 `gpt-6.1-sol`，推理强度为 `high`。
 
 统一使用 `forge.py` 启动实验，配置位于 `configs/workflow.json`，运行产物统一写入 `experiments/`。实验目录按需创建；已有实验记录保留，新配置只用于新准备的实验。
 
 ## 当前生成目标
 
-生成可运行的 Go KV 共识服务：可复用的共识节点、独立服务器进程、真实网络传输、多个客户端的并发请求、正常路径的执行结果、后台真实计时、可控时间和消息调度、测试与启动文档。每个逻辑命令只提交一次，客户端超时或断连后报告结果未知，不重试、不换节点找回结果，也不恢复旧的未完成请求。副本仍须自主接管、恢复命令并保证每条命令在每个副本只执行一次。所有自动化测试代码放在 `tests/`，具体测试内容与实现组织仍由 agent 选择。
+生成可运行的 Go KV 共识服务：可复用 Node、独立服务器进程、真实网络、多客户端并发、执行结果、后台真实计时、可控执行、测试与启动文档。客户端使用相同请求号和载荷跨入口重试；协议实例号与请求号分离，实例分别执行完成，应用效果与结果按请求去重。所有自动化测试代码放在 `tests/`，具体测试和实现组织由 agent 选择。
 
-协议规则以 `inputs/protocol.md` 为准。当前暂定采用客户端单次提交的范围，聚焦共识推进和实现质量；保留 `(ClientID, RequestSeq)`、执行完成后回复、真实并发与多进程运行。正常路径完整收集所有存活成员的观察后，再选择 Fast 或 Seal；命令在本地执行完成并保留结果后，退出本地未来冲突观察，原有历史记录继续保留。该剪枝不需要执行报告消息，安全性推导见 [本地剪枝说明](docs/local-pruning-safety.md)。未新增 crash-restart、动态成员、快照、任意网络分区恢复或安全历史删除协议。系统可以在固定成员、crash-stop 与同步时间假设下运行；不能因此宣称已经达到 etcd 的生产能力。
+共同协议材料是 [protocol.md](inputs/protocol.md) 与 [pseudocode.md](inputs/pseudocode.md)，来自两份混合 EPaxos PDF。使用广播窗口 W、慢回复人数 s、两阶段 Collect、PreAccept/Accept、ballot 恢复、HELP 与 Omega。原协调者有 K 个准入槽，本地执行完成后释放；已执行实例仍参与冲突扫描，历史和证据不回收。范围仍为固定成员、crash-stop，不含 WAL、重启追赶、动态成员或快照。完整组合证明和固定 W 下的历史增长边界见 [设计问题](docs/design-issues.md)。
 
-生成 agent 从简短的 `DESIGN.md` 草稿开始，识别抽象协议留下的实现选择，解释所选机制如何保持要求，并用实际代码和运行检查。说明重点包括首次观察与登记、发送与计时、决定与执行、客户端等待与副本义务；具体同步、接收事件、调度和数据结构由 agent 决定，不指定接收时间戳、有限批次或活跃索引方案。审计沿设计定位代码，依据要求与实际行为判断，修复和独立复核也不把偏好的实现方案当成正确答案。设计文档不替代协议要求或执行证据。
+本轮每次干净集群运行最多提交 10,000 条新逻辑请求，所有客户端合计，重试保持原 rid、不重复计数。负载端达到上限后停止新增请求，继续在执行预算内处理已有工作；服务端不增加永久容量阈值。W 在每次运行内固定，长期无限运行暂不评价。
 
-框架提供可选的 `runtime/tracecheck.py`，检查有限事件记录中的发送引用、完成后的交付期限和 crash-stop 一致性。控制器会读取报告引用的轨迹并保存检查结果，但不会执行 agent 提交的脚本，也不会把轨迹自洽判为共识正确。使用方法与边界见 [docs/workflow.md](docs/workflow.md)。
+生成 agent 从简短的 DESIGN 草稿开始，解释重要实现选择、状态归属及完成事件，并沿实际代码检查。重点包括共享冲突登记与逐实例状态、窗口与回复阶段、证据取齐与失效任务、槽释放与客户端去重。具体同步、接收入口、调度和数据结构由 agent 决定。审计依据共同规则和实际行为判断，修复与独立复核不把偏好的机制当成标准答案；设计文档不替代协议或执行证据。
+
+旧 `runtime/tracecheck.py` 仅保留为逐消息有界交付模型的独立历史工具。混合协议的新实验不注入或自动调用它，不能把其 `delivery_bound_ns` 改成 W 来判断新轨迹。执行记录和证据交接照常保留，语义由审阅结合实际材料判断。
 
 `runtime/schedule.py` 提供可选的事件调度与重放：通过薄适配器调用候选的实际接口，选择待处理动作，并在隔离执行日志中保留请求和实际观察。生成、审计、修复、复核都可使用；不要求候选采用固定接口，也不据此自动判定缺陷或修复。格式、证据交接和验证范围见 [docs/scheduling.md](docs/scheduling.md)。
 
@@ -21,7 +23,7 @@
 需要 Linux、Python 3.10+、Git、Go、Bubblewrap 和已登录的 Codex CLI。审计实现已从 CA 普通审计迁入本项目的 `auditor/`，运行不再依赖相邻的 `consensus-assurance` 源码或虚拟环境。控制器使用标准库；审计第三方依赖见 `requirements.txt`，由 `audit_python` 指定的本项目 `.venv` 提供。真实审计保留原有权限与命名空间隔离，需要终端允许创建命名空间。`doctor` 检查本地工具和审计模块导入，不读取认证文件、不调用模型，也不验证账号可用性或完整审计隔离环境。
 
 ```bash
-cd /home/nitro/Desktop/consensus-forge
+cd /home/nitro/Desktop/consensus-forge-vft-epaxos
 python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt
 .venv/bin/python forge.py doctor
@@ -96,7 +98,8 @@ flowchart LR
 | --- | --- |
 | `inputs/TASK.md` | 从库升级为完整可运行系统的任务书 |
 | `inputs/AGENTS.md` | 候选 workspace 的工作范围、测试目录和执行要求 |
-| `inputs/protocol.md` | 同步协议的规则、已有论证及客户端提交范围 |
+| `inputs/protocol.md` | 混合协议模型、规则、目标及论证边界 |
+| `inputs/pseudocode.md` | 状态、事件流程、证书验证和后台推进 |
 | `inputs/system.md` | 服务、网络、客户端、并发、时间、可控执行及交付边界 |
 | `inputs/AUDIT.md` | 初次审计及同会话续审的提示，仅供审计阶段使用 |
 | `inputs/VERIFY.md` | 修复后的独立复核任务，检查原问题、前后版本及证据极性 |
@@ -113,7 +116,7 @@ flowchart LR
 | `requirements.txt` | 本地审计运行所需的第三方 Python 依赖 |
 | `issues.py` | 问题索引、轨迹检查注记、跨版本证据路径映射、修复导航与独立复核关联 |
 | `runtime/agent_records.py` | 汇总当前阶段的原生主会话与子会话元数据、实际模型、回合时间及去重后的响应 token，缺失记录明确标为不完整 |
-| `runtime/tracecheck.py` | 标准库有限事件记录检查器，可独立运行；不实现共识规则或正确性裁判 |
+| `runtime/tracecheck.py` | 旧逐消息时间模型的历史工具，不接入新实验 |
 | `runtime/schedule.py` | 通过候选适配器进行有限事件调度与严格重放，stdout 保留实际请求和观察 |
 | `runtime/` | 生成与审计共同依赖的执行、配置辅助、工具链、存储筛选、版本重放和证据关联；不依赖两个 agent 角色 |
 | `runtime/replay.py` | 为隔离命令准备指定候选的私有副本，保留补充测试文件并清理临时副本 |
@@ -122,13 +125,13 @@ flowchart LR
 | `processes.py` | 工作流辅助子进程的超时、中断、清理与日志记录 |
 | `tests/` | 控制器离线测试，不是候选共识测试 |
 
-没有提供协议参考实现、研究者测试答案或固定的 Go 包骨架。双方当前的 `protocol.md` 内容相同；baseline 提供协议核心和系统交付目标，主流程额外引导 agent 解释和验证实现选择，并组织独立审计与证据修复。材料整理与工程要求都是实验输入的一部分，详见 [docs/material-preparation.md](docs/material-preparation.md)。2026-11-05 的提示修订只用于新准备的实验，历史实验按各自输入分析。所有 Markdown 段落保持单行。
+双方得到相同的 `protocol.md` 与 `pseudocode.md`，没有提供可运行协议参考实现、研究者测试答案或固定 Go 骨架。baseline 自主组织实现与自测；主流程额外提供工程设计指导、独立审计和证据修复。比较必须使用同一协议与系统范围，历史实验按各自保存的输入分析。材料对应见 [material-preparation.md](docs/material-preparation.md)，所有 Markdown 段落保持单行。
 
-协议与系统设计的已补规则、开放问题及当前范围限制集中记录在 [docs/design-issues.md](docs/design-issues.md)，供研究者后续讨论；该文档不作为 agent 输入，也不改变当前协议要求。
+研究者待讨论的保证范围与证明义务记录在 [docs/design-issues.md](docs/design-issues.md)，不作为额外 agent 输入。已经明确的协议规则与可自由选择的工程机制分开说明。
 
-现有 baseline 与主流程初始、最终候选的共同场景比较放在 [comparison/](comparison/README.md)，包含真实 Node 测试、TCP/HTTP 交叉检查和历史增长测量。[首轮结果](comparison/report-2026-11-04.md)与原始候选分开保存，不作为生成或审计输入。
+`comparison/` 保留旧同步协议候选的历史比较脚本与报告，其 Delta、接口和剪枝假设不适用于混合协议；不作为新实验输入或新协议评测结果。
 
-提示与参考材料平铺在 `inputs/`：`TASK.md` 是生成提示，`AUDIT.md` 是审计提示，`REPAIR.md` 是修复提示，`VERIFY.md` 是独立复核提示，`AGENTS.md` 是工作要求，`protocol.md` 和 `system.md` 是协议与工程参考材料。控制器按阶段选择输入，初始生成不会收到 `AUDIT.md`、`REPAIR.md` 或 `VERIFY.md`。每次实验会复制当次使用的材料，后续审计读取实验内的 `inputs/AUDIT.md` 副本。审计提示用一个 `<!-- continuation -->` 分隔首次任务和续审提示。
+材料平铺在 `inputs/`：TASK 是生成任务，AUDIT 是审计任务，REPAIR 是修复任务，VERIFY 是独立复核任务，AGENTS 是工作要求；protocol 与 pseudocode 是共同协议材料，system 是服务交付与工程指导。初始生成不收到审计、修复、复核任务；各阶段使用当次保存的输入。新增伪代码随候选交付审计，并随前后版本进入修复和复核。角色提示的 `<!-- continuation -->` 分隔首次与续轮任务。
 
 ## 结果在哪里
 
@@ -152,7 +155,7 @@ issues.json                  全部问题的来源版本、证据、状态与复
 
 修复接收的是报告和证据，不是控制器概括过的几句话。交接包明确提醒：某些复现测试的 `PASS` 表示“成功触发缺陷”，不能把所有绿色测试都当作系统正确。后续未完成回合只保留为原始记录，不覆盖最后完整报告。新的候选不包含旧审计反馈目录，但会保留 agent 加入的回归测试。
 
-`feedback/<轮次>/overview.md` 用短摘录和链接供修复 agent 导航；完整报告和原始字段仍在交接包内。可选案例与未决问题进入 `evidence-index.json`，供后续修复、复核选择复用，保留各自记录版本，不自动变成当前版本结论。`isolated_exec.outputs` 可在清理前归档指定输出文件/目录，保存位置和排除原因见执行结果的 `artifacts`。问题引用 `executions/<id>/result.json` 或该执行日志时，控制器关联命令、状态、起始源码、输入恢复路径与产物；原生 shell 则用 `turns/<回合>/stdout.jsonl#<item_id>` 精确选择命令。命令保持原样，旧绝对路径和临时二进制需 agent 检查或重建；控制器不自动执行这些命令。`trace_checks` 与 `evidence_feedback` 提供记录层面的检查和具体疑点，不能替代断言与性质的语义审阅。格式及边界见 [docs/workflow.md](docs/workflow.md)。
+`feedback/<轮次>/overview.md` 用短摘录和链接供修复 agent 导航；完整报告和原始字段仍在交接包内。可选案例与未决问题进入 `evidence-index.json`，供后续修复、复核选择复用，保留各自记录版本，不自动变成当前版本结论。`isolated_exec.outputs` 可在清理前归档指定输出文件/目录，保存位置和排除原因见执行结果的 `artifacts`。问题引用 `executions/<id>/result.json` 或该执行日志时，控制器关联命令、状态、起始源码、输入恢复路径与产物；原生 shell 则用 `turns/<回合>/stdout.jsonl#<item_id>` 精确选择命令。命令保持原样，旧绝对路径和临时二进制需 agent 检查或重建；控制器不自动执行这些命令。`evidence_feedback` 提供执行与版本关联的具体疑点，不能替代断言与性质的语义审阅。旧 `trace_files` 仍可保留导航，新导入的 `trace_checks` 为空，不产生协议时间结论。格式及边界见 [docs/workflow.md](docs/workflow.md)。
 
 隔离执行可选 `source` 和 `overlays` 参数：审计的 `candidate` 指当前候选，复核另有 `before`，修复的 `candidate` 指修复前输入。工具复制对应源码并加入 agent 自选的测试文件，保留起始 commit、补充文件、命令和输出；默认仍使用可修改工作区。该记录证明起始输入和执行事实，不能证明任意命令真正检查了所述性质。审计续轮会收到新的具体证据问题，相同问题不反复推送；修复和复核也收到这些反馈及原始记录。使用示例见 [docs/workflow.md](docs/workflow.md)。
 
