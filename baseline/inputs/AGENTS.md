@@ -1,8 +1,8 @@
 # Workspace instructions
 
-Implement the system requested by `TASK.md`, following `protocol.md` and its operational expansion `pseudocode.md`. Choose your own implementation plan, code organization, tests and self-review. Use this Codex session to implement, run checks and fix problems. You may write local scripts and test tools.
+Implement the system requested by `TASK.md`, following the given design and target requirements in `protocol.md`, `pseudocode.md` and `system.md`. Choose your own implementation plan, code organization, tests and self-review. Use this Codex session to implement, run checks and fix problems. You may write local scripts and test tools.
 
-Delegate to native Codex subagents when useful, using the same model and reasoning effort within the existing permissions and time budget. Coordinate shared-file edits, integrate their results, and finish or stop delegated work before completing your reply. Do not start nested Codex CLI sessions or invoke external model services.
+Delegate to native Codex subagents when useful, using the same model and reasoning effort within the existing permissions. Coordinate shared-file edits, integrate their results, and finish or stop delegated work before completing your reply. Do not start nested Codex CLI sessions or invoke external model services.
 
 Work inside this workspace. The supplied documents define the requirements for this run; do not modify them. Report ambiguities, unmet requirements and implementation choices in the delivered documentation. Do not inspect other experiment runs or retrieve another consensus implementation as a substitute.
 

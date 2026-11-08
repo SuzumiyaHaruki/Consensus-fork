@@ -16,7 +16,7 @@ sys.path.insert(0, str(PROJECT))
 from generator.config import settings_from_dict
 from generator import runner
 
-INPUTS = ('AGENTS.md', 'TASK.md', 'protocol.md', 'pseudocode.md')
+INPUTS = ('AGENTS.md', 'TASK.md', 'protocol.md', 'pseudocode.md', 'system.md')
 CONDITION = 'native-codex-system-generation'
 OPTIONS = {'model', 'reasoning_effort', 'timeout_seconds', 'action_seconds', 'codex'}
 

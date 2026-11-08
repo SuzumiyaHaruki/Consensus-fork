@@ -15,8 +15,8 @@ def prepare(settings, stage, deadline):
     bootstrap = 'import sys;sys.path.insert(0, ' + repr(str(ROOT)) + ');from generator.execution import main;main()'
     try:
         result = subprocess.run([settings.execution_python, '-I', '-c', bootstrap,
-                                 str(stage), str(deadline), str(settings.action_seconds)],
-                                capture_output=True, text=True, timeout=max(0.01, min(45, deadline - time.monotonic())))
+                                 str(stage), json.dumps(deadline), str(settings.action_seconds)],
+                                capture_output=True, text=True, timeout=max(0.01, min(45, deadline - time.monotonic())) if deadline is not None else 45)
     except subprocess.TimeoutExpired as exc:
         errors = exc.stderr or b''
         if isinstance(errors, bytes):
@@ -97,8 +97,8 @@ async def probe(server, stage):
 
 def main():
     import asyncio
-    stage, deadline, action = Path(sys.argv[1]), float(sys.argv[2]), float(sys.argv[3])
+    stage, deadline, action = Path(sys.argv[1]), json.loads(sys.argv[2]), float(sys.argv[3])
     prepared = configure(stage, deadline, action)
     prepared['probe'] = asyncio.run(asyncio.wait_for(probe(prepared['server'], stage),
-                                                   max(0.01, min(30, deadline - time.monotonic()))))
+                                                   max(0.01, min(30, deadline - time.monotonic())) if deadline is not None else 30))
     print(json.dumps(prepared))

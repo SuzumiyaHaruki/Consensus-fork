@@ -14,6 +14,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from runtime.storage import EXCLUDED_DIRS, digest, file_digest, fixed_submodules, write_json
+from runtime.toolchains import go_module
 
 from .codex import Codex
 from runtime.evidence import report_feedback
@@ -418,8 +419,7 @@ def run(config, target, *, client_factory=Codex, environment_only=False):
         source = capture_source(
             config.repo_path, root / "source", deadline)
         if target.get("expected_module"):
-            if not (root / "source/go.mod").is_file() or not any(
-                    line.split() == ["module", target["expected_module"]] for line in (root / "source/go.mod").read_text().splitlines()):
+            if go_module(root / "source") != target["expected_module"]:
                 raise ValueError("Captured Go module differs from target.expected_module")
         write_json(root / "inputs/source.json", source)
         shutil.copytree(root / "source", root / "work", dirs_exist_ok=True)

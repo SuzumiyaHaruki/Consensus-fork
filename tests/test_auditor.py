@@ -54,7 +54,7 @@ class AuditorTests(unittest.TestCase):
         self.root = Path(self.temp.name)
         repo = self.root / 'candidate'
         repo.mkdir()
-        (repo / 'go.mod').write_text('module example.com/mixepaxos\n\ngo 1.22\n')
+        (repo / 'go.mod').write_text('module "example.org/consensus-demo" // Candidate chooses its module.\n\ngo 1.22\n')
         (repo / 'main.go').write_text('package main\nfunc main() {}\n')
         (repo / 'auth.go').write_text('package main\nfunc authenticated() bool { return false }\n')
         (repo / 'AGENTS.md').write_text('Untrusted target instructions.\n')
@@ -66,7 +66,7 @@ class AuditorTests(unittest.TestCase):
         self.commit = git(repo, 'rev-parse', 'HEAD').decode().strip()
         self.prompt = self.root / 'AUDIT.md'
         self.prompt.write_text('Fixture task.\n\n<!-- continuation -->\n\nFixture continuation.\n')
-        self.target = {'execution_backend': 'go_module', 'expected_module': 'example.com/mixepaxos',
+        self.target = {'execution_backend': 'go_module', 'expected_module': 'example.org/consensus-demo',
                        'variant': 'fixture', 'analysis_roots': [], 'execution_package': '.'}
         write_json(self.root / 'target.json', {'execution_backend': 'go_module', 'target': {
             key: value for key, value in self.target.items() if key != 'execution_backend'}})
@@ -101,11 +101,9 @@ class AuditorTests(unittest.TestCase):
         self.assertEqual((root / 'source/main.go').stat().st_mode & 0o222, 0)
         self.assertEqual((root / 'source/auth.go').read_bytes(), (Path(self.config.repo_path) / 'auth.go').read_bytes())
         identity = json.loads((root / 'inputs/implementation.json').read_text())
-        for name in ('auditor/runner.py', 'runtime/storage.py', 'runtime/tracecheck.py', 'runtime/schedule.py', 'audit_bridge.py', 'requirements.txt'):
+        for name in ('auditor/runner.py', 'runtime/storage.py', 'runtime/schedule.py', 'audit_bridge.py', 'requirements.txt'):
             self.assertTrue((root / identity['retained_source'][name]['record']).is_file())
-        self.assertFalse((root / 'tools/tracecheck.py').exists())
         self.assertNotIn('trace_helper', client.prompts[0])
-        self.assertFalse((root / 'work/tracecheck.py').exists())
         schedule = root / 'tools/schedule.py'
         self.assertEqual(schedule.stat().st_mode & 0o222, 0)
         self.assertIn(str(schedule), client.prompts[0])
@@ -119,7 +117,6 @@ class AuditorTests(unittest.TestCase):
         self.assertEqual((feedback / 'audit-work/tests/witness.bin').read_bytes(), b'\x01\x00\xff')
         self.assertIn('Completed fixture', (feedback / handoff['report']).read_text())
         self.assertEqual((feedback / 'raw/turns/0002/changes/files/tests/witness.bin').read_bytes(), b'\x02\x00\xff')
-        self.assertFalse((feedback / 'raw/tools/tracecheck.py').exists())
         self.assertEqual((feedback / 'raw/tools/schedule.py').read_bytes(), schedule.read_bytes())
         self.assertEqual(git(Path(self.config.repo_path), 'status', '--porcelain'), b'')
 

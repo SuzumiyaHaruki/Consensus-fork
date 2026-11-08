@@ -15,7 +15,6 @@
 | `../runtime/agent_records.py` | 在私有 home 清理前保留主/子会话关系、实际模型、回合时间和逐响应去重用量，排除指令正文与认证内容 |
 | `../runtime/codex_support.py` | 公共 Codex 配置序列化、自动能力关闭项和顶层错误分类 |
 | `../runtime/toolchains.py` | 公共离线工具环境，保留原普通审计的 Cargo/Maven 辅助函数；Forge 当前选择 Go |
-| `../runtime/tracecheck.py` | 旧逐消息模型的独立历史工具，新实验不注入 |
 | `../runtime/replay.py` / `../runtime/evidence.py` | 指定候选副本执行、保留补充文件、关联真实执行记录和生成具体证据反馈 |
 | `__main__.py` | 将 `python -m auditor` 转到配置与命令入口 |
 | `__init__.py` | Python 包声明，无初始化副作用 |
@@ -46,4 +45,4 @@
 
 修复复核使用 `task_mode: review`、`review_context` 和 `inputs/VERIFY.md`。上下文包括前后候选、原反馈、修复声明及修复阶段的隔离执行记录，复制为只读；新问题审计不接收该上下文。`review.json` 与 `findings.json` 随普通回合增量保留，根目录 `issues.py` 处理版本、ID 与证据关联。生成/修复通过 `generator/execution.py` 注册公共执行服务。
 
-每次运行将公共 `schedule.py` 复制到只读 `tools/`，run brief 给出路径，交接包保留工具与实际执行日志。旧 `tracecheck.py` 不注入混合协议实验，也不在导入时自动检查轨迹。轨迹直接作为 `evidence`；旧 `trace_files` 仅保留导航。每回合的 `evidence-feedback.json` 仍指出具体执行关联或版本问题，agent 可以补证据、解释或收窄结论。完整边界见 [../docs/workflow.md](../docs/workflow.md)。
+每次运行将公共 `schedule.py` 复制到只读 `tools/`，run brief 给出路径，交接包保留工具与实际执行日志。工具记录调度和观察，不自动判断协议时间前提或共识性质。轨迹直接作为 `evidence`；旧 `trace_files` 仅保留导航。每回合的 `evidence-feedback.json` 仍指出具体执行关联或版本问题，agent 可以补证据、解释或收窄结论。完整边界见 [../docs/workflow.md](../docs/workflow.md)。

@@ -15,6 +15,7 @@ from processes import invoke
 from generator.runner import (REQUIRED_INPUTS, Terminated, doctor as generation_doctor, execute as execute_agent,
                               exclusive_run, prepare as prepare_agent, utc_now)
 from runtime.storage import read_json, write_json
+from runtime.toolchains import go_module
 from workflow_config import ROOT, from_dict
 from issues import findings, pending, repairable, feedback_bundle, review_result, apply_review, catalog_entry
 
@@ -29,9 +30,9 @@ def bridge_command(settings, *args):
     return [settings.audit_python, str(ROOT / 'audit_bridge.py'), *map(str, args)]
 
 
-def agent_settings(settings, root, seconds):
+def agent_settings(settings, root):
     return Settings(model=settings.generator_model, reasoning_effort=settings.generator_reasoning_effort,
-                    timeout_seconds=seconds, codex=settings.codex, inputs_dir=str(root / 'inputs'),
+                    timeout_seconds=None, codex=settings.codex, inputs_dir=str(root / 'inputs'),
                     output_root=str(root / 'stages'), execution_python=settings.audit_python,
                     action_seconds=settings.action_seconds)
 
@@ -81,7 +82,7 @@ def prepare(settings, label='system'):
         'settings': settings.to_dict(), 'stages': [], 'candidates': [],
         'generation_environment': {'mode': 'host', 'read_isolation': False, 'sandbox': 'workspace-write'},
         'audit_environment': {'engine': 'auditor/codex_plain', 'isolation': 'CA-derived permission profile and Bubblewrap'},
-        'verification': 'Independent agent before/after repair verification; further discovery only within remaining budget and repair rounds.',
+        'verification': 'Independent agent before/after repair verification; further discovery uses per-audit budgets and the repair-round limit.',
     })
     return root
 
@@ -108,7 +109,7 @@ class Runtime:
     def _audit(self, settings, candidate, folder, seconds, timeout, context=None):
         folder.mkdir(parents=True)
         write_json(folder / 'target.json', {'execution_backend': 'go_module', 'target': {
-            'variant': 'mixepaxos_system', 'expected_module': 'example.com/mixepaxos',
+            'variant': 'consensus_system', 'expected_module': go_module(Path(candidate['path'])),
             'analysis_roots': [], 'execution_package': '.',
         }})
         write_json(folder / 'config.json', {
@@ -208,7 +209,6 @@ def execute(root, runtime=None):
         issues = []
         catalog = []
         start = time.monotonic()
-        deadline = start + settings.total_seconds
         record.update(status='running', started_at=utc_now(), evidence_index='evidence-index.json')
 
         def save():
@@ -228,12 +228,6 @@ def execute(root, runtime=None):
                 'entries': catalog})
             write_json(root / 'experiment.json', record)
 
-        def remaining():
-            value = deadline - time.monotonic()
-            if value <= 0:
-                raise StopWorkflow('budget_exhausted', 'Total experiment budget exhausted')
-            return value
-
         def finish(reason):
             status = reason if reason in {'needs_specification', 'verification_incomplete',
                                          'verification_failed', 'environment_blocked'} else 'cycle_complete'
@@ -248,8 +242,8 @@ def execute(root, runtime=None):
             print(f'[{kind}] {path}', flush=True)
             return entry
 
-        def run_agent(kind, seconds, candidate=None, feedback=None, reserve_seconds=0):
-            stage = prepare_agent(agent_settings(settings, root, min(seconds, remaining())), kind)
+        def run_agent(kind, candidate=None, feedback=None):
+            stage = prepare_agent(agent_settings(settings, root), kind)
             if candidate is not None:
                 if candidate_commit(Path(candidate['path'])) != candidate['commit']:
                     raise ValueError('Candidate identity changed before repair')
@@ -259,19 +253,7 @@ def execute(root, runtime=None):
                 (stage / 'prompt.txt').write_bytes((root / 'inputs/REPAIR.md').read_bytes())
             entry = phase(kind, stage)
             meta = read_json(stage / 'run.json')
-            allocated = min(seconds, remaining() - reserve_seconds)
-            if kind == 'repair' and allocated < settings.minimum_repair_seconds:
-                entry.update(status='not_started', allocated_seconds=0, ended_at=utc_now(),
-                             reason='Preparation left less than the minimum repair budget')
-                meta.update(status='not_started', workflow_role=kind, candidate_commit=candidate['commit'],
-                            reason=entry['reason'])
-                write_json(stage / 'run.json', meta)
-                save()
-                return None
-            if allocated <= 0:
-                raise StopWorkflow('budget_exhausted', 'Preparation consumed the time available before the audit reserve')
-            meta['settings']['timeout_seconds'] = allocated
-            entry['allocated_seconds'] = allocated
+            entry['allocated_seconds'] = None
             meta.update(workflow_role=kind, candidate_commit=candidate['commit'] if candidate else None,
                         candidate_path=candidate['path'] if candidate else None)
             write_json(stage / 'run.json', meta)
@@ -292,7 +274,7 @@ def execute(root, runtime=None):
             except ValueError as exc:
                 raise StopWorkflow('needs_specification', str(exc)) from exc
             candidate = runtime.export(settings, stage / 'workspace', root / 'candidates' / f'v{number:03d}',
-                                       root / 'captures' / f'v{number:03d}', min(60, remaining()))
+                                       root / 'captures' / f'v{number:03d}', 60)
             candidate['version'] = number
             record['candidates'].append(candidate)
             record['current_candidate'] = candidate
@@ -309,40 +291,26 @@ def execute(root, runtime=None):
             save()
             if not record['environment']['ready']:
                 raise StopWorkflow('environment_blocked', 'Local tool/dependency checks failed; no generation started')
-            # Generation leaves time for discovery. Repairs reserve review, not
-            # another mandatory discovery round after the last modification.
-            reserve = settings.verification_seconds + 10
-            available = remaining() - reserve
-            if available <= 0:
-                raise StopWorkflow('budget_exhausted', 'Total budget cannot cover generation and discovery reserve')
-            stage = run_agent('generation', min(settings.generation_seconds, available), reserve_seconds=reserve + 60)
+            stage = run_agent('generation')
             candidate = capture(stage, 0)
             repairs, number, forced_stop = 0, 0, None
             while True:
                 audit_seconds = settings.initial_audit_seconds if number == 0 else settings.audit_seconds
-                can_search_again = remaining() >= (audit_seconds + settings.minimum_repair_seconds
-                    + settings.repair_verification_seconds + reserve + 60)
-                final = repairs + 1 >= settings.max_repairs or not can_search_again
+                final = repairs + 1 >= settings.max_repairs
                 folder = root / 'audits' / f'{number:03d}'
                 entry = phase('final_audit' if final else 'audit', folder)
                 imported = {'audit_number': number, 'candidate_commit': candidate['commit'],
                             'status': 'pending', 'issue_count': None}
                 entry['finding_import'] = imported
                 save()
-                # The first audit keeps its own budget even in a generation-only run.
+                # The first audit keeps its own budget even when no repair rounds are allowed.
                 if final and number > 0:
                     audit_seconds = settings.verification_seconds
-                available = remaining() - 10
-                repair_reserve = settings.minimum_repair_seconds + settings.repair_verification_seconds + 60
-                if repairs < settings.max_repairs and available > repair_reserve:
-                    available -= repair_reserve
-                seconds = min(audit_seconds, available)
+                seconds = audit_seconds
                 entry['allocated_seconds'] = seconds
-                if seconds <= 0:
-                    raise StopWorkflow('budget_exhausted', 'Insufficient time to start another audit')
                 if candidate_commit(Path(candidate['path'])) != candidate['commit']:
                     raise ValueError('Candidate changed before audit')
-                audit_run = runtime.audit(settings, candidate, folder, seconds, min(seconds + 10, remaining()))
+                audit_run = runtime.audit(settings, candidate, folder, seconds, seconds + 10)
                 if (audit_run / 'run.json').is_file():
                     agents = read_json(audit_run / 'run.json').get('agents')
                     if agents:
@@ -378,19 +346,10 @@ def execute(root, runtime=None):
                               'repair_limit')
                     finish(reason)
                     break
-                # Recompute after actual audit/archival time, not its original nominal allocation.
-                seconds = min(settings.repair_seconds, remaining() - settings.repair_verification_seconds - 60)
-                if seconds < settings.minimum_repair_seconds:
-                    finish('insufficient_repair_budget')
-                    break
                 feedback = root / 'feedback' / f'{repairs:03d}'
                 feedback_bundle(feedback, handoff_path, candidate, issues, catalog)
                 expected_ids = [issue['id'] for issue in repairable(issues)]
-                stage = run_agent('repair', seconds, candidate, feedback,
-                                  reserve_seconds=settings.repair_verification_seconds + 60)
-                if stage is None:
-                    finish('insufficient_repair_budget')
-                    break
+                stage = run_agent('repair', candidate, feedback)
                 repair = read_repair_result(stage / 'workspace', candidate['commit'], expected_ids)
                 record['stages'][-1]['repair_claim'] = repair
                 save()
@@ -418,40 +377,36 @@ def execute(root, runtime=None):
                            'repair_executions': 'repair-executions/' if (context/'repair-executions').is_dir() else None})
                 review_folder = root / 'reviews' / f'{repairs:03d}' / 'audit'
                 entry = phase('repair_verification', review_folder)
-                seconds = min(settings.repair_verification_seconds, remaining() - 10)
-                entry['allocated_seconds'] = max(0, seconds)
-                if seconds <= 0:
+                seconds = settings.repair_verification_seconds
+                entry['allocated_seconds'] = seconds
+                bundle = root / 'reviews' / f'{repairs:03d}' / 'handoff'
+                try:
+                    review_run = runtime.verify(settings, candidate, review_folder, context, seconds,
+                                                seconds + 10)
+                    agents = read_json(review_run / 'run.json').get('agents')
+                    if agents:
+                        entry['agents'] = {**agents, 'run_dir': str(review_run)}
+                    entry.update(status='returned', audit_run=str(review_run), ended_at=utc_now())
+                    prepare_handoff(review_run, candidate, bundle)
+                    result = review_result(bundle, previous, candidate, expected_ids)
+                except StopWorkflow as exc:
+                    if exc.status == 'interrupted':
+                        raise
+                    forced_stop = 'verification_incomplete' if exc.status == 'budget_exhausted' else 'verification_failed'
+                    entry.update(status='failed', reason=str(exc), ended_at=utc_now())
+                except (OSError, ValueError) as exc:
                     forced_stop = 'verification_incomplete'
-                    entry.update(status='not_started', reason='No review budget remains', ended_at=utc_now())
+                    entry.update(status='incomplete', reason=str(exc))
                 else:
-                    bundle = root / 'reviews' / f'{repairs:03d}' / 'handoff'
-                    try:
-                        review_run = runtime.verify(settings, candidate, review_folder, context, seconds,
-                                                    min(seconds + 10, remaining()))
-                        agents = read_json(review_run / 'run.json').get('agents')
-                        if agents:
-                            entry['agents'] = {**agents, 'run_dir': str(review_run)}
-                        entry.update(status='returned', audit_run=str(review_run), ended_at=utc_now())
-                        prepare_handoff(review_run, candidate, bundle)
-                        result = review_result(bundle, previous, candidate, expected_ids)
-                    except StopWorkflow as exc:
-                        if exc.status == 'interrupted':
-                            raise
-                        forced_stop = 'verification_incomplete' if exc.status == 'budget_exhausted' else 'verification_failed'
-                        entry.update(status='failed', reason=str(exc), ended_at=utc_now())
-                    except (OSError, ValueError) as exc:
-                        forced_stop = 'verification_incomplete'
-                        entry.update(status='incomplete', reason=str(exc))
-                    else:
-                        apply_review(issues, result, bundle, candidate)
-                        note = catalog_entry(bundle, candidate, f'r{repairs:03d}', 'review.json')
-                        if note:
-                            catalog.append(note)
-                        entry['review_result'] = result
-                        entry['discovered_issues'] = [item['id'] for item in result['new_issues']]
-                        states = {issue['state'] for issue in pending(issues)}
-                        if 'environment_blocked' in states:
-                            forced_stop = 'environment_blocked'
+                    apply_review(issues, result, bundle, candidate)
+                    note = catalog_entry(bundle, candidate, f'r{repairs:03d}', 'review.json')
+                    if note:
+                        catalog.append(note)
+                    entry['review_result'] = result
+                    entry['discovered_issues'] = [item['id'] for item in result['new_issues']]
+                    states = {issue['state'] for issue in pending(issues)}
+                    if 'environment_blocked' in states:
+                        forced_stop = 'environment_blocked'
                 if (not changed and not specification_claim and not forced_stop
                         and not any(issue['id'] in expected_ids and issue['state'] == 'needs_specification' for issue in issues)):
                     forced_stop = 'no_change'
@@ -459,11 +414,10 @@ def execute(root, runtime=None):
                 # The final discovery may be repaired. Its independent review
                 # ends the run, including any unresolved or newly found issues.
                 if (forced_stop or final or repairs >= settings.max_repairs
-                        or pending(issues) and not repairable(issues)
-                        or remaining() < settings.audit_seconds + repair_reserve + 10):
+                        or pending(issues) and not repairable(issues)):
                     finish(forced_stop or ('needs_specification' if pending(issues) and not repairable(issues) else
                            'repair_limit' if repairs >= settings.max_repairs else
-                           'insufficient_repair_budget' if pending(issues) else 'final_review_complete'))
+                           'final_review_complete'))
                     break
                 number += 1
         except StopWorkflow as exc:

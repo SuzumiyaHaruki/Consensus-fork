@@ -282,7 +282,6 @@ class WorkflowTests(unittest.TestCase):
                 self.assertEqual(args[args.index('--model') + 1], 'gpt-6.1-sol')
                 self.assertIn('model_reasoning_effort="high"', args)
                 stage_path = Path(stage['path'])
-                self.assertFalse((stage_path / 'inputs/tracecheck.py').exists())
                 self.assertEqual((stage_path / 'workspace/pseudocode.md').read_bytes(), (root / 'inputs/pseudocode.md').read_bytes())
                 self.assertFalse((stage_path / 'workspace/AUDIT.md').exists())
                 if stage['kind'] == 'generation':
@@ -518,74 +517,26 @@ class WorkflowTests(unittest.TestCase):
         self.assertTrue(draft['index'].endswith('/work/review.json'))
         self.assertEqual(Path(draft['index']).read_text(), '{"issues": [{"disposition": "fixed"')
 
-    def test_final_audit_can_be_repaired_with_review_reserved(self):
+    def test_agent_and_handoff_duration_do_not_shorten_audit_or_review(self):
         runtime = OfflineRuntime()
         clock = [100.0]
-        agent, audit, verify = runtime.agent, runtime.audit, runtime.verify
-        def timed_agent(stage):
-            result = agent(stage)
-            meta = read_json(stage / 'run.json')
-            clock[0] += 100 if meta['workflow_role'] == 'generation' else meta['settings']['timeout_seconds']
-            return result
-        def timed(call, *args):
-            result = call(*args)
-            clock[0] += args[-2]
-            return result
-        with patch.object(runtime, 'agent', side_effect=timed_agent), \
-             patch.object(runtime, 'audit', side_effect=lambda *args: timed(audit, *args)), \
-             patch.object(runtime, 'verify', side_effect=lambda *args: timed(verify, *args)), \
-             patch('workflow.time.monotonic', side_effect=lambda: clock[0]):
-            _, result = self.run_fixture(runtime, total_seconds=5000, max_repairs=3)
-        self.assertEqual(result['stop_reason'], 'final_review_complete')
-        self.assertEqual(runtime.calls, ['generation', 'audit', 'repair', 'verify'])
-        self.assertEqual([s['kind'] for s in result['stages']],
-                         ['generation', 'final_audit', 'repair', 'repair_verification'])
-        self.assertEqual(result['stages'][2]['allocated_seconds'], 340)
-        self.assertEqual(runtime.budgets, [('audit', 3600), ('verify', 900)])
-        self.assertEqual(result['elapsed_seconds'], 4940)
-
-    def test_slow_feedback_copy_rechecks_minimum_repair_budget(self):
-        runtime = OfflineRuntime()
-        clock = [100.0]
-        original = workflow.copy_tree
-        def slow_copy(source, destination, *args, **kwargs):
-            original(source, destination, *args, **kwargs)
-            if destination.name == 'feedback' and destination.parent.name == '.forge':
-                # Leave 200 s for repair after reserving independent review and capture.
-                reserve = self.settings.repair_verification_seconds + 60
-                clock[0] = 100.0 + self.settings.total_seconds - reserve - 200
-        with patch('workflow.copy_tree', side_effect=slow_copy), \
-             patch('workflow.time.monotonic', side_effect=lambda: clock[0]):
-            _, result = self.run_fixture(runtime, max_repairs=3)
-        self.assertEqual(runtime.calls.count('repair'), 0)
-        self.assertEqual(result['stop_reason'], 'insufficient_repair_budget')
-        self.assertEqual(runtime.budgets, [('audit', 3600)])
-        skipped = [stage for stage in result['stages'] if stage['kind'] == 'repair']
-        self.assertEqual(skipped[0]['status'], 'not_started')
-
-    def test_early_generation_finish_leaves_time_for_repairs_and_ends_at_review(self):
-        runtime = OfflineRuntime()
-        clock = [100.0]
-        original_agent, original_audit, original_verify = runtime.agent, runtime.audit, runtime.verify
+        original_agent, original_copy = runtime.agent, workflow.copy_tree
         def agent(stage):
-            result = original_agent(stage)
-            clock[0] += 1800
-            return result
-        def audit(settings, candidate, folder, seconds, timeout):
-            result = original_audit(settings, candidate, folder, seconds, timeout)
-            clock[0] += seconds
-            return result
-        def verify(settings, candidate, folder, context, seconds, timeout):
-            result = original_verify(settings, candidate, folder, context, seconds, timeout)
-            clock[0] += seconds
-            return result
-        with patch.object(runtime, 'agent', side_effect=agent), patch.object(runtime, 'audit', side_effect=audit), \
-             patch.object(runtime, 'verify', side_effect=verify), patch('workflow.time.monotonic', side_effect=lambda: clock[0]):
+            self.assertIsNone(read_json(stage / 'run.json')['settings']['timeout_seconds'])
+            clock[0] += 24 * 3600  # Both generation and repair exceed every former limit.
+            return original_agent(stage)
+        def copy(source, destination, *args, **kwargs):
+            clock[0] += 3600
+            return original_copy(source, destination, *args, **kwargs)
+        with patch.object(runtime, 'agent', side_effect=agent), patch('workflow.copy_tree', side_effect=copy), \
+             patch('workflow.time.monotonic', side_effect=lambda: clock[0]):
             _, result = self.run_fixture(runtime, max_repairs=3)
-        self.assertEqual(runtime.calls.count('repair'), 2)
-        self.assertEqual(result['stop_reason'], 'final_review_complete')
-        self.assertEqual(runtime.budgets[-1], ('verify', 900))
-        self.assertLessEqual(result['elapsed_seconds'], self.settings.total_seconds)
+        self.assertEqual(runtime.calls, ['generation'] + ['audit', 'repair', 'verify'] * 3)
+        self.assertEqual(result['stop_reason'], 'repair_limit')
+        self.assertEqual(runtime.budgets, [('audit', 3600), ('verify', 900)] + [('audit', 1800), ('verify', 900)] * 2)
+        self.assertGreater(result['elapsed_seconds'], 4 * 24 * 3600)
+        self.assertTrue(all(stage['allocated_seconds'] is None for stage in result['stages']
+                            if stage['kind'] in {'generation', 'repair'}))
 
     def test_zero_repairs_still_audits_generation(self):
         runtime = OfflineRuntime()
@@ -693,13 +644,8 @@ class WorkflowTests(unittest.TestCase):
                 self.assertEqual(result['status'], expected)
                 self.assertEqual(runtime.calls, calls)
 
-    def test_budget_and_environment_failures_do_not_launch_generation(self):
+    def test_environment_failure_does_not_launch_generation(self):
         runtime = OfflineRuntime()
-        root = workflow.prepare(self.settings)
-        with patch('workflow.time.monotonic', side_effect=[10, 10 + self.settings.total_seconds + 1, 10 + self.settings.total_seconds + 2]):
-            result = workflow.execute(root, runtime)
-        self.assertEqual(result['status'], 'budget_exhausted')
-        self.assertEqual(runtime.calls, [])
         with patch.object(runtime, 'check', return_value={'ready': False}):
             _, result = self.run_fixture(runtime)
         self.assertEqual(result['status'], 'environment_blocked')
@@ -754,6 +700,7 @@ class WorkflowTests(unittest.TestCase):
         self.assertFalse(Path(settings.output_root).exists())
 
     def test_audit_exit_and_response_must_agree(self):
+        put(self.root / 'candidate/go.mod', 'module example.org/consensus-demo\n')
         for number, (response, code, exception) in enumerate((
             ({'stop': 'agent_call_limit'}, 0, ValueError),
             ({'stop': 'agent_call_limit'}, 7, workflow.StopWorkflow),
@@ -770,9 +717,9 @@ class WorkflowTests(unittest.TestCase):
             with self.subTest(number=number), patch('workflow.invoke', side_effect=fake_invoke):
                 if exception:
                     with self.assertRaises(exception):
-                        workflow.Runtime().audit(self.settings, {'path': '/unused'}, folder, 30, 40)
+                        workflow.Runtime().audit(self.settings, {'path': str(self.root / 'candidate')}, folder, 30, 40)
                 else:
-                    result = workflow.Runtime().audit(self.settings, {'path': '/unused'}, folder, 30, 40)
+                    result = workflow.Runtime().audit(self.settings, {'path': str(self.root / 'candidate')}, folder, 30, 40)
                     self.assertEqual(result, folder / 'runs/fixture')
 
 
@@ -868,10 +815,11 @@ class BridgeIntegrationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix='forge-bridge-') as temp:
             root = Path(temp)
             workspace = root / 'workspace'
-            put(workspace / 'go.mod', 'module example.com/mixepaxos\n\ngo 1.22\n')
+            put(workspace / 'go.mod', 'module "example.org/consensus-demo" // Candidate chooses its module.\n\ngo 1.22\n')
             put(workspace / 'main.go', 'package main\nfunc main() {}\n')
             retained = {'protocol.md': (ROOT / 'inputs/protocol.md').read_text(),
                         'pseudocode.md': (ROOT / 'inputs/pseudocode.md').read_text(),
+                        'system.md': (ROOT / 'inputs/system.md').read_text(),
                         'wire/auth.go': 'package wire\nfunc Authenticate() bool { return false }\n',
                         'wire/auth.zig': '// Source language is not a capture policy.\n',
                         'docs/secret-key.md': 'Authentication implementation notes.\n',
@@ -914,7 +862,7 @@ class BridgeIntegrationTests(unittest.TestCase):
             code = ('import sys; '
                     'from auditor.config import load_config,validate_selection; '
                     'c=load_config(sys.argv[1]); t=validate_selection(c); '
-                    'assert t["expected_module"]=="example.com/mixepaxos"; print("config valid; no model call")')
+                    'assert t["expected_module"]=="example.org/consensus-demo"; print("config valid; no model call")')
             process = subprocess.run([settings.audit_python, '-c', code, str(folder / 'config.json')],
                                      cwd=ROOT, capture_output=True, text=True, timeout=20)
             self.assertEqual(process.returncode, 0, process.stderr)

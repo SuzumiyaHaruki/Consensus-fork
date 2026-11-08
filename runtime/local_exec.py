@@ -27,9 +27,9 @@ from runtime import replay
 DESCRIPTION = ('Run an ordinary local test in a private network and PID namespace. The ordinary shell retains its current restrictions. '
                'Use this tool for TCP or a bounded isolated run; start all communicating processes within the same invocation. '
                'Returns execution output, not an audit verdict. cwd is relative to this run working copy. '
-               'Execution remains bounded by action and active run/phase deadlines; only the auditor pauses its Agent turn timer. '
+               'Each call has an action timeout; audit and explicitly timed runs also have a phase deadline. Only the auditor pauses its Agent turn timer. '
                'No background service survives an invocation. Complete raw logs are retained read-only. '
-               'Calls in the same run serialize across tool processes, including native subagents; queue waiting consumes the run budget. '
+               'Calls serialize across tool processes, including native subagents; queue waiting consumes the phase budget, or the action timeout when the phase has no deadline. '
                'Optionally select source from the captured sources listed in the run brief and overlays of relative test/helper files from work. '
                'This starts from a private candidate copy; overlays and the starting commit are retained. Without source, work is mutable and no exact candidate binding is claimed. '
                'Use outputs to retain selected relative files/directories from the execution workspace before cleanup, including on test failure/timeout. '
@@ -56,8 +56,8 @@ def server_settings(control, action_timeout, run_deadline=None):
     # -S excludes site hooks/.pth; only explicitly selected installed packages and trusted source load.
     code = 'import sys,runpy;sys.path[:0]=' + repr([str(script.parents[1]), sysconfig.get_path('purelib')])
     code += ';runpy.run_path(' + repr(str(script)) + ',run_name="__main__")'
-    # A queued call can wait behind another agent's execution. The service still enforces
-    # the action limit after acquiring the run lock and the shared total deadline.
+    # A queued call can wait behind another agent. Without a phase deadline,
+    # queue waiting and execution share one action timeout.
     tool_timeout = max(action_timeout, run_deadline - time.monotonic()) if run_deadline is not None else action_timeout
     return {'command': '/usr/bin/env', 'args': ['-i', 'PATH=/usr/bin:/bin', 'LANG=C.UTF-8',
             sys.executable, '-I', '-S', '-c', code, str(control)], 'cwd': str(script.parent),
@@ -79,8 +79,9 @@ def timestamp():
 
 def remaining(control, requested):
     limits = {'requested': requested if requested is not None else control['action_timeout'],
-              'action_timeout': control['action_timeout'],
-              control.get('deadline_kind', 'total_seconds'): control['run_deadline'] - time.monotonic()}
+              'action_timeout': control['action_timeout']}
+    if control.get('run_deadline') is not None:
+        limits[control.get('deadline_kind', 'total_seconds')] = control['run_deadline'] - time.monotonic()
     key = min(limits, key=limits.get)
     return max(0, limits[key]), key
 
@@ -150,6 +151,11 @@ async def execution_lock(records, deadline):
 
 
 async def execute(control, arguments, request_id):
+    if control.get('run_deadline') is None:
+        # Untimed generation still bounds each tool call, including its queue wait.
+        args = Arguments.model_validate(arguments)
+        seconds = min(args.timeout_seconds or control['action_timeout'], control['action_timeout'])
+        control = control | {'run_deadline': time.monotonic() + seconds, 'deadline_kind': 'action_timeout'}
     async with execution_lock(control['records'], control['run_deadline']):
         return await execute_locked(control, arguments, request_id)
 

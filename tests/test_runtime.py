@@ -13,7 +13,7 @@ import unittest
 from unittest.mock import patch
 
 from runtime import replay
-from runtime.local_exec import execution_lock
+from runtime.local_exec import execute, execution_lock
 from runtime.evidence import inspect_item, report_feedback
 
 
@@ -222,6 +222,12 @@ asyncio.run(main())
                 with self.assertRaisesRegex(TimeoutError, 'Run deadline'):
                     async with execution_lock(records, time.monotonic()+.1):
                         self.fail('Concurrent server entered the execution section')
+                # An untimed stage still bounds a queued tool call before running a command.
+                with patch('runtime.local_exec.execute_locked') as command:
+                    with self.assertRaisesRegex(TimeoutError, 'deadline'):
+                        await execute({'records': str(records), 'run_deadline': None, 'action_timeout': .1},
+                                      {'argv': ['true']}, 'queued')
+                    command.assert_not_called()
                 entered = asyncio.Event()
                 async def wait_for_owner():
                     async with execution_lock(records, time.monotonic()+5):

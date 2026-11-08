@@ -84,8 +84,6 @@ async def exercise(prepared, stage, host_port):
                       '\ntry: p.write_text("bad")\nexcept OSError: pass\nelse: raise AssertionError("writable input")\n')
             record = await call(['/usr/bin/python3', '-I', '-c', script])
             assert record['status'] == 'completed' and record['exit_code'] == 0, record
-            record = await call(['/usr/bin/python3', '-I', str(stage / 'inputs/tracecheck.py'), 'tests/trace.json'])
-            assert record['status'] == 'completed' and record['exit_code'] == 0, record
             overlays = ['tests/schedule_adapter.py', 'tests/schedule.json']
             for mode, filename in [('--plan', 'schedule.json'), ('--replay', 'previous.jsonl')]:
                 record = await call(['/usr/bin/python3', '-I', str(stage / 'inputs/schedule.py'), mode,
@@ -147,8 +145,7 @@ def main():
         (stage / 'inputs').mkdir()
         (stage / 'inputs/material.txt').write_text('read-only')
         project = Path(__file__).resolve().parents[1]
-        for name in ('tracecheck.py', 'schedule.py'):
-            shutil.copyfile(project / 'runtime' / name, stage / 'inputs' / name)
+        shutil.copyfile(project / 'runtime/schedule.py', stage / 'inputs/schedule.py')
         shutil.copyfile(project / 'tests/fixtures/schedule_adapter.py', stage / 'workspace/tests/schedule_adapter.py')
         (stage / 'workspace/tests/schedule.json').write_text(json.dumps({
             'setup': {'pending': [{'id': 'a:1', 'actions': ['deliver'], 'dst': 'b'}]},
@@ -158,13 +155,6 @@ def main():
         (stage / 'workspace/go.mod').write_text('module local/check\n\ngo 1.22\n')
         (stage / 'workspace/tests/process_test.go').write_text(GO_TEST)
         (stage / 'workspace/tests/replay_check.py').write_text('from pathlib import Path\np=Path("../value.txt")\nprint(p.read_text())\np.write_text("private change")\n')
-        (stage / 'workspace/tests/trace.json').write_text(json.dumps({
-            'clock': 'controlled', 'members': ['A', 'B', 'C'], 'fault_limit': 1,
-            'delivery_bound_ns': 10, 'end_ns': 11, 'events': [
-                {'at_ns': 0, 'kind': 'send', 'id': 'tx1', 'src': 'A', 'dst': 'B'},
-                {'at_ns': 0, 'kind': 'send_complete', 'id': 'tx1'},
-                {'at_ns': 1, 'kind': 'crash', 'node': 'A'},
-                {'at_ns': 10, 'kind': 'deliver', 'id': 'tx1'}]}))
         prepared = prepare(Settings(action_seconds=90), stage, time.monotonic() + 150)
         control = json.loads((stage/'execution-control.json').read_text())
         # Deliberately conflicting host, ancestor and project instructions must not be loaded.
@@ -215,7 +205,7 @@ def main():
         print(json.dumps({'status': 'passed', 'checks': ['native MCP configuration', 'STDIO private TCP',
                          'private generation configuration and explicit supplied instructions without host skills',
                          'separate MCP servers serialize execution and preserve the shared clock',
-                         'two Go subprocesses with race detector', 'read-only materials', 'retained trace helper execution',
+                         'two Go subprocesses with race detector', 'read-only materials',
                          'host files/logs/network inaccessible', 'before/after source replay and retained overlays',
                          'selected output retention after success, failure and timeout',
                          'event scheduling and strict replay through the shared helper',

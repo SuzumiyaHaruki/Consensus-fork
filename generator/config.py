@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 class Settings:
     model: str | None = "gpt-6.1-sol"
     reasoning_effort: str | None = "high"
-    timeout_seconds: float = 3600
+    timeout_seconds: float | None = None
     codex: str = "codex"
     profile: str | None = None
     web_search: str = "disabled"
@@ -46,6 +46,8 @@ def settings_from_dict(values: dict, base: Path) -> Settings:
         raise ValueError("web_search must be disabled, cached, or live")
     for name in ('timeout_seconds', 'action_seconds'):
         seconds = merged[name]
+        if name == 'timeout_seconds' and seconds is None:
+            continue
         if isinstance(seconds, bool) or not isinstance(seconds, (int, float)) or not math.isfinite(seconds) or seconds <= 0:
             raise ValueError(f'{name} must be finite and positive')
     merged['execution_python'] = os.path.abspath(base / Path(merged['execution_python']).expanduser())

@@ -22,14 +22,10 @@ class WorkflowSettings:
     repair_prompt: str = str(ROOT / 'inputs/REPAIR.md')
     review_prompt: str = str(ROOT / 'inputs/VERIFY.md')
     output_root: str = str(ROOT / 'experiments')
-    total_seconds: float = 14400
-    generation_seconds: float = 5400
     initial_audit_seconds: float = 3600
     audit_seconds: float = 1800
-    repair_seconds: float = 1800
     verification_seconds: float = 1800
     repair_verification_seconds: float = 900
-    minimum_repair_seconds: float = 300
     audit_turn_seconds: float = 900
     action_seconds: float = 300
     audit_calls: int = 20

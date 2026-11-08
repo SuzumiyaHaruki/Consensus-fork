@@ -59,7 +59,7 @@ class Client:
                                  *codex_options(self.settings), 'Local configuration inspection only.'],
                                 cwd=self.stage / 'workspace', env=self.environment,
                                 capture_output=True, text=True,
-                                timeout=max(.01, min(30, self.deadline - time.monotonic())))
+                                timeout=max(.01, min(30, self.deadline - time.monotonic())) if self.deadline is not None else 30)
         if result.returncode:
             (self.stage / 'client-probe.stderr').write_text(result.stderr)
             raise ValueError('Native prompt isolation check failed; see client-probe.stderr')

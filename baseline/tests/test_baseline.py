@@ -25,8 +25,8 @@ class BaselineTests(unittest.TestCase):
         self.fake = self.root/'fake-codex'
         shutil.copyfile(run.PROJECT/'tests/fake_codex.py', self.fake)
         self.fake.chmod(0o755)
-        runner.write_json(self.root/'config.json', {'model': 'gpt-6.1-sol', 'reasoning_effort': 'high',
-                          'codex': str(self.fake), 'timeout_seconds': 10})
+        runner.write_json(self.root/'config.json', runner.read_json(run.PROJECT/'baseline/config.json') |
+                          {'codex': str(self.fake)})
         self.settings = run.load(self.root/'config.json')
 
     def test_prepare_delivers_only_local_materials_and_same_optional_tools(self):
@@ -34,14 +34,14 @@ class BaselineTests(unittest.TestCase):
             root = run.prepare(self.settings)
         record = run.inspect(root)
         self.assertEqual(record['condition'], run.CONDITION)
-        self.assertEqual(record['input_files'], ['AGENTS.md', 'TASK.md', 'protocol.md', 'pseudocode.md'])
+        self.assertIsNone(record['settings']['timeout_seconds'])
+        self.assertEqual(record['input_files'], ['AGENTS.md', 'TASK.md', 'protocol.md', 'pseudocode.md', 'system.md'])
         self.assertEqual(set(p.name for p in (root/'workspace').glob('*.md')), set(run.INPUTS))
         for name in run.INPUTS:
             self.assertEqual((root/'inputs'/name).read_bytes(), (self.root/'inputs'/name).read_bytes())
             self.assertEqual((root/'workspace'/name).read_bytes(), (root/'inputs'/name).read_bytes())
         self.assertEqual((root/'inputs/schedule.py').read_bytes(), (run.PROJECT/'runtime/schedule.py').read_bytes())
-        self.assertFalse((root/'inputs/tracecheck.py').exists())
-        for name in ('protocol.md', 'pseudocode.md'):
+        for name in ('protocol.md', 'pseudocode.md', 'system.md'):
             self.assertEqual((root/'inputs'/name).read_bytes(), (run.PROJECT/'inputs'/name).read_bytes())
         self.assertFalse((root/'events.jsonl').exists())
         self.assertTrue((root/'workspace/.git').is_dir())
@@ -97,6 +97,8 @@ class BaselineTests(unittest.TestCase):
         auth.mkdir()
         runner.write_json(auth/'auth.json', {'auth_mode': 'chatgpt', 'tokens': {}})
         def prepare_execution(settings, root, deadline):
+            self.assertIsNone(deadline)
+            self.assertEqual(settings.action_seconds, 300)
             runner.write_json(root/'execution-control.json', {'environment': {'PATH': '/usr/bin:/bin'}})
             return {'options': []}
         with patch.dict(os.environ, {'CODEX_HOME': str(auth), 'CODEX_API_KEY': ''}), \

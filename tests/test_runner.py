@@ -77,11 +77,9 @@ class RunnerTests(unittest.TestCase):
         self.assertTrue((first / "workspace" / ".git").is_dir())
         self.assertFalse((first / "events.jsonl").exists())
         self.assertFalse((first / "workspace" / "evaluation").exists())
-        self.assertFalse((first / 'inputs/tracecheck.py').exists())
         self.assertNotIn('trace_helper', read_json(first / 'run.json'))
         for folder in ('inputs', 'workspace'):
             self.assertEqual((first / folder / 'pseudocode.md').read_bytes(), (ROOT / 'inputs/pseudocode.md').read_bytes())
-        self.assertFalse((first / 'workspace/tracecheck.py').exists())
         self.assertEqual((first / 'inputs/schedule.py').read_bytes(), (ROOT / 'runtime/schedule.py').read_bytes())
         self.assertFalse((first / 'workspace/schedule.py').exists())
         self.assertEqual(read_json(first / 'run.json')['schedule_helper'], 'inputs/schedule.py')
@@ -113,6 +111,15 @@ class RunnerTests(unittest.TestCase):
         config = read_json(run / 'client-settings.json')
         self.assertEqual(config['developer_instructions'], (self.inputs / 'AGENTS.md').read_text())
         self.assertEqual(config['project_doc_max_bytes'], 0)
+
+    def test_no_stage_deadline_completes_and_keeps_action_timeout(self):
+        self.settings = settings_from_dict(self.settings.to_dict() | {'timeout_seconds': None}, self.root)
+        run = self.prepared()
+        result = execute(run)
+        self.assertEqual(result['status'], 'agent_finished')
+        self.assertIsNone(result['settings']['timeout_seconds'])
+        self.assertEqual(result['settings']['action_seconds'], 300)
+        self.assertFalse(list(run.glob('.client-*')))
 
     def test_private_client_copies_only_auth_and_cleans_secrets_on_failure(self):
         run = self.prepared()
@@ -206,6 +213,7 @@ class RunnerTests(unittest.TestCase):
         self.assertTrue(await_process_exit(child))
 
     def test_sigterm_saves_partial_run_and_stops_children(self):
+        self.settings = settings_from_dict(self.settings.to_dict() | {'timeout_seconds': None}, self.root)
         run = self.prepared("interrupt")
         script = (
             "import sys; from pathlib import Path; from generator.runner import execute; "

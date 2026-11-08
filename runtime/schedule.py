@@ -13,7 +13,7 @@ events/observations. Init also supplies scope: what code runs and what is bypass
 Pending entries have unique string id, actions:[string,...], and arbitrary JSON
 metadata for selection. Events must be actual observations, not planned actions.
 Events and extra adapter fields are retained without a protocol-specific timing
-verdict. This helper does not validate the mixed protocol's W/s assumptions.
+verdict. This helper does not validate the supplied protocol assumptions.
 
 Plan steps:
   {"do":"submit","args":{"node":"A","command":{...}}}

@@ -1,4 +1,5 @@
 """Neutral tool and offline dependency environments shared with the plain baseline."""
+import json
 import os
 from pathlib import Path
 import shutil
@@ -72,3 +73,13 @@ def maven_environment(scratch, maven, java_home, cache):
 def go_environment(workspace):
     return {"GOCACHE": str(workspace / ".execution/go-build"), "GOPROXY": "off", "GOSUMDB": "off",
         "GOTOOLCHAIN": "local", "GOFLAGS": "-mod=readonly", "GOWORK": "off", "GOMODCACHE": str(Path.home() / "go/pkg/mod")}
+
+
+def go_module(workspace):
+    """Read the module identity with Go's parser, without changing files or fetching dependencies."""
+    result = subprocess.check_output(['go', 'mod', 'edit', '-json', 'go.mod'], cwd=workspace,
+        env={**os.environ, **go_environment(workspace), 'GOENV': 'off'}, stderr=subprocess.PIPE, timeout=10)
+    name = (json.loads(result).get('Module') or {}).get('Path')
+    if not name:
+        raise ValueError('Candidate must declare a module in go.mod')
+    return name

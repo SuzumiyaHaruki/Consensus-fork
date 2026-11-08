@@ -16,7 +16,6 @@ def main(argv=None):
         child = sub.add_parser(name)
         child.add_argument('--config', type=Path, default=DEFAULT)
         child.add_argument('--output-root')
-        child.add_argument('--total-seconds', type=float)
         child.add_argument('--max-repairs', type=int)
         if name != 'doctor':
             child.add_argument('--label', default='sol-high-system')
@@ -26,7 +25,7 @@ def main(argv=None):
     args = parser.parse_args(argv)
     try:
         if args.action in {'prepare', 'run', 'doctor'}:
-            settings = load(args.config, {k: getattr(args, k) for k in ('output_root', 'total_seconds', 'max_repairs') if getattr(args, k) is not None})
+            settings = load(args.config, {k: getattr(args, k) for k in ('output_root', 'max_repairs') if getattr(args, k) is not None})
             if args.action == 'doctor':
                 result = workflow.doctor(settings)
                 print(json.dumps(result, ensure_ascii=False, indent=2))

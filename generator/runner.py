@@ -260,6 +260,7 @@ def execute(run_dir: Path) -> dict:
         })
         write_json(run_dir / "run.json", metadata)
         started = time.monotonic()
+        deadline = started + settings.timeout_seconds if settings.timeout_seconds is not None else None
         process = None
         client = None
         execution_ready = False
@@ -272,9 +273,9 @@ def execute(run_dir: Path) -> dict:
 
         signal.signal(signal.SIGTERM, handle_term)
         try:
-            prepared = execution.prepare(settings, run_dir, started + settings.timeout_seconds)
+            prepared = execution.prepare(settings, run_dir, deadline)
             execution_ready = True
-            client = Client(settings, run_dir, started + settings.timeout_seconds)
+            client = Client(settings, run_dir, deadline)
             tool_environment = read_json(run_dir / 'execution-control.json')['environment']
             client.prepare(tool_environment)
             client.authenticate()
@@ -291,7 +292,7 @@ def execute(run_dir: Path) -> dict:
                 metadata["pid"] = process.pid
                 write_json(run_dir / "run.json", metadata)
                 try:
-                    process.communicate(input=prompt, timeout=max(0.01, started + settings.timeout_seconds - time.monotonic()))
+                    process.communicate(input=prompt, timeout=max(0.01, deadline - time.monotonic()) if deadline is not None else None)
                     returncode = process.returncode
                     state = "process_exited"
                 except subprocess.TimeoutExpired:
@@ -300,7 +301,7 @@ def execute(run_dir: Path) -> dict:
             state = "interrupted"
         except (OSError, ValueError, subprocess.SubprocessError) as exc:
             state = 'launch_failed' if execution_ready else 'environment_blocked'
-            if time.monotonic() >= started + settings.timeout_seconds:
+            if deadline is not None and time.monotonic() >= deadline:
                 state = 'timed_out'
             metadata["error"] = str(exc)
         finally:
