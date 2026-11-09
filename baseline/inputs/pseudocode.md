@@ -1,6 +1,6 @@
 # Mixed EPaxos: operational pseudocode
 
-Read with `protocol.md`. This expands the current protocol, including frontier coverage, checkpoint replacement and retained request results. Atomic actions and evidence rules are required; equivalent indexes, storage structures, synchronization and scheduling are implementation choices. Names and data structures illustrate the rules; they do not prescribe Go packages or a single-threaded implementation. `atomic` means the indicated local checks and mutations cannot interleave. SEND queues/issues a real message without recursively calling a receiver; self-messages use the same receiving interface. POST schedules later work. Broadcast is a loop of individual sends, not atomic multicast. Waiting saves state and returns to a fair scheduler. All protocol records described below must correspond to actual events under the trusted crash-stop model.
+Read with `protocol.md`. This expands the current protocol, including frontier coverage, checkpoint replacement and request deduplication across epochs. Atomic actions and evidence rules are required; equivalent indexes, storage structures, synchronization and scheduling are implementation choices. Names and data structures illustrate the rules; they do not prescribe Go packages or a single-threaded implementation. `atomic` means the indicated local checks and mutations cannot interleave. SEND queues/issues a real message without recursively calling a receiver; self-messages use the same receiving interface. POST schedules later work. Broadcast is a loop of individual sends, not atomic multicast. Waiting saves state and returns to a fair scheduler. All protocol records described below must correspond to actual events under the trusted crash-stop model.
 
 ## 1. Records and state
 
@@ -68,7 +68,7 @@ Per instance retain descriptor, promise initially 0, first vote, latest accepted
 
 A task has ID, instance, role ORIGIN/RECOVERY, ballot, active flag, generation, stage, current call ID, initial deadline, observation proof, Prepare proof/outcome/inherited record, initial support, Validate proof/missing set/resolutions and frozen proposal. Initialize all fields on task creation. Stages are ORIGIN_WAIT, PREPARE, OBSERVE, VALIDATE_COLLECT, VALIDATE_WAIT, ACCEPT and STOPPED. A completion token is `(taskID,x,b,generation,stage,callID)`. Changing stage cancels an unfinished current call and increments generation. The task generation is not history epoch g. Task replacement does not clear protocol facts.
 
-Non-Collect messages use their own correlation fields, not artificial Collect phases: HELP/HELP_REPLY bind helpID, source instance/ballot/task and target instance; Fetch binds fetchID/requester and `DESC(x)` or `REF(ref)`; NeedRecover binds x, descriptor and evidence; Learn binds x and certificate; heartbeats/complaints bind member and heartbeat number. Keep recovery work, incoming/outgoing HELP, inactive HELP IDs, pending fetches with deferred events, client FIFO, local pending requests, client waiters, request-to-command bindings, permanent result table, K slots and slot-to-instance bindings. Also retain installed epoch/base, monotone retired epoch floor, ordinal allocation, frozen seal inventories, per-slot control promises/accepts/decisions, contiguous control prefix, cumulative manifest and prepared snapshot. Global Omega state does not reset at an epoch transition.
+Non-Collect messages use their own correlation fields, not artificial Collect phases: HELP/HELP_REPLY bind helpID, source instance/ballot/task and target instance; Fetch binds fetchID/requester and `DESC(x)` or `REF(ref)`; NeedRecover binds x, descriptor and evidence; Learn binds x and certificate; heartbeats/complaints bind member and heartbeat number. Keep recovery work, incoming/outgoing HELP, inactive HELP IDs, pending fetches with deferred events, client FIFO, local pending requests, client waiters, request-to-command bindings, executedRequests, K slots and slot-to-instance bindings. executedRequests records completed rids and necessary command bindings; it is distinct from pending local bindings and transient replies. Also retain installed epoch/base, monotone retired epoch floor, ordinal allocation, frozen seal inventories, per-slot control promises/accepts/decisions, contiguous control prefix, cumulative manifest and prepared snapshot. Global Omega state does not reset at an epoch transition.
 
 ## 2. Common operations and event discipline
 
@@ -264,9 +264,9 @@ New Observe/Validate scans are not initial votes. High-ballot observations do no
 
 ## 5. Admission, fast decision and normal Accept
 
-Before submitting new operations, the client establishes a unique session ClientID under protocol.md section 3.1. It atomically allocates a fresh RequestSeq per new logical operation and preserves the complete rid and command for retries. Replica request bindings, local duplicate merging, waiters and permanent results are keyed by the complete `(ClientID, RequestSeq)` pair across epochs.
+Before submitting new operations, the client establishes a unique session ClientID under protocol.md section 3.1. It atomically allocates a fresh RequestSeq per new logical operation and preserves the complete rid and command for retries. Replica request bindings, local duplicate merging, waiters and executedRequests are keyed by the complete `(ClientID, RequestSeq)` pair across epochs.
 
-On CLIENT_REQUEST, reject a known rid with a different payload. If its result exists, return the retained result. Otherwise bind its payload and add a waiter. Merge requests already locally queued or active; enqueue a new local request once and POST admission. If another instance completes the request while queued, admission returns that result and removes the queued marker without allocating a slot.
+On CLIENT_REQUEST, reject a known rid with a different payload. If executedRequests contains the rid, return ALREADY_EXECUTED without another application execution. Otherwise bind its payload and add a waiter. Merge requests already locally queued or active; enqueue a new local request once and POST admission. Check execution status again before allocating an instance: if completed while queued, complete outstanding waiters with ALREADY_EXECUTED and remove the queued marker without allocating a slot, preserving any original-result replies already prepared for delivery. A pending binding alone never implies execution. An unknown local rid can be admitted, so EXECUTE_ONE must independently deduplicate.
 
 ```text
 ADMIT_ONE():
@@ -486,16 +486,19 @@ EXECUTION_TICK():
             for x in SCC sorted by (decided.seq,instance ID): EXECUTE_ONE(x)
 
 EXECUTE_ONE(x):
-    atomic over application, result table, execution flag and slot accounting:
+    atomic over application, executedRequests, waiters, execution flag and slot accounting:
         if executed: return
-        require known rid bindings/results, if any, agree with payload
+        require known rid command bindings, if any, agree with payload
         bind rid to payload
-        if result already exists: reuse it
-        else: apply payload and save its result
+        if rid in executedRequests: response = ALREADY_EXECUTED
+        else:
+            response = apply payload
+            executedRequests[rid] = command binding
         mark instance executed
         if self is origin and x owns a slot: release exactly that slot once
         if local pending entry equals x: remove it
-    reply to retained client waiters with that result; POST(ADMISSION_TICK)
+        capture replies for current waiters with response; remove those waiters
+    send captured replies; POST(ADMISSION_TICK)
     remove completed closed vertices from the active execution graph only
     keep registered visibility, executed membership and necessary proofs until checkpoint
 ```
@@ -555,16 +558,16 @@ Checkpoint formation uses the control protocol below and the Collect rules in se
 SealSnapshot = {author,g,parentBaseID,immutable inventory and object references}
 ManifestPlan = {g,parentBaseID,sealCollect,inventory union and necessary closure,descriptors}
 ControlValue = START(plan) | ADD(delta,admissionEvidence)
-             | CLOSE(finalManifest,decisionReferences,stateAndResultAndSeqRoots)
+             | CLOSE(finalManifest,decisionReferences,stateAndDedupAndSeqRoots)
 ControlState = {author,key,promise,highestAcceptedOrNONE,decisionOrNONE}
 ControlCert = {g,slot,prevValueID,exactValue,controlAcceptCollect}
 CheckpointBody = {closedEpoch,parentBaseID,closeValueID,finalManifestID,
-                  applicationRoot,permanentRequestResultsRoot,sequenceRoot,nextEpoch}
+                  applicationRoot,executedRequestsRoot,sequenceRoot,nextEpoch}
 CheckpointReady = {author,key,bodyID}     # actual verification/execution/storage event
 CheckpointCert = {body,storeCollect}
 ```
 
-ControlValueID identifies `(g,slot,prevValueID,exactValue)`; CheckpointBody identity identifies its canonical content. A different ballot or ACK set for the same value cannot change identity. Choose the encoding and snapshot representation while preserving exact equality and unambiguous references. A snapshot contains all data represented by its roots, including exact rid/command/results. These identifiers do not supply proof of authorship, availability or checkpoint validity.
+ControlValueID identifies `(g,slot,prevValueID,exactValue)`; CheckpointBody identity identifies its canonical content. A different ballot or ACK set for the same value cannot change identity. Choose the encoding and snapshot representation while preserving exact equality and unambiguous references. A snapshot contains all data represented by its roots, including executedRequests and necessary command bindings, rather than a permanent result archive. Local pending bindings and reply caches are excluded. These identifiers do not supply proof of authorship, availability or checkpoint validity.
 
 ```text
 SEAL_LOCAL(g):
@@ -635,7 +638,7 @@ SealInventory calls SEAL_LOCAL and returns the immutable inventory under the act
 
 Authorization precedes registration, new votes/accepts and cached-positive replay, including the replayed body's references. Required instances include paths, scans, forces and HELP endpoints. A Prepare for authorized x reports its real highest accepted value even if its historical references include unauthorized y; those references stay passive until ADD. Do not conceal accepted facts. Previously registered instances remain visible after START even if not authorized. A scan that needs one returns NEED_ATTACH with its real prior registration/vote and descriptor; request ADD, then retry with fresh attempt/nonce after the extension decides. Missing data is fetched outside atomic transitions and resumption rechecks all conditions.
 
-START validates its Seal Collect, all inventories and exact known closure. ADD requires genuine descriptors and evidence of an authorized target's inherited acceptance, mandatory initial paths or necessary old registered conflicts; a late new client request cannot manufacture authorization. Each addition is nonempty and permanent. CLOSE requires the current manifest's complete legal decisions and dependency-closed execution, plus deterministic state/result/seq summaries from the parent and that manifest only. Pending or partial-accepted ADD must still be inherited when it is highest; CLOSE cannot skip it. All candidate transitions obey these checks even if their coordinator later loses eligibility. Collect NACK handling, complete broadcasts and both phase snapshots remain unchanged.
+START validates its Seal Collect, all inventories and exact known closure. ADD requires genuine descriptors and evidence of an authorized target's inherited acceptance, mandatory initial paths or necessary old registered conflicts; a late new client request cannot manufacture authorization. Each addition is nonempty and permanent. CLOSE requires the current manifest's complete legal decisions and dependency-closed execution, plus deterministic state/deduplication/seq summaries from the parent and that manifest only. Pending or partial-accepted ADD must still be inherited when it is highest; CLOSE cannot skip it. All candidate transitions obey these checks even if their coordinator later loses eligibility. Collect NACK handling, complete broadcasts and both phase snapshots remain unchanged.
 
 Drain uses the ordinary command recovery/HELP protocol. Before sending a new acceptance with unauthorized dependencies, retain the genuine selection evidence, obtain ADD and resume only if the task is still current. A successful old decision intersects the Seal output: a prior vote enters its inventory closure, while a later vote requires actual decided authorization. Thus the terminal manifest must include every legally chosen old instance, including hidden fast decisions. An omitted attempt can have partial acceptance, but no legal chosen value; terminal status is RETIRED_UNCHOSEN, meaning retirement without a chosen value, rather than a Prepare reply reporting NONE or an application outcome.
 
@@ -643,7 +646,8 @@ Drain uses the ordinary command recovery/HELP protocol. Before sending a new acc
 PREPARE_CHECKPOINT(g):
     require complete actual START/ADD/CLOSE decided prefix
     verify and execute final manifest's complete decided graph relative to parent
-    build canonical CheckpointBody and complete application/result/seq snapshot
+    incrementally build complete application/deduplication/seq snapshot from parent and manifest
+    build canonical CheckpointBody referencing that snapshot
     retain prepared snapshot and pin necessary original evidence
 
 RECEIVE_CHECKPOINT_STORE(req):
@@ -670,19 +674,22 @@ ACTIVATE(cert,snapshot):
         recheck target/base/ancestry and installation generation
         if target == installedEpoch: require same base identity; return without resetting state
         if target < installedEpoch: return without overwriting newer state
-        install application state, permanent result table, seq summary and base together
+        install application state, executedRequests, seq summary and base together
         advance retiredEpochFloor and installedEpoch monotonically
         initialize only this newly installed epoch's indexes, ordinal budget and graph
         retire covered old tasks/caches/proofs and slots once
         for each retained pending logical request:
-            if result now present: arrange reply with the original result
+            if rid in executedRequests: complete remaining waiters with ALREADY_EXECUTED
             else: retain command/rid/waiters and fairly requeue for the new epoch
+        preserve original-result replies already prepared for delivery
         open new admission; resume background work
 ```
 
-A Ready holder cannot discard originals until it has installed a complete snapshot with actual CheckpointCert. If the producer crashes before certificate dissemination, recover the control CLOSE and run Store for the same deterministic body again, or learn its existing certificate. Valid Store's complete Collect leaves a final correct full-snapshot holder under the window assumptions. Original proofs can then be replaced, not reconstructed from a hash. No disk-restart guarantee is implied. Snapshot representation, incremental preparation, transmission, cache management and equivalent indexing are choices; keep certified data/necessary ancestry available and avoid repeatedly processing all cumulative history in ordinary operations.
+A Ready holder cannot discard originals until it has installed a complete snapshot with actual CheckpointCert. If the producer crashes before certificate dissemination, recover the control CLOSE and run Store for the same deterministic body again, or learn its existing certificate. Valid Store's complete Collect leaves a final correct full-snapshot holder under the window assumptions. Original proofs can then be replaced, not reconstructed from a hash. No disk-restart guarantee is implied.
 
-A lagging but live member receiving a newer epoch returns NEED_CHECKPOINT and obtains the base before voting there. It remains a member and an alive responder for the window model. Old requests at advanced members return EPOCH_CLOSED with checkpoint information, never replayed positives or recreated instances. Closed-epoch evidence cannot act as a new-nonce response. Failed preparation/transfer does not roll back current state or authorize deletion. Repeated activation cannot reset a used ordinal, new-epoch work or global Omega state. Do not require permanent precise old-instance query archives; preserve exact rid results and command bindings without TTL/watermark expiry.
+Complete snapshot preparation and retention obey protocol.md §§9.4–9.5: preserve the full logical state while reusing unchanged data, rather than making another cumulative copy at each checkpoint. Choose snapshot representation, transfer, indexing and reclamation mechanisms while preserving certified ancestry, state availability and unfinished operations. These abstract steps do not prescribe a copying layout or reclamation algorithm.
+
+A lagging but live member receiving a newer epoch returns NEED_CHECKPOINT and obtains the base before voting there. It remains a member and an alive responder for the window model. Old requests at advanced members return EPOCH_CLOSED with checkpoint information, never replayed positives or recreated instances. Closed-epoch evidence cannot act as a new-nonce response. Failed preparation/transfer does not roll back current state or authorize deletion. Repeated activation cannot reset a used ordinal, new-epoch work or global Omega state. Do not require permanent result or precise old-instance query archives; preserve enough executed-request and command-binding information to prevent repeated effects across epochs. Result eviction does not erase execution.
 
 Checkpoint triggers and J are configurable implementation choices subject to J>=K. Triggering, transfer and requeue scheduling must preserve fair service across epochs: a pending logical request cannot be repeatedly discarded or indefinitely postponed by checkpoints. Queued requests remain separate from admitted descriptors and cannot be added to a sealed manifest merely to bypass the allocation rule.
 
@@ -690,4 +697,4 @@ Checkpoint triggers and J are configurable implementation choices subject to J>=
 
 Origin paths use PreAccept followed by fast decision or a separate Accept; recovery keeps highest-accepted inheritance, Observe/Rebuild or exact-initial Validate with per-conflict HELP. Coverage proofs use immutable initial paths, and Validate keeps full hot obligations. Checkpoint control is a distinct no-fast-path Prepare/Accept log; its Store certificate replaces only the history it has actually closed. Observations are not AcceptACKs, and timeout is neither NoFast nor accurate death evidence.
 
-Evidence retirement and exact client-result retention throughout the cluster run follow protocol.md sections 7 and 9. The supported system scope is defined in section 11.
+Evidence retirement, request deduplication throughout the cluster run and duplicate-response semantics follow protocol.md sections 7 and 9. The supported system scope is defined in section 11.

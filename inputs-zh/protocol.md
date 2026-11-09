@@ -1,293 +1,443 @@
 # 混合 EPaxos
 
-本文按客户端请求、决定、执行、恢复和历史替换的顺序解释协议。`pseudocode.md` 展开对应的事件、记录和验证规则；两份文档共同定义生成、审计、修复和复核采用的协议要求。其中的名称和数据结构表达协议义务，不规定必须采用的运行时架构。发现实质矛盾时应报告，不能悄悄弱化规则或替换共识算法。
+正文定义概念、前提和证据条件，英文伪代码集中表达状态转换、分支顺序与原子边界；说明文字解释原因，不逐步复述算法。[system.md](system.md) 定义服务能力、运行时和成本要求。数据结构、线程、队列、缓存及存储方式由实现选择。
 
-## 1. 一个请求如何经过整个系统
+## 1. 协议目标
 
-客户端向某个副本提交应用操作，例如 `Put(k, 1)`。这个副本可以直接开始协调该操作，无需先成为整个集群的 leader。不同副本可以并发协调不同操作。
+任意副本可接纳请求并协调一个实例；协调者失效后由恢复流程接续。决定固定实例值，执行遵守依赖关系，依赖环按确定顺序处理。检查点完成旧 epoch 的必要工作，携带应用和去重状态进入下一 epoch。同一请求可对应多个重试实例，但至多产生一次应用效果。
 
-1. 接收副本先将请求排队。允许接纳时，为请求创建一个协议实例，也就是为该请求达成决定的一次尝试。它记录与已知冲突实例的依赖关系，用于确定执行顺序，再向其他副本收集观察。
-2. 各副本可能知道不同的并发操作。如果足够多的初始观察一致，且满足快速路径条件，原协调者就决定初始值。否则，它收集观察，再请求副本接受一个具体值，其中包含依赖关系和执行序号。
-3. 决定固定实例的值。执行是另一个步骤：副本取得依赖图所需的决定，并按规定顺序执行。只有实际应用执行才能产生成功的客户端结果。
-4. 如果实例迟迟没有决定，后台恢复读取此前的投票和接受记录，再继续推进协议。恢复协调者可以改变，但实例身份及任何已经作出的决定必须保留。
-5. 历史增长后，副本关闭一组有限的旧实例，并就一个检查点达成一致。检查点包含这些实例产生的应用状态、请求结果和必要摘要。新实例以该检查点为起始状态；只有满足检查点安装规则后，才能删除旧协议证据。
+## 2. 副本、故障和时间前提
 
-因此，客户端请求和协议实例是不同对象。同一个请求的重试可以产生多个实例，但应用去重保证该逻辑请求只有一次效果，并保留其结果。后续章节依次介绍这些身份、回复收集方式，以及各项状态转换的条件。
+固定成员集合 Pi 有 n 个副本，采用共同的成员 ID 顺序和初始状态。整个运行最多 f 个副本 crash-stop，0 <= f < n；崩溃副本永久停止。消息来源真实、内容不被篡改，允许重复和乱序。正确副本之间的通信、处理和调度可靠且公平；有限真实时间内只有有限事件。公平性不提供固定延迟。
 
-## 2. 副本、故障与时间假设
+广播窗口 W > 0 从调用开始构造或广播计起，覆盖编码、全部发送与排队、双向传输、处理、必要证据获取与验证、回复接纳及计时误差。若收集者持续存活、完成向全部成员发送并实际等到 W 截止，则截止时仍存活的成员中，至多 s 个尚未提供已被收集者收到的回复；不同窗口的慢成员可以不同。
 
-### 2.1 成员与故障
+令 q=n-f、L=f+1，要求 0 <= s < q 且 q <= L，因此 L+q=n+1。W 是关于实际载荷和工作的外部假设，不能由公平性或收到 q 份回复推出；窗口违例不等于准确判死。恢复协调另需第 8 节的心跳前提。
 
-固定成员集合为 Pi，共 n 个成员，所有副本采用相同的成员 ID 顺序。整个运行期间最多 f 个成员崩溃，0 <= f < n。崩溃会永久停止副本；它不会恢复或重新加入。正确副本在本次运行中始终不崩溃；当前存活的副本以后仍可能崩溃。运行从干净配置和共同的初始应用状态开始。
+## 3. 请求、实例与依赖
 
-消息不会被伪造或篡改。允许乱序和重复，不假设 FIFO 传输。正确副本之间的通信、请求处理和任务调度可靠且公平。持续存活的慢副本最终会处理请求。有限真实时间内只发生有限个事件。公平性保证最终得到处理，不提供固定完成时间。
+### 3.1 身份与接纳额度
 
-### 2.2 广播窗口 W
+请求编号 `rid=(ClientID,RequestSeq)`：ClientID 在集群运行的不同客户端会话间唯一，RequestSeq 是会话内不复用的递增正整数，并发分配也不得重复。重试跨入口或 epoch 保留同一 rid 和命令；历史回收不得导致身份复用。
 
-协议使用广播请求、收集回复的操作：发起方向每个成员发送请求，再收集它们的回复。时间假设针对这项完整操作，而不是分别针对每条网络消息。
+命令 `cmd={rid,payload,footprint}` 包含应用操作及参数、与实际操作一致的访问描述。交换执行顺序可能改变应用状态、去重状态或任一结果的命令必须判为冲突；同 rid 命令冲突，允许保守增加冲突。`executedRequests` 保存已执行 rid 及必要命令绑定，与具体实例的执行标记分开。
 
-令 W > 0 为从该次调用的构造或广播开始计量的窗口。它包括未缓存的编码、向全部成员发送与排队、双向传输、接收方调度与处理、必要证据的获取和验证、回复接纳，以及时钟误差。对于持续存活、向所有成员完成广播、并实际等待到窗口截止的收集者，在截止时仍存活的成员中，最多 s 个成员的回复尚未被收集者收到。不同收集者、不同窗口中的慢成员可以不同。
+每次接纳创建实例 `(g,origin,ordinal)`：g 是 epoch，origin 是创建副本，ordinal 在该副本的当前 epoch 内从 1 到 J 递增分配且不复用。恢复保持实例身份，重试可创建新实例。epoch g 从已安装检查点 Cg 开始，baseID 标识它；初始 epoch 为 0，所有副本共享 C0。
 
-至少 n-f 个成员始终正确。将后文使用的回复门槛记为 q=n-f，要求 0 <= s < q。仅收到 q 份回复不能证明完整窗口前提成立。一个回复晚到，也不能证明发送者已经崩溃。
+每个 origin 有 K 个接纳槽，J >= K >= 1；接纳占一槽，每 epoch 最多分配 J 个实例，全体最多 U=nJ 个。用尽 J 暂停新接纳并触发关闭，也可提前关闭。额度限制不阻塞恢复、证据获取和检查点；槽释放见第 7 节。
 
-W 是针对本次运行实际载荷和工作量的外部假设，不能由公平性推出。为运行配置并解释 W，以及用于计时的实际运行时事件。sent、received、RPC 等名称本身不能说明传输、处理或回复接纳发生在何时。报告本地检测到的运行假设违例；这既不能证明其他窗口成立，也不能撤销决定。协议保证以给定前提为条件，不是在任意窗口违例下仍无条件成立的安全性。
+### 3.2 值与 ballot
 
-## 3. 请求、实例与 epoch
+实例 x 的不可变初始值为 `V0(x)=(cmd,baseID,D0,seq0)`。D0 是初始直接依赖，seq0 用于依赖环内排序。后续值 `V=(cmd,baseID,D,seq)` 保留 cmd、baseID 和全部直接 D0 边；完整值相等须比较全部字段。依赖不含 x 自身，并具有同 epoch 的完整真实描述符。
 
-### 3.1 逻辑请求及其命令
+ballot 0 属于 origin；正 ballot 为按字典序排列的 `(round,coordinator)`。每实例保留单调承诺 promise、不可变初始投票 initialVote、最高接受记录 accepted、决定 decision 和执行信息。新操作不得低于 promise，同 ballot 不得接受不同值。
 
-不同客户端都可能把自己的第一个操作编号为 1。为了区分这些操作，每个客户端会话先获得一个 `ClientID`，它在本次集群运行的全部客户端会话中唯一。该会话内的新逻辑操作再用 `RequestSeq` 编号。完整逻辑请求编号为 `rid = (ClientID, RequestSeq)`。请求绑定、重复检查和保留结果都使用这个完整二元组，不能只使用 RequestSeq。
+### 3.3 依赖覆盖与观察
 
-同一会话并发提交时，原子分配 RequestSeq，使用递增正整数且不重复使用。每个新操作只分配一次编号。重试该操作时，保持 rid 的两个组成部分和完整命令不变，包括更换入口副本和跨历史 epoch 重试。RequestSeq 用来识别操作，不规定执行顺序，也不同于协议执行序号和实例 ID。
+边 x -> y 表示 x 依赖 y。D0 构成不可变初始图 E0，Reach0(a,z) 表示从 a 到 z 的已验证初始路径，Reach0(a) 表示从 a 沿初始图可达的实例集合；初始边只能引用已有真实描述符。缺失材料表示未知。检查点代表此前已执行基座，当前依赖只引用本 epoch 实例。
 
-选择并解释如何保证 ClientID 唯一。例如，各副本可以分配 `(成员 ID, 本地会话计数器)` 形式的身份，每次为新会话分配时原子递增计数器。成员 ID 区分分配者，计数器区分同一分配者创建的会话。在 crash-stop 模型下，整个运行期间保留这份副本本地分配状态；检查点安装、epoch 变化和历史退休都不能重置或回滚它。分配副本后来崩溃，不影响已发出身份继续使用。允许等价分配机制和具体编码选择，但不能把相同身份分给不同会话。
+约简候选集合 C 时，保留 D0，并使每个被省略的实例都能从某个保留实例沿 E0 到达，保存路径见证。只能约简未冻结候选。前沿用 b 替换 a 还要求：Reach0(b,a)，且对任意未来命令 c，CONFLICT(a,c) 都能推出 CONFLICT(b,c)。允许多个前沿头；完整冲突查询仍须可用。
 
-客户端重启后，如果没有保留会话身份和请求编号分配状态，必须先获得新 ClientID，再开始新操作。新身份不能把结果未知的旧操作变成安全重试：重试需要原 rid 和命令。本实验不要求持久恢复客户端会话状态及未完成请求。
+`REGISTER(x)` 使实例对冲突查询可见，并保留必要事实和引用。已登记或投票的实例，包括已执行实例，在合法检查点替换前始终可见；被动获取证据不调用 REGISTER。
 
-应用操作及其参数构成 `payload`，例如 `Put(k, 1)`。为了判断操作是否相互影响，应用还提供确定性的冲突函数，以及称为 `footprint` 的访问描述。对单键操作，它可以描述访问的键及读写类型。根据操作推导 footprint，或按照所选应用接口验证它；具体表示由实现选择。完整逻辑命令记为 `cmd`，其内容是 `{rid, payload, footprint}`。
+`SCAN(x,kind)` 查询并记录当前冲突、覆盖见证和序号，随后在同一原子块内登记 x，见各接收端伪代码。`historicalMaxExcludingX` 是基座及全部已登记相关实例的历史 seq0 最大值，排除 x，空集按 0 计；不能只看前沿头或约简后的依赖。
 
-### 3.2 为什么实例需要另一个身份
+| kind | 扫描内容 |
+| --- | --- |
+| INIT | 按本节覆盖规则约简冲突依赖，初始序号为 `1+historicalMaxExcludingX`。 |
+| PREACCEPT / OBSERVE | 记录冲突依赖及覆盖见证，扫描序号为 `max(seq0(x),1+historicalMaxExcludingX)`。 |
+| VALIDATE | 按 OBSERVE 扫描，同时列出所有不在 Reach0(x) 内的已登记热冲突，作为待解决义务；不能只列前沿头。 |
 
-副本通过创建实例正式接纳请求。创建者称为该实例的 `origin`，即原始协调者。在其他入口副本重试，可以为同一 rid 创建另一个实例；后续协调者接管已有实例，不改变该实例的 origin 或身份。
+### 3.4 公共转换与证据规则
 
-为了替换历史，协议将实例创建过程划分为多个历史 epoch。epoch g 从已安装检查点 Cg 开始；Cg 表示带入该 epoch 的应用状态、保留的请求结果和历史摘要。全部副本从 g=0 和同一个初始检查点 C0 开始。安装经过认证的检查点后推进历史 epoch。这与改变某个实例的协调者是两件事。
+伪代码的 `atomic` 表示其中的本地检查与更新不可交错，不规定使用锁还是事件循环；`require` 是转换前提，不满足就不能继续该转换；等待不阻塞其他必要工作。代码中的“重查当前条件”包括 ballot、epoch、决定及协调资格，冻结或接受还需要目标及必要引用的授权。广播逐个发送，可能被崩溃中断；等待外部材料后仍须重查条件。
 
-一个 epoch 内，每个 origin 依次分配实例，使用从 1 到配置上限 J 的 `ordinal` 序号。因此，实例 ID 为 `(g, origin, ordinal)`。同一 origin 在同一 epoch 内不能重复使用 ordinal，所以实例 ID 不会重复。检查点的身份称为 `baseID`，用于指明实例依据哪个检查点；g 则表示历史代次。检查点身份及安装规则随第 9 节的检查点流程展开。
+证据保留实际产生记录的副本、目标、完整值及操作关系，使用前取得必要内容；拒绝矛盾描述符、循环证明和同 ballot 不等值。接收时核对来源及调用归属。已有合法决定优先学习；缺失材料不能当作 NONE。旧协调工作失效不删除历史事实，晚到合法决定仍可学习，但不得重新激活已退休 epoch。决定安装与传播幂等，重复证书必须与已有完整值一致。
 
-### 3.3 并发槽位与 epoch 分配次数
+## 4. 正常路径：PreAccept 与决定
 
-每个 origin 有 K 个私有接纳槽位，K >= 1。创建实例占用一个槽位；正常情况下，该 origin 本地执行实例后释放。因此，K 限制并发占用槽位数，J 限制该 origin 在一个 epoch 内总共能够分配多少实例。要求 J >= K。释放槽位不会恢复已使用的 ordinal。
+### 4.1 接纳与初始投票
 
-一个 epoch 内至多接纳 U=nJ 个实例。某个 origin 用尽 J 后暂停新分配，并请求关闭 epoch；也允许选择更早的检查点触发条件。排队请求尚未获得实例，不对冲突查询可见。接纳暂停期间，后台恢复和已经接纳工作的服务继续进行。
+接纳为请求正式分配实例；此前的排队请求不进入冲突集合。初始投票不可改写：FastOK 支持精确 V0，Mismatch 保留不匹配扫描。两者都是正观察回复，Mismatch 不是 NACK。
 
-## 4. 依赖、共识值与冲突前沿
+```text
+ADMIT(cmd):
+    if cmd.rid in executedRequests: return ALREADY_EXECUTED
+    fairly wait for an open epoch and K/J capacity
+    atomic:
+        if cmd.rid in executedRequests: return ALREADY_EXECUTED
+        require admission is still open and K/J capacity remains
+        allocate x = (g, self, next ordinal) for cmd
+        scan = SCAN(x, INIT); V0(x) = (cmd, baseID, scan.deps, scan.seq)
+        REGISTER(x); save origin FastOK(V0(x)); occupy one K slot
+    start COLLECT(PreAccept(x, 0, V0(x))) and retain its original W deadline
 
-### 4.1 副本要决定什么
+upon PreAccept(x, 0, V0):
+    atomic:
+        require actual origin sender, compatible descriptor, promise <= 0 and current authorization
+        if no initialVote[x]:
+            scan = SCAN(x, PREACCEPT); REGISTER(x)
+            if all scanned conflicts lie in Reach0(x) and scan.seq == seq0(x):
+                save initialVote[x] = FastOK(V0)
+            else: save initialVote[x] = Mismatch(scan)
+        reply = initialVote[x]
+    send reply
+```
 
-如果交换两个命令的执行顺序，可能改变应用状态或任一操作的结果，包括请求结果去重状态，那么这两个命令冲突。同 rid 命令相互冲突。应用冲突函数及索引必须找出每个真实冲突。可以采用并在文档中说明更保守的分类，将本可交换的操作也视为冲突。例如，通常的单键分类允许同一键的不同读操作交换顺序，而写与读、写与写均冲突。
+### 4.2 三种推进情况
 
-实例记录对其他实例的依赖。边 x -> y 表示 x 依赖 y；执行遵循依赖顺序，遇到环时使用确定性的排序规则。直接依赖集合记为 D，包含同一 epoch 中其他真实实例的 ID。已经纳入检查点的工作由基准表示，不再用跨越旧 epoch 的依赖边表示。
+设 e>=0、2e<q，快速门槛 F=n-e。PreAccept 同时检查快速决定和普通路径的观察收集；下表说明三种情况的关系，具体转换见本节及第 5 节 Collect：
 
-协议还分配执行序号 `seq`，根据冲突历史计算，用于在依赖环内部排列实例；它既不是客户端 rid，也不是实例 ordinal。一个完整提议值或决定值为 `V = (cmd, baseID, D, seq)`，相等判断比较全部字段。实例 x 的首个描述符固定唯一、不可变的初始值 V0(x)，包括命令、已安装检查点基准、初始依赖和初始序号。后续协议步骤只能按下面的规则选择其他依赖集合或序号，并始终保留命令和基准。
+| 情况 | 作用 | 决定方式 |
+| --- | --- | --- |
+| 快速路径 | 使用匹配初始投票，不依赖观察 Collect 已返回。 | 直接决定 V0，不经过 Accept。 |
+| 大门槛 | Collect 第一阶段完成观察收集，可包含 Mismatch。 | 满足原始 W 等待后，通过 Accept 决定。 |
+| 小门槛 | Collect 在原始 W 后进入第二阶段，再完成观察收集。 | 通过 Accept 决定，不另等第二个 W。 |
 
-### 4.2 初始路径与覆盖
+`fastEligible(x)` 表示 origin 处于有效 ballot 0，实例未决定、未封存，不知道更高 ballot/promise，从未观察到 Mismatch，且没有冻结不等于 V0 的提案。FastCert 包含 origin 的真实 OriginDecision 及支持精确 V0 的投票；历史投票本身不是一次决定。
 
-记 D0(x) 为 x 的初始直接依赖，E0 为这些不可变初始边构成的图。Reach0(a,z) 表示沿 E0 从 a 到 z 的已验证路径。初始边只引用已经创建的真实描述符，因此路径见证不能用未来值循环证明自身。路径对象缺失表示 UNKNOWN，不表示没有路径。通过协议的对象获取操作 Fetch 取得缺失描述符或证据。
+进入第二阶段、观察收集完成或 W 到期均不自动关闭快速路径。origin 持续接收初始投票，保留原始截止时间；跨阶段相同投票只计一个副本。例如 q=3、L=5、F=6，广播已完成且快速条件满足时，0.4W 收到第五份 FastOK 可完成观察收集，0.6W 收到第六份仍可快速决定。同值 Accept 可与快速路径重叠；不等值冻结与快速决定互斥。
 
-依赖不一定总要写成直接边：如果 x 依赖 a，而 a 有到 z 的不可变初始路径，那么 x 已经通过这条路径覆盖 z。利用覆盖可以减少重复的依赖列表。不过，每个后续值仍须直接保留 D0(x)。路径能够说明覆盖关系，不能说明其中实例已经决定或执行。
+`MERGE` 由正常路径和恢复共用。输入 scans 来自成功观察证明，forced 带有强制依赖的合法依据；返回值中的 DirectCover 保留真实观察、强制依据和约简路径见证。`REDUCE` 使用第 3.3 节的覆盖规则，不能改动已冻结值。
 
-为一个覆盖冲突集合 C 的新候选保留必需集合 M=D0(x)。从 C union M 中选择 P，使 M 包含于 P，且每个 z in C 要么属于 P，要么能从某个 a in P 沿 E0 到达。P 可以作为约简后的依赖集合，同时保留实际路径见证。不能把已冻结、已接受或已决定的值改写成另一种等价表示。
-
-### 4.3 不逐项列出全部历史时，如何找出冲突
-
-冲突前沿是一组候选实例，利用初始路径覆盖来代表更早的冲突。维护当前 epoch 的前沿、完整的已登记当前 epoch 冲突索引，以及精确的历史初始序号摘要。这里“热”指尚未被检查点替换的当前 epoch 历史；已经执行的实例仍可能属于热历史。
-
-用前沿头 b 替换 a，须满足 Reach0(b,a)，且 b 覆盖 a 对未来操作的冲突范围：对每个相关未来查询 c，CONFLICT(a,c) 都能推出 CONFLICT(b,c)。否则保留 a，或仅使用索引缩小完整冲突查询的范围。通常的读写分类中，写影响未来读和未来写的前沿；读只影响未来写的前沿。允许多个互不可比的前沿头。不同读之间可能没有路径，所以即使串行操作同一个键，也不一定只有一个前沿头。允许等价索引；任意冲突谓词不意味着可以获得常量大小的精确摘要。
-
-序号计算使用基准和全部本地已登记热冲突中的精确历史初始序号最大值；扫描 x 时排除 x。不能只根据约简后的依赖集合或前沿头计算。接纳与观察时的具体公式见第 6 节。
-
-### 4.4 可见性与保留的证据
-
-登记使实例对后续冲突查询可见。这与仅通过 Fetch 获得对象不同：获取的证据保持被动，直到授权的协议转换将其登记。每个正式登记或投过票的实例，在合法检查点替换其 epoch 之前，都必须对相关热扫描可见，包括已执行实例。关闭 epoch 时，一条记录可以仍然可见，但暂时没有继续进行新转换的授权；第 9 节说明这种授权。
-
-在合法检查点退休之前，保留已登记实例及支持其处理所需的协议历史。移除前沿项或活动执行图中的已执行顶点，不等于删除其协议证据。后续章节介绍达成决定和执行过程中产生的具体记录。
-
-## 5. Collect：为一次操作收集回复
-
-### 5.1 协调轮次与回复身份
-
-恢复时可以更换原协调者。为了排列这些协调尝试，每个实例使用称为 ballot 的协调轮次。ballot 0 属于 origin；正 ballot 是按字典序比较的 `(round, coordinator)`。副本的 promise 记录它承诺拒绝低于哪个 ballot 的新请求；同一实例的 promise 单调增长。本地任务 generation 用来识别过期回调，历史 epoch g 用来区分检查点代次。这些身份各有用途。
-
-Collect 执行一次广播操作，并记录回复，复用于初始观察、提案接受、恢复读取和检查点操作。Collect 完成本身不是命令决定。每个请求和回复绑定配置、epoch 与基准、请求者、实际发送者、目标、ballot、attempt、操作、phase、nonce 和载荷。attempt 标识一次调用；阶段 nonce 区分该调用的第一次和第二次广播。按不同成员计数，同时保留它们在两个阶段的真实记录。
-
-正回复表示成功处理了请求的操作，不一定表示同意发起方的初始值。NACK 表示拒绝，并携带真实原因。决定回复携带实例已经有决定的证据。证据缺失时延后处理；这既不是正回复，也不是明确声明不存在先前记录。
-
-### 5.2 两种完成方式
-
-除 q=n-f 外，定义 L=f+1，并要求 q <= L，因此 L+q=n+1。L 是完成一次完整广播后即可结束的回复门槛；另一条路径使用窗口 W 和两次广播。命令和检查点调用都必须实现这两个分支。
-
-1. 从该次调用的构造或广播开始启动 W，向全部成员发送阶段 1，包括自己。崩溃可能中断逐条发送。完整发送要求所声明的传输机制确实成功发出整组消息。全部发送完成后，至少 L 份正回复允许提前完成，无需等 W。
-2. 否则同时等待 W 到期和至少 q 份回复，再冻结第一阶段映射 A。少于 q 份时继续等待。不能重置原截止时间来排除昂贵工作。
-3. 切分后，使用新的阶段 2 nonce 广播相同操作和载荷。完成第二次全部发送后，当 `|B| >= q` 或 `|A union B| >= L` 时完成，其中 B 为第二阶段回复映射。无需再等一个 W。同一成员在两个阶段都回复时，保留两份快照。
-
-### 5.3 拒绝、重试和晚到证据
-
-成功证据只包含正回复。收集者不能丢弃已经接纳且匹配的 NACK，再挑选正回复子集声称成功。匹配的 NACK，包括来自较早阶段的 NACK，可以使仍在运行的尝试失败；已保存事实保留。按要求使用新的 attempt 或 ballot 和当前状态重试，不能复用已经被拒绝的证据。
-
-晚到的阶段 1 回复不能扩大冻结 A，也不能进入 B。同键重传只有在检查 epoch 权限后才能重放原回复。新 nonce 必须重新检查当前状态；恢复读取重新获取当前接受和决定信息。选择最高已接受值时，两个阶段都参与。处理合法已有决定和初始历史投票，不依赖收集是否已经完成。历史对象不能重新激活已退休 epoch，也不能在那里充当新回复。
-
-每个成功输出至少包含 q 个成员。如果两个输出中至少一个包含 L 个成员，L+q=n+1 保证交集。两个输出都较小时，利用较早切分点的遗漏界和较晚阶段 2 的回复者，在真实窗口前提下可得到至少 q-s 个交集成员。回复是实际生成时刻的快照，不是同时刻的全局状态。由于 L>f，大输出中包含至少一个最终正确的持有者；符合条件的小输出保留至少 q-s 个最终正确的第一阶段回复者。不满足完整 Collect 条件的任意 q 份确认，不能使用该论证。
-
-## 6. 接纳与原协调者流程
-
-### 6.1 创建实例并收集观察
-
-客户端请求进入公平的本地 FIFO。epoch 开放时，接纳在一个原子动作中重新检查已安装基准、空闲 K 槽和剩余 J 分配额度；查询冲突前沿和历史序号最大值；用约简依赖冻结 V0；登记描述符和初始边；保存 origin 不可变的首次观察和匹配投票；占用槽位。V0(x) 中的序号 Seq0(x) 为精确历史冲突最大值加一，包括基准中的历史。网络等待放在这个原子动作之外。
-
-origin 启动 Collect(PreAccept)，请求副本对 x 作出初始观察。接收者的首次扫描原子地查询当前已登记冲突、计算 `max(seq0(x),1+historicalMaxExcludingX)`，并登记 x。若每个观察到的前沿候选都已被 Reach0(x) 覆盖，且 seq 未改变，则记录精确 V0 和称为 FastOK 的匹配投票。否则保存带约简覆盖及 D0 的 Mismatch 扫描。Mismatch 是正观察，不是 NACK。重复 PreAccept 不能改写首次投票。
-
-在原子区域之外 Fetch 缺失证据，然后重新检查 epoch，并在记录扫描前重做查询。在该原子点之前发生的并发登记必须被覆盖；后来的登记必须观察此前实例。即使观察 Collect 已完成，origin 仍继续监听初始投票。
-
-### 6.2 快速决定
-
-令 e >= 0 为允许缺少的快速投票数，要求 2e < q，并令 F=n-e。快速决定需要 F 个不同成员的真实匹配投票，同时满足以下本地条件：origin 的 ballot 0 任务仍有效且实例未决定，不知道更高 promise 或 ballot，没有观察到 Mismatch，且任何已冻结值均等于 V0。单调标记 `seenMismatch` 记录是否观察过 Mismatch，不能因任务替换而清除。
-
-满足条件时，原子创建真实的原协调者决定记录 OriginDecision 及其快速证书 FastCert，安装决定并安排传播。只有历史投票不构成原协调者决定。本地 epoch 封存后停止新的原协调者快速决定，即使匹配投票随后到达也不例外。恢复必须保留可能隐藏的快速决定，不能制造替代的 OriginDecision。
-
-例如，n=7、f=4、s=2、e=1 时，q=3、L=5、F=6。F 统计快速决定所需的匹配初始投票；L 和 q 是 Collect 的完成门槛，不能与 F 混用。
-
-### 6.3 普通接受及其证据
-
-走普通接受路径时，使用已验证的初始路径约简，合并 D0、所有纳入的观察扫描及其序号依据。全部输入等于 V0 时保留精确 V0。观察 Collect 可以提前完成，但普通 Accept 仍须等待该调用原始第一个 W 截止。保留初始投票监听器和定时器。
-
-提案携带两类证据，分别回答“它覆盖了哪些冲突”和“为什么这个协调者可以选择这个值”。前者称为 `Cover`；直接根据观察形成的覆盖证据称为 `DirectCover`。后者称为 `Selection`；原协调者的普通选择是 `NORMAL`。冻结值、DirectCover、NORMAL Selection 和观察证明，再单独执行 Collect(Accept)。冻结表示固定这个提案，不能让后续回复继续修改它。
-
-若冻结值不同于 V0，纳入的实际 Mismatch 必须已经关闭快速路径。冻结观察集合外晚到的 Mismatch，可以关闭快速决定，但不能改变提案。同值 Accept 可以与快速决定重叠；不等值冻结和快速决定在本地互斥。
-
-接收者在返回接受确认 AcceptACK 之前，验证并保留完整提案、Cover、Selection，以及所有尚未被检查点替换的必要证据。引用和分块获取可以避免重复打包，但只有 ID 不够。合法已安装检查点是被替换历史展开的终点。保存接受记录前，原子地重新检查 epoch 授权、promise、决定和同 ballot 值。Accept 时不重新计算本地依赖。成功的 Collect(Accept) 连同有效提案构成接受证书 AcceptCert。本地任务改变后，完整合法 Accept 证明仍有效，但不能重新开启已退休 epoch。
-
-## 7. 学习决定、执行与回复客户端
-
-### 7.1 安装决定与取得证据
-
-FastCert 和 AcceptCert 使用同一个决定安装转换。同一实例的第二份证书必须在完整值上与已有决定一致。首次安装停止该实例的协调，并只安排一次传播和执行。传播消息称为 Learn。重复 Learn 不能导致重复释放槽位或即时循环传播。在合法检查点退休前，保留不可变投票和扫描、promise、接受值及必要证据、决定、依赖描述、执行标记，以及等待继续处理的义务。
-
-Fetch 从实际持有者取得缺失描述符或证据。Fetch 和恢复服务应独立于应用执行。保留真实作者身份和记录关系；内容标识符、编码和共享方式由实现选择，但不能代替证书验证。不可变对象的验证结果可以缓存；可变权限检查不能省略。
-
-已经持有先前证据的副本之间，普通消息应只提供必要新证据，避免递归重编码全部累计历史。缺少该历史的接收者先获取再使用；需要计入这个成本，不能把整个冷路径称为一次网络往返。活动证据在合法替换前必须可恢复。如果 origin 崩溃导致其 FastCert 消失，恢复应保留原值并形成 AcceptCert，不能伪造 OriginDecision。
-
-### 7.2 依赖执行与槽位释放
-
-执行实例前，取得相对于已安装基准的完整、已决定依赖闭包，即该实例和沿依赖能够到达的全部实例。缺失描述符触发 Fetch；依赖尚未决定时触发恢复。将环归入强连通分量 SCC，按先依赖后被依赖的顺序执行各分量，分量内部按 `(final seq, instance ID)` 排序。
-
-活动图索引、增量 SCC 更新或有界图重算由实现选择。本地已执行顶点能够离开活动图，是因为其全部冻结出边所指依赖已经执行或纳入基准。在检查点替换前，仍保留必要协议证据和已执行集合。重叠执行工作必须保持规定顺序和原子去重。
-
-正常情况下，只有 origin 本地执行才能释放该实例的 K 槽位，且只能释放一次。commit、超时、重试、远端执行或仅准备检查点都不能释放。崩溃 origin 的槽位不转交。合法检查点安装还可按第 9 节退休被覆盖槽位。后台恢复、Fetch、HELP、控制和检查点工作均不依赖空闲接纳槽位；HELP 是第 8 节介绍的恢复协助交换。
-
-### 7.3 结果、重试与取消
-
-应用状态和 rid 结果表在同一个确定性转换中改变。首次执行应用命令并保留精确命令绑定和结果；同 rid 的后续实例复用结果，不重复效果。只有实际应用执行才能返回应用成功。整个集群运行期间跨全部检查点保留精确结果，并纳入快照。存储可以随结果字节增长，但普通工作不能反复扫描或编码整张结果表。不要求提供精确历史实例和证明查询档案。
-
-合并本地重复请求。跨入口尝试可以创建不同实例，但只产生一次去重后的效果。拒绝已知矛盾 rid 复用，不能损坏合法工作。客户端取消或超时意味着结果未知，不删除已接纳义务。如果入口停止，客户端在其他入口重试相同命令和 rid。客户端重启日志及副本 crash-restart 不在范围内。进度依赖协议与窗口假设、能够访问正确入口，以及适用的持续等待或重试行为；不承诺固定客户端回复截止时间。
-
-## 8. 自主进度与恢复
-
-### 8.1 选择恢复协调者：Omega
-
-即使没有新客户端请求，未决定实例或缺失依赖仍需要后台推进。NeedRecover 是请求推进工作的通知，不是副本死亡证据。为了协调恢复，每个副本维护一个本地选中的成员，称为 Omega。正 ballot 命令和检查点控制协调要求本地 Omega=self。失去资格时停止协调，不停止请求处理、证据服务或删除已保存事实。原始 ballot 0 任务的资格独立于 Omega，但仍受 epoch 封存和授权约束。
-
-Omega 使用带编号的心跳。各副本发出递增心跳编号；接收者在 `(k+1)*W` 后按顺序执行第 k 项检查。complaint 记录协议规定的心跳缺失观察。含 q 份真实 complaint 的证书称为 BadCert。保持证书不可变并去重，选取 `(certificate count, member ID)` 最小的成员。更大心跳编号不表示之前的心跳已收到；晚到也不撤销 complaint。Omega 改变时唤醒恢复和检查点控制工作，并停止不再符合资格的正 ballot 任务。
-
-除第 2 节的前提外，Omega 的计时论证还假设本地时钟漂移有界，且至少一个正确心跳源的广播间隔最终有界。选择能够支持所需接收论证的传输和等待机制。仅有公平性和有界发出间隔，不能约束某个具体心跳的接收时间。如果使用广播窗口前提，这些心跳也必须满足完整发送和实际等待条件。心跳调度和表示方式由实现选择；不能替换成始终正确的 leader 或基于超时的准确死亡检测器。
-
-历史 epoch 不能重置全局心跳、检查编号或 BadCert 数量。只有保持未来行为和必要证据可用性时，才可等价压缩已收编号集合、重复检测和证据。这类全局进度状态可以增长，其成本与命令历史压缩分开说明。
-
-### 8.2 准备恢复与继承已接受工作
-
-恢复以高于已知 ballot 和 promise 的轮次启动新的 Collect(Prepare)。Prepare 在建立新 promise 的同时，读取各副本的初始投票、接受值和决定信息。先学习合法已有决定。否则从两个 Collect 阶段中选择最高已接受 ballot，继承其精确值和原始 Cover，称为 INHERIT 选择。同一最高 ballot 的值必须相等。后来的冲突信息不能覆盖继承结果。
-
-epoch 正在关闭时，继承值可能引用尚未获准开展新工作的实例。仍须报告真实接受记录。在发送带这些依赖的新 Accept 前，取得检查点流程中的授权扩展 ADD，不能隐瞒接受事实。ADD 在第 9 节定义。
-
-没有接受记录时，协调者必须区分“初始快速决定仍有可能”和“初始值已经可以安全替换”。令 R 为回复成员并集，r 为其大小，H 为真实匹配初始投票的不同作者集合，h 为其大小。Prepare 回复中的显式 NONE 表示没有产生初始投票；引用对象暂不可得不等于 NONE。
-
-### 8.3 排除快速决定与重建
-
-`NoFast(x)` 是永久排除 x 初始快速决定的证明。它需要 e+1 个不同且符合资格的作者，每个作者由以下某种实际记录支持：针对 x 的初始 Mismatch；明确报告没有初始投票的正向 Prepare 回复；针对另一个与 x 冲突、且双方初始路径互不可达实例的匹配初始投票；或某个已决定冲突实例的合格原始 Cover 扫描，该扫描未覆盖 x。第 8.5 节说明恢复如何通过冲突实例取得后两类证据。没有直接边不足以证明没有路径。超时、NACK 和缺失证据都不是见证。
-
-没有接受记录时，有效 NoFast 允许重建。当 h < r-e 时，H 之外的真实 Prepare 记录提供符合资格的见证，用来构造 NoFast。Rebuild 要求该证明、成功且无接受记录的 Prepare，以及尚未冻结的提案。它运行 Collect(Observe)，每个新请求 nonce 都产生新冲突扫描。合并 D0、两个阶段的观察及当前已证明的强制依赖，保持初始路径覆盖。保留命令、基准和全部原始直接 D0 边；使用精确历史序号建议和强制序号下界。这产生 DirectCover，并采用 REBUILD 选择。
-
-强制依赖是由冲突实例的恢复证据支持的额外覆盖义务。恢复协助可以在冻结前添加强制依赖，但不能改变 Observe 载荷、重启该调用，或修改已冻结、已继承的值。同样，NoFast 证明不能覆盖从 Prepare 继承的值。
-
-### 8.4 保留并验证初始值
-
-没有接受记录，也没有 NoFast 时，有 h >= r-e >= q-e > e。协调者必须验证精确 V0，不能重建。Collect(Validate) 进行新扫描，保留 Reach0(x) 之外每个真实已登记热冲突，不只保留前沿头。冻结两个阶段这些显式义务的并集。
-
-对其中每个冲突 y，使用已验证初始路径 y -> x，或最终依赖路径 y -> x 解决义务；后者要求路径起点和每条使用到的出边所属实例都已有合法决定。终点 x 可以尚未决定。临时候选路径或缺失对象不是解决依据。学习 x 的决定就结束恢复；获得 NoFast 则将无接受记录的恢复转入 Rebuild。否则，请求下一节介绍的协助。
-
-全部义务解决后，对精确 V0 发 Accept，携带保留义务及其解决证据的 ValidatedCover，并采用 VALIDATE_INITIAL 选择。热义务集合可以大至 U；只保留最新前沿不足以支持这项反向路径检查。
-
-### 8.5 冲突实例之间的 HELP
-
-HELP 请求另一实例的恢复提供解决冲突所需证据。它绑定源实例、任务及 ballot、目标实例、双方描述符和真实 H 支持投票。验证 x 时，先对 Reach0(x) 之外的冲突 y 检查反向初始路径或已决定路径。若 x、y 仍初始互不可达，且 |H_x|>e，x 的支持产生 NoFast(y)，并强制 y 覆盖 x。目标运行或复用自己的 Prepare；继承值和已冻结值优先。
-
-y 的支持也可能反过来排除 x 的快速决定，但不能解除帮助 y 的义务。未完成帮助跟随当前 Omega 选择推进。HELP 提供证据并请求恢复，不能绕过快速决定或 Accept 规则自行决定命令。
-
-对于已经决定、但没有可用反向路径的 y，沿精确 INHERIT 记录追溯其原始 Cover。先完整取得固定扫描和初始路径证据，再判断它是否没有覆盖 x。覆盖 x 的 DirectCover 或 fast 来源扫描提供反向路径。如果 ValidatedCover 观察到 x，就必须保留 x 的解决证据：初始反向路径与双方初始互不可达矛盾；已决定路径解决证据则提供 x 已经产生的决定。
-
-否则，用 e+1 个符合资格、来自不同作者的真实排除见证构造 NoFast(x)，再在重建 x 时强制覆盖 y。对象缺失时需要 Fetch 或等待，不能得出不可达结论。检查点关闭期间，不能过滤授权集合之外的历史已登记实例，以此制造“未观察到”的见证。
-
-### 8.6 公平的后台工作
-
-对已知未决定的当前 epoch 实例、缺失对象、未完成 HELP、当前 Collect 重传和检查点任务，维护公平、幂等的工作。等待时保存状态并返回，让其他工作可以运行。宽限期、重试间隔、队列结构和退避是实现选择，不是故障检测器。限制冗余的物理排队及在途工作，同时保留逻辑义务和公平服务，包括接纳暂停期间。第 9 节定义关闭期间如何授权旧工作，以及退休如何结束旧工作。
-
-## 9. 关闭 epoch 并安装检查点
-
-### 9.1 封存与确定必须完成的实例
-
-仅做前沿约简，不会删除支撑旧决定的证据。检查点只有在关闭旧工作并保留应用效果、请求结果之后，才能替换这些证据。流程先停止新接纳，确定必须完成的旧实例，完成其执行，再确保产生的快照可用，最后才允许证据退休。
-
-每个副本维护 seal 台账，记录已登记、投票、接受、决定和执行的实例，以及必要对象引用。`SEAL_LOCAL` 与接纳、登记和投票原子化：停止新分配和原协调者快速决定，然后保留台账的不可变清单 inventory。封存不擦除事实。
-
-关闭期间获准继续处理的实例构成一个集合，称为 manifest。副本必须先就这个集合及其必要扩展达成一致，再据此授权新工作。下面的控制日志负责这些决定。
-
-### 9.2 控制日志：START、ADD 和 CLOSE
-
-合格协调者运行 Collect(SealInventory)，收集所有纳入的冻结 inventory 及其已知必要闭包，获取并保留 ManifestPlan 所需的完整描述符和证据。独立的顺序控制日志就 manifest 如何演变达成一致：START 建立 manifest，ADD 扩展它，CLOSE 终止该 epoch 的控制序列。
-
-控制目标为 `(CONTROL,g,k)`，槽位 0 用于 START，后续槽位用于 ADD 或终止 CLOSE。各槽位使用新的正 ballot Prepare/Accept，遵守相同 Collect、promise，以及跨两个阶段精确继承最高接受值的规则。控制协调使用 Omega 资格。SealInventory 和控制 Prepare/Accept 都触发本地封存；没有投票的成员安装控制证书时也会封存。控制前缀是已经连续决定的一系列控制槽位。保存控制接受并回复前，验证这个前驱前缀及所选转换。部分接受既不是授权，也不是决定。
-
-START 决定前，新的旧 epoch 转换只能使用本地冻结 inventory。之后须使用已安装、已决定控制前缀的累计 manifest。授权不仅针对操作目标，也针对依赖、路径、扫描、强制依赖和 HELP 目标。历史只读接受及证明数据仍须报告，即使其中某个引用实例未授权；报告本身不激活该实例。此前已登记实例仍对冲突扫描可见。
-
-START 固定合法计划中的初始 manifest。ADD 加入一组非空、真实遗漏实例及其闭包，依据是已授权实例的继承接受值、必需初始路径，或扫描、Validate 发现的必要旧登记冲突。晚到的新客户端请求不构成授权。扫描若需要未授权旧冲突，返回 NACK(NEED_ATTACH)，携带真实历史证据并请求 ADD；ADD 决定后，再用新尝试重试。不能隐去冲突来返回正扫描。每个已决定 ADD 永久扩大 manifest，因此至多发生 U 减初始大小次这样的添加。
-
-只有当前 manifest 中的实例都有合法决定，且完成依赖闭合的执行，全部最终依赖均位于 manifest 或父基准内，才可选择 CLOSE。它绑定当前前缀、最终 manifest、决定，以及确定性的应用、结果和序号根。这里的根标识快照应包含的完整状态或摘要，具体表示由实现选择。ADD 和 CLOSE 竞争同一个下一槽位，最高已接受值仍然优先。ADD 决定后，必须重新计算后续 CLOSE。CLOSE 决定后，禁止进一步 ADD，以及旧 epoch 中新的命令和控制投票。为了准备快照，仍允许学习 manifest 的决定并执行其图。协调者失败后，恢复相同控制决定，不能用偏好的更大 manifest 替换已接受值。
-
-### 9.3 最终 manifest 覆盖什么
-
-成功的旧 Accept 或 Fast 集合与合法 Seal 输出有交集。如果交集成员先投票，其 inventory 和引用闭包会包含该实例。如果先封存，之后的投票就必须有实际 START/ADD 授权。因此，最终 manifest 不能遗漏任何合法决定的旧实例。
-
-被排除的尝试可能已有部分接受记录，但没有合法选定值。终止检查点将其认证为 RETIRED_UNCHOSEN，即没有选定值便退休。这既不是 Prepare 的 NONE 回复，也不是应用执行证据。该实例不再需要决定，但其逻辑请求仍承担服务义务。
-
-### 9.4 准备快照与收集存储确认
-
-根据父基准和唯一已决定 CLOSE 构造规范 CheckpointBody，包含已关闭 epoch、父身份、精确 CLOSE 决定值身份、最终 manifest 身份、应用状态、永久 rid 绑定和结果、历史冲突序号摘要，以及下一 epoch。摘要包括父基准和 manifest，不包括被排除的私有尝试。同一个控制值或检查点，在不同 ballot 或确认集合下身份相同；证书字节不是它的身份。编码、对象标识符和快照结构由实现选择。不能循环引用正在构建的证书。
-
-CheckpointStore，简称 Store，是一次 Collect 调用，请求成员确认它们持有完整的已准备快照和原始证据。在对精确调用返回 CheckpointReady 之前，成员必须验证、准备并保留这些材料。未准备好的成员返回 NACK(NOT_READY)，并开始准备或传输；该尝试不能丢弃这份 NACK。准备完成后，可以开展后续尝试。这里 Store 指在存活副本上保留数据；这个 crash-stop 模型不要求磁盘持久化。
-
-快照可以在 Store 调用前准备，成本仍计入整个检查点过程。Store 调用开始后，其 W 区间包括调用内实际发生的编码、通信、证据获取、验证和处理，遵循第 2.2 节。不能移动调用起点，也不能扣除补齐准备工作花费的时间。虽然新尝试有自己的窗口，被拒绝的尝试及新尝试前的准备，仍计入检查点总延迟。
-
-成功 Store 产生包含全部实际 Collect 阶段记录的 CheckpointCert。在 Collect 前提下，它留下至少一个最终正确的完整快照持有者。仅有 CheckpointReady 不允许删除证据。证书生产者崩溃时，持有者保留原始证明和快照，使后继可以恢复 CLOSE 并对同一个 body 重做 Store，或学习已有证书。
-
-### 9.5 安装、落后成员与退休
-
-只有取得合法 CheckpointCert、完整已验证快照，以及通往已知基准的已认证父值链，才可安装。安装与应用及结果状态、epoch 权限和接纳原子化；传输后重新检查这些条件。旧检查点不能回滚状态。重复安装同一基准无效果，不能重置 ordinal、覆盖更新的应用状态或清除新 epoch 工作。获取更高目标的数据时，可以暂停旧动作，但传输失败必须保留此前状态和证据。
-
-仍存活但落后的副本，在新 epoch 投票前先取得认证基准，期间返回 NEED_CHECKPOINT。它仍是 Pi 的成员，计入窗口模型中的存活成员。这是始终存活成员的同步，不是崩溃后重启。
-
-只有证书支持的安装完成后，才能退休本地旧协议证据、缓存、图、被覆盖任务和槽位。旧请求返回 EPOCH_CLOSED 或检查点信息，不能返回新的旧 epoch 正回复或伪造 NONE。封存期间，manifest 之外的已登记实例仍可见，但开展新转换前必须有已决定 ADD；epoch 退休后，使用终止检查点回复，不重新启动恢复。
-
-CheckpointReady 是可信 crash-stop 状态机关于已验证闭包执行和完整存储的记录。已安装检查点明确替换证据，不是从摘要重建已删除投票。保持当前基准、必要祖先关系和快照可供落后成员获取。保留精确请求结果，不要求无限期保留逐实例证明档案。允许等价的增量快照和传输策略；普通请求工作不应反复复制全部累计结果。
-
-### 9.6 带入下一 epoch 的槽位与请求
-
-安装只释放一次 origin 被覆盖的槽位：manifest 中的实例已在快照中执行，被排除的旧实例被认证为 RETIRED_UNCHOSEN。仅准备候选检查点不能释放槽位。
-
-退休结束的是一次实例尝试，不是逻辑请求。安装后，若已有保留结果，就返回给现有等待者。否则存活入口保留未完成请求和等待者，并在新 epoch 公平地重新排队相同命令和 rid。一个实例退休，不能证明同 rid 的另一个实例尚未执行。
-
-接纳和检查点调度必须公平服务跨多次 epoch 变化保留的请求。反复封存或退休不能丢弃或无限推迟待处理请求。不能只为绕过接纳规则，就把排队请求加入已封存 manifest。
-
-## 10. 目标保证与论证边界
-
-Agreement 要求同一实例的全部决定具有精确相同的完整值。同一 epoch 内的冲突 Visibility 要求任意冲突实例之间至少存在一个方向的最终依赖可达性。保留初始边使已验证 Reach0 成为永久成立的可达性下界。只用这些见证替换边，保持被比较图的可达性、SCC 和基于序号的顺序。这是关于表示的论证，不表示不同实现或调度会选择相同图。
-
-跨 epoch 时，唯一已安装检查点先关闭旧 manifest，新命令再使用其状态。请求结果和效果继续保留，旧消息不能重新开启已退休尝试。结合 epoch 内性质、确定性执行和去重，这些规则支撑客户端历史线性一致性的目标。证据处理、HELP 与控制并发、进度的完整证明仍是研究义务，有限检查不能完成这些证明。缺少证明不允许省略必需转换，也不意味着每个合规实现选择都属于规格缺口。
-
-K 限制 origin 占用槽位，J 限制 epoch 分配次数；两者都不限制全部证明历史字节、应用状态或精确结果。即使实例固定，恢复竞争也可能增加热证据。表示和传输应减少不必要的重复工作，并解释 W 下剩余成本。检查点暂停和冷状态传输是明确成本。不能为达到资源目标丢弃必需效果或结果。
-
-## 11. 本次实验范围
-
-实验不对一次集群运行中的逻辑请求总数设置固定上限。J 限制每个 origin 在单个 epoch 内的分配次数；进入后续 epoch 后可以继续接纳请求。请求持续积累时，窗口假设、进度义务和结果保留规则仍然适用。
-
-实验不要求完整生产存储引擎、重启持久性、普遍内存上界或永久历史实例查询服务。正确存活副本可以在内存中保留数据；磁盘持久化可选。
-
-动态成员、副本重启或重新加入、任意分区恢复不在范围内。通过检查点同步仍存活的落后副本属于协议内容，精确客户端结果在整个集群运行期间保持可用。
+```text
+MERGE(x, scans, forced):
+    if forced is empty and every scan value equals V0(x):
+        return V0(x), DirectCover(scans)
+    C = D0(x) union all scan dependencies union forced dependencies
+    D, witnesses = REDUCE(C, keep=D0(x))
+    seq = max(seq0(x), 1 + max({0} union {seq0(z): z in C}), all scan sequence values)
+    return (x.cmd, x.baseID, D, seq), DirectCover(scans, forced, witnesses)
+```
+
+```text
+upon initial vote, PreAccept COLLECT completion, or original W deadline:
+    atomic:
+        retain valid votes/proof; remember Mismatch permanently
+        require current origin at ballot 0 and no decision
+        if F distinct matching FastOK and fastEligible(x):
+            emit OriginDecision; install FastCert; arrange dissemination; return
+        if no observation proof, W not reached, or proposal already frozen: return
+        V, Cover = MERGE(x, observationProof.scans, {})
+        if V != V0(x): require included Mismatch was processed before this freeze
+        freeze proposal(x, 0, V, Cover, NORMAL)
+    start COLLECT(Accept(frozen proposal))
+```
+
+### 4.3 接受提案
+
+Cover 说明冲突覆盖：DirectCover 来自真实观察及约简见证，ValidatedCover 来自第 6.3 节的完整验证义务及解决证据。Selection 说明选值依据：
+
+| Selection | 必要依据 |
+| --- | --- |
+| NORMAL | origin 在 ballot 0 未决定时，凭成功 PreAccept 观察按第 4.2 节冻结；不同于 V0 时有冻结前已处理的 Mismatch。 |
+| INHERIT | 当前正 ballot 的成功 Prepare 中，跨两阶段最高 accepted 的完整值和原始 Cover 原样继承；同最高 ballot 的值一致。 |
+| REBUILD | 当前 Prepare 无 accepted，有 NoFast；候选来自同 ballot 成功 Observe 的全部扫描及有效强制依赖。 |
+| VALIDATE_INITIAL | 当前 Prepare 无 accepted，支持票满足第 6.3 节门槛；值为精确 V0，成功 Validate 的全部义务已解决。 |
+
+Accept 验证协调者提供的候选及依据，不重算本地依赖来替换提案。冻结值不随晚到回复改变。
+
+```text
+upon Accept(x, b, V, Cover, Selection):
+    fetch required evidence; verify full value, Cover and Selection by the rules above
+    atomic:
+        recheck authorization, b >= promise[x], decision and same-ballot value
+        promise[x] = b; REGISTER(x); save full acceptance and evidence
+    send AcceptACK
+
+upon successful COLLECT(Accept):
+    form AcceptCert from its proof and valid proposal; install and disseminate decision
+```
+
+## 5. 公共 Collect
+
+Collect 为 PreAccept、Accept、Prepare 和检查点操作复用大、小门槛收集；快速决定仅属于 PreAccept。正回复按不同成员计数，两阶段分别保存实际记录；`members(proof)` 是其中各阶段正回复的成员并集。第一阶段 A 冻结后不再扩大，晚到第一阶段回复不得计入 B。
+
+```text
+COLLECT(request):
+    t0 = time construction or broadcasting begins
+    while this call is active, any admitted matching NACK from either phase fails it
+    broadcast request to Pi with a fresh phase-1 identity
+    wait until phase-1 sending is complete
+    wait until |replies1| >= L or (now >= t0 + W and |replies1| >= q)
+    if |replies1| >= L: return large-threshold proof
+    A = freeze(replies1)
+    broadcast the same request to Pi with a fresh phase-2 identity
+    wait until phase-2 sending is complete
+    wait until |replies2| >= q or |members(A) union members(replies2)| >= L
+    return proof retaining A, replies2 and actual phase records
+```
+
+回复绑定请求方、真实回复方、配置、epoch/base、目标、ballot、操作、调用、阶段和载荷；不混用不同调用或阶段。新阶段重新处理，PreAccept 仍复用不可变初始投票；同次请求重传可复用回复，但须满足当前 epoch 授权。收集结束后仍处理合法决定和初始投票。
+
+失败后重试使用新调用身份。缺失证据不算正回复，也不算没有历史记录。成功证明须保留实际广播、W 截止切分和两阶段回复；调用起点固定，不能移动它以排除构造或发送成本。
+
+每个输出至少含 q 个成员；大输出凭 L+q=n+1 相交，小输出之间依赖真实窗口前提保证至少 q-s 个交点。大输出包含最终正确持有者；合格小输出的第一阶段保留至少 q-s 个最终正确持有者。任意 q 个 ACK 不足以替代 Collect。
+
+## 6. 恢复、NoFast 与 HELP
+
+### 6.1 Prepare 与选值优先级
+
+Prepare 报告承诺后的真实状态，供恢复方判断哪些历史选择仍须保留。NoFast 和强制依赖不能覆盖继承或冻结值；选值优先级由下面的 RECOVER 表达。
+
+无 accepted 时，R 为两阶段回复成员并集，r=|R|；H 为其中对 V0 有真实初始 FastOK 的副本集合，h=|H|。显式 NONE 是实际无初始投票，不是材料缺失。冻结前缺少必要 epoch 授权时，按第 9 节取得 ADD 后再继续。
+
+```text
+upon Prepare(x, b, descriptor):
+    atomic:
+        require positive b >= promise[x], compatible descriptor and current authorization
+        promise[x] = b; REGISTER(x)
+        reply = snapshot(initialVote[x], accepted[x], decision[x])
+    send reply
+
+RECOVER(x):
+    require Omega == self, authorized recovery and no decision
+    if a frozen normal proposal remains valid: continue that work; return
+    b = fresh positive ballot above known ballots and promises
+    P = COLLECT(Prepare(x, b, descriptor(x)))
+    if a valid decision is learned: install it; return
+    if either phase of P contains accepted records:
+        a = highest accepted across both phases; require equal highest values agree
+        obtain required authorization
+        atomic: recheck recovery conditions; proposal = freeze(a.value, a.originalCover, INHERIT(P, a))
+    else:
+        R, H = reply members and matching initial-vote members from both phases
+        if |H| < |R| - e: construct NoFast(x) from eligible records outside H
+        proposal = REBUILD(x, b, P) if NoFast(x) else VALIDATE_INITIAL(x, b, P, H)
+    if a valid decision is learned: install it; return
+    run COLLECT(Accept(x, b, proposal)) under current recovery conditions
+```
+
+### 6.2 NoFast 与重建
+
+NoFast(x) 永久排除 x 的初始快速决定，需要来自至少 e+1 个不同副本的有效见证。按原始产生记录的副本计数，每副本一次，转发不增加数量：
+
+| 见证 | 条件 |
+| --- | --- |
+| 初始不匹配 | 该副本对 x 的不可变初始 Mismatch。 |
+| 承诺后无投票 | 该副本的正 ballot Prepare 正回复，已作出该 ballot 的 promise，明确报告初始投票 NONE。 |
+| 冲突实例匹配票 | 该副本对另一冲突实例的 FastOK，且双方沿初始图互不可达。 |
+| 已决定冲突的原始扫描 | 另一冲突实例有合法决定，双方初始互不可达，且该副本的真实原始 Cover 扫描完整覆盖中没有 x。 |
+
+超时、NACK、缺失对象和本地不匹配标记不算见证。Observe 两阶段使用相同描述符；强制依赖是冻结时合并的输入，其新增不要求重启观察。
+
+```text
+upon Observe(x, b, descriptor) or Validate(x, b, descriptor):
+    atomic:
+        require positive b >= promise[x], compatible descriptor and current authorization
+        promise[x] = b
+        scan = SCAN(x, OBSERVE or VALIDATE); REGISTER(x)
+    send scan
+
+REBUILD(x, b, P):
+    require P has no accepted record, valid NoFast(x) and no frozen proposal
+    O = COLLECT(Observe(x, b, descriptor(x)))
+    atomic:
+        recheck recovery conditions
+        V, Cover = MERGE(x, O.scans from both phases, current valid forces)
+        freeze and return (V, Cover, REBUILD(P, NoFast(x)))
+```
+
+### 6.3 验证初始值与 HELP
+
+验证初始值不改变 V0，而是证明冲突已从另一个方向得到覆盖。Validate 的义务见第 3.3 节；每项 y 的解决依据必须是反向路径 y -> x：初始路径，或每条出边所属实例已有合法决定的最终路径，终点 x 不必已决定。Prepare 的支持门槛满足 `h>=r-e>=q-e>e`。
+
+```text
+VALIDATE_INITIAL(x, b, P, H):
+    require P has no accepted record, no NoFast(x) and |H| >= |members(P)| - e > e
+    T = COLLECT(Validate(x, b, descriptor(x)))
+    U = fixed union of obligations from both phases
+    while U has unresolved items and no decision and no NoFast(x):
+        fairly select unresolved y
+        if a valid initial or decided reverse path y -> x exists: save resolution
+        else: pursue HELP
+    if a valid decision is learned: install it; end recovery
+    if NoFast(x): return REBUILD(x, b, P)
+    atomic:
+        recheck recovery conditions, no NoFast(x) and all U resolved
+        freeze and return (V0(x), ValidatedCover(T, U, resolutions), VALIDATE_INITIAL(P, H))
+```
+
+HELP 的源实例 x 请求冲突实例 y 提供反向路径或推进其恢复。Hx 是源实例的真实匹配初始支持票；消息绑定源正 ballot、目标及双方描述符。HELP 本身不能决定实例。y 的支持可能反向排除 x 的快速决定，但不取消帮助 y 的义务。
+
+```text
+upon HELP(x, b, y, Hx):
+    verify source positive ballot, descriptors, actual support and conflict relation
+    if a valid reverse path y -> x or decision for x is available: send it; return
+    if y is undecided, initially mutually unreachable with x, and |Hx| > e:
+        form NoFast(y); retain the obligation for y to cover x
+        pursue y's own Prepare, respecting inherited and frozen values
+    if y is decided:
+        trace original Cover through valid INHERIT records
+        if original scans cover x: obtain and send the reverse path
+        else if ValidatedCover resolves x: obtain and send its reverse path or x's decision
+        else if e+1 eligible original-scan witnesses exclude x:
+            form NoFast(x); retain the obligation for x's rebuild to cover y
+    fetch missing evidence; fairly retain and pursue unresolved obligations
+```
+
+最后一个分支使用第 6.2 节的合格见证，不能以材料缺失推断扫描未覆盖 x。y 的决定和原始 Cover 都是这项判断所需的证据。
+
+## 7. 执行与去重
+
+SCC 是依赖图的强连通分量，用于把依赖环作为一个整体排序。已执行顶点可退出活动图，但检查点替换前保留必要证据和冲突可见性。executedRequests 及必要绑定跨检查点保留；结果缓存缺失不允许重做，不要求永久保存原结果。客户端细节见 system.md。
+
+```text
+EXECUTE_CLOSURE(x):
+    fetch missing objects and pursue recovery of undecided dependencies
+    wait for the complete decided dependency closure relative to the installed base
+    for each SCC in dependency-first order:
+        for each y ordered by (final seq, instance ID): EXECUTE_ONE(y)
+
+EXECUTE_ONE(x):
+    atomic:
+        if executed[x]: return
+        require consistent command binding
+        if x.cmd.rid in executedRequests: result = ALREADY_EXECUTED
+        else: result = apply(x.cmd); record executedRequests[x.cmd.rid]
+        mark executed[x]; release its K slot once if self == x.origin
+    complete client replies according to system.md
+```
+
+正常释放 K 槽的唯一位置是 EXECUTE_ONE；远端执行、决定、超时和重试均不释放，崩溃 origin 的槽不转交。合法检查点安装可退休其覆盖的槽位。
+
+## 8. 恢复协调与进度
+
+每副本通过 Omega 选择恢复协调者。正 ballot 的命令与检查点控制协调仅在本地 Omega=self 时进行；失去资格停止新协调动作，仍处理请求、提供证据并保留事实。原始 ballot 0 不依赖 Omega。
+
+BadCert 是 q 个不同副本针对同一 `(成员,心跳编号)` 产生的真实 complaint。它用于选择恢复协调者，不表示准确判死。心跳按精确编号记录：晚到心跳不撤回 complaint，更大编号不填补缺失编号。
+
+```text
+initially: heartbeat = 0; k = 1; badCount[p] = 0 for each p; Omega = min(Pi)
+
+repeatedly broadcast heartbeats:
+    heartbeat += 1; broadcast Heartbeat(self, heartbeat) to Pi
+
+upon Heartbeat(p, j): record receipt of the exact pair (p, j)
+
+run checks sequentially:
+    wait (k + 1) * W
+    for each p != self without received Heartbeat(p, k): broadcast Complaint(p, k)
+    k += 1; continue with the next check
+
+upon q authentic complaints from distinct replicas for (p, j), or a valid BadCert(p, j):
+    retain the certificate; increment badCount[p] only if (p, j) has not been counted
+    disseminate certificate; Omega = argmin((badCount[p], p) for p in Pi)
+    pursue unfinished work under current coordinator eligibility
+```
+
+还要求本地时钟漂移有界，至少一个正确心跳源的广播间隔最终有界。发送与等待须支持所用接收界，使用 W 时满足第 2 节完整广播和真实等待前提；仅有有界发出间隔与公平性不够。epoch 切换不重置心跳编号、检查编号或 BadCert 计数。
+
+已知未决定实例、缺失依赖、HELP 和检查点须持续公平推进，即使没有新请求或接纳暂停。未完成 HELP 随 Omega 更替继续，额度耗尽和协调更替不能丢弃义务。
+
+## 9. 关闭 epoch 与检查点
+
+### 9.1 封存与授权
+
+关闭依次完成封存、排干旧工作、保存检查点和开放新 epoch。inventory 是本地封存时已登记、投票、接受、决定与执行事实的固定清单。
+
+```text
+SEAL_LOCAL(g):
+    atomic with admission, registration and voting:
+        stop new allocations and origin fast decisions for g
+        freeze inventory on first sealing; reuse it thereafter
+
+upon SealInventory(g):
+    check base and epoch; SEAL_LOCAL(g)
+    reply with the frozen inventory
+```
+
+关闭协调者用 Collect(SealInventory) 的全部输出及必要已知引用闭包形成 START 计划。获准继续转换的实例集合称为 manifest：START 未决定时仅使用本地冻结 inventory，之后按连续决定的 START/ADD 前缀授权。授权覆盖目标、所需依赖、路径、HELP 对象及缓存正回复的重放。
+
+manifest 外的旧登记实例仍参与冲突查询；需要未授权引用时保留事实、返回 NEED_ATTACH，取得 ADD 后继续。Prepare 必须如实报告最高 accepted，即使其引用尚未授权；Fetch 或历史事实本身不授权新转换。
+
+### 9.2 控制日志
+
+控制槽按 `(g,k)` 编号，槽 0 决定 START，后续为 ADD 或终止 CLOSE。各槽有独立 promise/accepted，以正 ballot Prepare/Accept 和同一 Collect 协议选值，无快速路径；每个值绑定连续已决定前驱前缀。表中定义合法控制值，协调者和接收者都使用这些条件。
+
+| 控制值 | 条件与效果 |
+| --- | --- |
+| START | 合法 SealInventory Collect、全部纳入清单及必要闭包，建立 manifest。 |
+| ADD | 非空、不可撤回的实例及闭包，依据为授权实例的继承接受值、必需初始路径或真实旧登记冲突；不能引入新客户端请求。 |
+| CLOSE | manifest 全部合法决定并依赖闭合执行，依赖在 manifest 或父基座中；固定前缀、manifest、决定及父状态应用 manifest 后的应用、去重、序号摘要。 |
+
+manifest 由已决定的连续前缀确定，部分接受不构成授权。ADD 改变前缀后，之前为后续槽准备的 CLOSE 也须重新计算；争用同一槽时的继承优先级见下方代码。CLOSE 之后只允许学习 manifest 决定、执行、准备和保存快照，不再产生新的旧 epoch 命令/控制投票或 ADD。整个关闭过程持续推进恢复、HELP 和证据获取。
+
+```text
+PROPOSE_CONTROL(g, k, requested):
+    require Omega == self and complete decided predecessor prefix
+    b = fresh positive control ballot above known ballots and promises
+    P = COLLECT(ControlPrepare(g, k, b, prefix))
+    if a valid slot decision is known: install it; return
+    if either phase has accepted records:
+        select exact highest value and its evidence; require equal highest values agree
+    else: validate and select requested by the table above
+    A = COLLECT(ControlAccept(g, k, b, prefix, selectedValue, selectionEvidence))
+    form ControlCert from A; install and disseminate
+
+upon ControlPrepare(g, k, b, prefix):
+    verify base and decided predecessor prefix; SEAL_LOCAL(g)
+    atomic:
+        recheck prefix, current authorization and positive b >= promise[g, k]
+        promise[g, k] = b; reply = snapshot(accepted[g, k], decision[g, k])
+    send reply
+
+upon ControlAccept(g, k, b, prefix, value, selectionEvidence):
+    verify prefix, selection evidence and value by the table; SEAL_LOCAL(g)
+    atomic:
+        recheck prefix, authorization, positive b >= promise[g, k], decision and same-ballot value
+        promise[g, k] = b; save full acceptance and evidence
+    send ACK
+
+upon ControlCert(g, k, value, proof):
+    verify proof and decided predecessor prefix; SEAL_LOCAL(g)
+    atomic:
+        recheck prefix and consistency with any existing decision
+        install the decision and update manifest or CLOSE permissions
+```
+
+合法 Seal 输出与旧 Fast/Accept 输出相交：封存前的票进入清单，封存后投票受授权约束，因此最终 manifest 包含所有合法选定实例，包括隐藏快速决定。未纳入尝试可有部分接受，但无合法选定值，退休状态为 RETIRED_UNCHOSEN，不表示已执行。
+
+### 9.3 保存、安装与退休
+
+决定的 CLOSE 确定检查点内容：父基座、epoch、CLOSE 值、最终 manifest，以及父状态应用 manifest 后的完整应用、去重和历史初始序号状态；不含私有待处理请求或回复缓存。身份与 ballot、ACK 集合无关，证书不参与其自身认证内容的循环定义。
+
+`canonicalBody` 指上述逻辑内容；`prepared snapshot` 指已验证控制前缀和必要原证据、完成闭合执行，并实际备妥与 CLOSE 内容匹配的完整快照。准备可以早于 Store；Ready 是某个副本的保存事实，CheckpointCert 则来自完整成功的 Store Collect，按其前提保证存在正确持有者。
+
+```text
+SAVE_CHECKPOINT(g):
+    prepare the complete logical snapshot from parent state and the decided CLOSE
+    S = COLLECT(CheckpointStore(g, canonicalBody))
+    form CheckpointCert from S; disseminate and install
+
+upon CheckpointStore(g, body):
+    if no fully verified prepared matching snapshot: reply NACK(NOT_READY); return
+    retain the complete snapshot and required original evidence
+    reply CheckpointReady for this call
+```
+
+NOT_READY 按 Collect 的 NACK 规则使该次调用失败，准备完成后可另起调用。生产者在传播前崩溃时，后继恢复同一 CLOSE，对同一内容重做 Store 或学习已有证书；Ready 持有者继续保留原材料。
+
+快照准备与传输不改变当前状态，失败也不回滚它。安装前的验证可能与其他安装交错，所以最终更新须依据原子块内重查的基座。存活落后副本仍计入存活成员，取得基座前返回 NEED_CHECKPOINT，不参与新 epoch 投票。
+
+```text
+INSTALL_CHECKPOINT(cert, snapshot):
+    verify cert, complete snapshot and certified ancestry to a known base
+    target = cert.closedEpoch + 1
+    atomic:
+        recheck target, current base and ancestry
+        if target < installedEpoch: return STALE
+        if target == installedEpoch:
+            require same base identity; return ALREADY_INSTALLED
+        install application, deduplication, sequence state and base together
+        advance epoch and admission; retire only covered history and slots
+    finish executed pending requests; fairly carry remaining requests forward
+```
+
+本地持证且安装完成后才能退休被覆盖的旧实例、证明和槽位；当前状态、去重、必要认证关系及未完成操作仍须可用。旧请求返回 EPOCH_CLOSED 或检查点信息，不再给旧 epoch 正票或将已删除状态伪报为 NONE。证书替代旧证据，不保证重建原票。
+
+退休实例不等于完成请求。安装伪代码中的请求迁移依据执行记录：已执行请求结束等待，其余保留 rid 和命令，不得因反复检查点丢弃或无限推迟。快照表示、共享数据、父链组织与回收由实现设计，成本要求见 system.md。
+
+## 10. 保证与论证范围
+
+目标是同实例决定一致、epoch 内冲突实例至少一个方向最终依赖可达、确定性执行，以及跨 epoch 的线性一致应用语义和至多一次效果。进度以窗口、心跳、正确入口及公平推进前提成立为条件。HELP、证据和检查点并发尚无完整端到端证明；有限测试不替代证明，也不取消已明确的规则。
