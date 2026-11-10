@@ -1,6 +1,6 @@
 # Implement the supplied consensus system
 
-Implement the complete system described by `protocol.md`, `pseudocode.md` and `system.md`. Read all three documents in full. Deliver the specified runnable programs, reusable components, tests and documentation. Choose your own design, implementation process, tests and self-review. Do not substitute another consensus algorithm or modify the supplied requirements.
+Implement the complete system described by `protocol.md` and `system.md`. Read both documents in full. Deliver the specified runnable programs, reusable components, tests and documentation. Choose your own design, implementation process, tests and self-review. Do not substitute another consensus algorithm or modify the supplied requirements.
 
 Report actual commands/results, unresolved failures, material ambiguities and unmet requirements in the delivery. Choose unspecified implementation mechanisms yourself; report design problems without waiting for a design-agent response.
 

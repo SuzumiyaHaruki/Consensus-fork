@@ -42,18 +42,19 @@ def check_materials(workspace, inputs, names):
         raise ValueError('Supplied materials changed; retain draft and resolve specification: ' + ', '.join(changed))
 
 
-def prepare_handoff(audit_run, candidate, destination):
-    """Reconstruct the last completed worktree; never feed a cancelled draft as completed evidence."""
+def prepare_handoff(audit_run, candidate, destination, *, allow_partial=False):
+    """Reconstruct archived work; interrupted discovery claims remain explicitly provisional."""
     record = read_json(audit_run / 'run.json')
     source = read_json(audit_run / 'inputs/source.json')
     if source['commit'] != candidate['commit']:
         raise ValueError('Audit source commit does not match candidate')
     completed = [turn for turn in record['turns'] if turn['status'] == 'completed']
+    last_completed = max((turn['number'] for turn in completed), default=0)
+    partial = allow_partial and record['stop'] == 'external_error' and bool(record['turns'])
     report_ref = record.get('last_completed_report')
-    if not completed or not report_ref:
+    if not partial and (not completed or not report_ref):
         raise ValueError('Audit has no completed report; partial work remains in the original audit run')
-    last = max(turn['number'] for turn in completed)
-    report = inside(audit_run, report_ref)
+    last = max(turn['number'] for turn in record['turns']) if partial else last_completed
     destination.mkdir(parents=True, exist_ok=False)
     work = destination / 'audit-work'
     copy_tree(audit_run / 'source', work)
@@ -75,7 +76,9 @@ def prepare_handoff(audit_run, candidate, destination):
                     Path(directory).rmdir()  # Fail on undeleted files rather than silently losing evidence.
             copy_regular(inside(folder / 'changes/files', name), destination_file)
     delivered_report = work / 'report.md'
-    if not delivered_report.is_file() or delivered_report.read_bytes() != report.read_bytes():
+    if not delivered_report.is_file():
+        raise ValueError('Audit archive has no report')
+    if not partial and delivered_report.read_bytes() != inside(audit_run, report_ref).read_bytes():
         raise ValueError('Completed report does not match the reconstructed worktree')
     # Raw records remain separate, including any unfinished turn, with their original status.
     for name in ('turns', 'executions', 'tools', 'agent-records'):
@@ -87,10 +90,12 @@ def prepare_handoff(audit_run, candidate, destination):
         copy_regular(audit_run / 'agents.json', destination / 'raw/agents.json')
     handoff = {
         'candidate_commit': candidate['commit'], 'audit_run': str(audit_run),
-        'audit_stop': record['stop'], 'last_completed_turn': last,
+        'audit_stop': record['stop'], 'audit_reason': record.get('reason'),
+        'last_completed_turn': last_completed, 'report_turn': last,
+        'report_status': 'interrupted' if partial else 'completed',
         'report': 'audit-work/report.md', 'reproductions': 'audit-work/', 'raw_records': 'raw/',
         'test_polarity': 'Read each test: PASS may mean a violating witness was observed.',
-        'incomplete_turns': [t['number'] for t in record['turns'] if t['number'] > last],
+        'incomplete_turns': [t['number'] for t in record['turns'] if t['status'] != 'completed'],
         'supplemental_turns': [{'number': t['number'], 'status': t['status'],
                                'path': str(Path('raw') / inside(audit_run, t['path']).relative_to(audit_run))}
                               for t in record['turns'] if t['number'] > last],

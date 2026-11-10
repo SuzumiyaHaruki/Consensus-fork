@@ -23,7 +23,7 @@ def put(path, content):
     path.write_bytes(content if isinstance(content, bytes) else content.encode())
 
 
-def fixture_audit(folder, candidate, *, incomplete=False, empty=False):
+def fixture_audit(folder, candidate, *, incomplete=False, empty=False, external_error=False):
     folder.mkdir(parents=True)
     copy_tree(Path(candidate['path']), folder / 'source', excluded={'.git'})
     (folder / 'inputs').mkdir()
@@ -46,21 +46,25 @@ def fixture_audit(folder, candidate, *, incomplete=False, empty=False):
                    'variants': ['No variants executed'], 'trace_files': ['work/tests/trace.json']}]})
         write_json(path / 'changes/manifest.json', {'changed': {'report.md': {}, 'findings.json': {},
                    'tests/witness.bin': {}, 'tests/trace.json': {}}, 'deleted': []})
-        turns.append({'number': number, 'status': 'timeout' if incomplete else status,
+        if incomplete or external_error:
+            status = 'external_error' if external_error and number == 2 else 'timeout'
+        turns.append({'number': number, 'status': status,
                       'path': str(path.relative_to(folder))})
-    write_json(folder / 'run.json', {'stop': 'total_deadline', 'turns': turns,
-               'last_completed_report': None if incomplete else 'turns/0001/changes/files/report.md'})
+    write_json(folder / 'run.json', {'stop': 'external_error' if external_error else 'total_deadline', 'turns': turns,
+               'reason': 'Fixture service refusal' if external_error else None,
+               'last_completed_report': None if incomplete or external_error else 'turns/0001/changes/files/report.md'})
     put(folder / 'work/report.md', 'This mutable work tree contains the unfinished draft.\n')
     return folder
 
 
 class OfflineRuntime(workflow.Runtime):
-    def __init__(self, action='repaired', *, incomplete=False, wrong_commit=False, change_material=False, failure=None):
+    def __init__(self, action='repaired', *, incomplete=False, wrong_commit=False, change_material=False, failure=None, external_error=False):
         self.action = action
         self.incomplete = incomplete
         self.wrong_commit = wrong_commit
         self.change_material = change_material
         self.failure = failure
+        self.external_error = external_error
         self.calls = []
         self.empty_after = None
         self.review_disposition = 'fixed'
@@ -113,7 +117,7 @@ class OfflineRuntime(workflow.Runtime):
     def export(self, settings, workspace, destination, logs, timeout):
         # A small fixture export keeps state-machine tests independent of audit dependencies.
         destination.mkdir(parents=True)
-        names = ['go.mod', 'server.go', 'README.md', 'protocol.md', 'pseudocode.md', 'system.md']
+        names = ['go.mod', 'server.go', 'README.md', 'protocol.md', 'system.md']
         if (workspace / 'tests/regression_test.go').exists():
             names.append('tests/regression_test.go')
         for name in names:
@@ -128,6 +132,7 @@ class OfflineRuntime(workflow.Runtime):
         self.audit_prompt = Path(settings.audit_prompt).read_text()
         self.budgets.append(('audit', seconds))
         return fixture_audit(folder / 'runs/fixture', candidate, incomplete=self.incomplete,
+                             external_error=self.external_error,
                              empty=self.empty_after is not None and candidate['version'] >= self.empty_after)
 
     def verify(self, settings, candidate, folder, context, seconds, timeout):
@@ -282,7 +287,7 @@ class WorkflowTests(unittest.TestCase):
                 self.assertEqual(args[args.index('--model') + 1], 'gpt-6.1-sol')
                 self.assertIn('model_reasoning_effort="high"', args)
                 stage_path = Path(stage['path'])
-                self.assertEqual((stage_path / 'workspace/pseudocode.md').read_bytes(), (root / 'inputs/pseudocode.md').read_bytes())
+                self.assertEqual((stage_path / 'workspace/protocol.md').read_bytes(), (root / 'inputs/protocol.md').read_bytes())
                 self.assertFalse((stage_path / 'workspace/AUDIT.md').exists())
                 if stage['kind'] == 'generation':
                     self.assertFalse((stage_path / 'workspace/REPAIR.md').exists())
@@ -495,6 +500,57 @@ class WorkflowTests(unittest.TestCase):
         self.assertEqual(inspected['stages'][-1]['agents']['thread_count'], 2)
         self.assertEqual(before, {p: p.read_bytes() for p in before})
 
+        # Continue the old failure at its archived handoff, without another model audit.
+        resumed = workflow.execute(root, runtime, resume=True)
+        self.assertEqual(resumed['status'], 'cycle_complete')
+        self.assertEqual(runtime.calls, ['generation', 'audit', 'repair', 'verify'])
+        self.assertEqual(resumed['started_at'], result['started_at'])
+        self.assertGreater(resumed['elapsed_seconds'], result['elapsed_seconds'])
+        self.assertEqual(resumed['resumptions'][0]['status'], 'audit_failed')
+        self.assertEqual(resumed['stages'][1]['audit_stop'], 'external_error')
+        self.assertEqual(resumed['stages'][1]['report_status'], 'interrupted')
+        self.assertNotIn('pending_report', resumed['stages'][1])
+        for path, content in before.items():
+            if path.is_relative_to(root / 'audits'):
+                self.assertEqual(path.read_bytes(), content)
+        with self.assertRaisesRegex(ValueError, 'Resume requires'):
+            workflow.execute(root, runtime, resume=True)
+
+    def test_interrupted_discovery_delivers_archived_findings_to_repair_and_review(self):
+        runtime = OfflineRuntime(external_error=True)
+        root, result = self.run_fixture(runtime)
+        self.assertEqual(result['status'], 'cycle_complete')
+        self.assertEqual(runtime.calls, ['generation', 'audit', 'repair', 'verify'])
+        handoff = read_json(root / 'feedback/000/handoff.json')
+        self.assertEqual((handoff['report_status'], handoff['last_completed_turn'], handoff['report_turn']),
+                         ('interrupted', 0, 2))
+        self.assertEqual((root / 'feedback/000/audit-work/tests/witness.bin').read_bytes(), b'\x02\x00\xff')
+        self.assertNotIn('mutable work tree', runtime.delivered_report)
+        self.assertIn('interrupted audit', (root / 'feedback/000/overview.md').read_text())
+        issue, = read_json(root / 'issues.json')['issues']
+        self.assertEqual(issue['source_report']['status'], 'interrupted')
+        self.assertEqual(issue['state'], 'fixed')  # Only the independent review closes it.
+
+    def test_empty_or_missing_interrupted_findings_never_mean_a_clean_audit(self):
+        for missing in (False, True):
+            with self.subTest(missing=missing):
+                runtime = OfflineRuntime(external_error=True)
+                runtime.empty_after = 0
+                original = runtime.audit
+                def audit(*args):
+                    path = original(*args)
+                    if missing:
+                        for manifest in path.glob('turns/*/changes/manifest.json'):
+                            data = read_json(manifest)
+                            del data['changed']['findings.json']
+                            write_json(manifest, data)
+                    return path
+                with patch.object(runtime, 'audit', side_effect=audit):
+                    root, result = self.run_fixture(runtime)
+                self.assertEqual(result['status'], 'audit_incomplete')
+                self.assertEqual(runtime.calls, ['generation', 'audit'])
+                self.assertEqual(read_json(root / 'issues.json')['import_status'], 'incomplete')
+
     def test_failed_review_draft_cannot_close_issue_and_damaged_index_stays_visible(self):
         runtime = OfflineRuntime()
         runtime.empty_after = 1
@@ -701,11 +757,13 @@ class WorkflowTests(unittest.TestCase):
 
     def test_audit_exit_and_response_must_agree(self):
         put(self.root / 'candidate/go.mod', 'module example.org/consensus-demo\n')
-        for number, (response, code, exception) in enumerate((
-            ({'stop': 'agent_call_limit'}, 0, ValueError),
-            ({'stop': 'agent_call_limit'}, 7, workflow.StopWorkflow),
-            ({'stop': 'turn_timeout'}, 1, None),
-            ({'stop': 'cancelled'}, 1, workflow.StopWorkflow),
+        for number, (response, code, exception, context) in enumerate((
+            ({'stop': 'agent_call_limit'}, 0, ValueError, None),
+            ({'stop': 'agent_call_limit'}, 7, workflow.StopWorkflow, None),
+            ({'stop': 'turn_timeout'}, 1, None, None),
+            ({'stop': 'cancelled'}, 1, workflow.StopWorkflow, None),
+            ({'stop': 'external_error'}, 1, None, None),
+            ({'stop': 'external_error'}, 1, workflow.StopWorkflow, self.root / 'review-context'),
         )):
             folder = self.root / f'audit-{number}'
             if number:
@@ -717,9 +775,9 @@ class WorkflowTests(unittest.TestCase):
             with self.subTest(number=number), patch('workflow.invoke', side_effect=fake_invoke):
                 if exception:
                     with self.assertRaises(exception):
-                        workflow.Runtime().audit(self.settings, {'path': str(self.root / 'candidate')}, folder, 30, 40)
+                        workflow.Runtime()._audit(self.settings, {'path': str(self.root / 'candidate')}, folder, 30, 40, context=context)
                 else:
-                    result = workflow.Runtime().audit(self.settings, {'path': str(self.root / 'candidate')}, folder, 30, 40)
+                    result = workflow.Runtime()._audit(self.settings, {'path': str(self.root / 'candidate')}, folder, 30, 40, context=context)
                     self.assertEqual(result, folder / 'runs/fixture')
 
 
@@ -818,7 +876,6 @@ class BridgeIntegrationTests(unittest.TestCase):
             put(workspace / 'go.mod', 'module "example.org/consensus-demo" // Candidate chooses its module.\n\ngo 1.22\n')
             put(workspace / 'main.go', 'package main\nfunc main() {}\n')
             retained = {'protocol.md': (ROOT / 'inputs/protocol.md').read_text(),
-                        'pseudocode.md': (ROOT / 'inputs/pseudocode.md').read_text(),
                         'system.md': (ROOT / 'inputs/system.md').read_text(),
                         'wire/auth.go': 'package wire\nfunc Authenticate() bool { return false }\n',
                         'wire/auth.zig': '// Source language is not a capture policy.\n',

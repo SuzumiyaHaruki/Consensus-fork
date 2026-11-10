@@ -1,25 +1,45 @@
 # System requirements
 
-Implement `protocol.md` and `pseudocode.md` as a runnable Go replicated key/value system. They define the protocol rules and assumptions; this document defines the target service, runtime capabilities and deliverables. All three documents apply together. Do not substitute another consensus algorithm.
+Implement the protocol in [protocol.md](protocol.md) as a runnable Go replicated KV system. This document defines service capabilities, engineering costs and deliverables. Choose the architecture, data structures, concurrency mechanisms and interfaces that meet these requirements.
 
-## Service and configuration
+## 1. Service and configuration
 
-Deliver module `example.com/mixepaxos`: reusable consensus Node components, separate server processes, real network transport, a reusable client interface and CLI, tests and documentation. Support multiple independent concurrent clients. Configure member identity and addresses, a consistent configuration identity, n/f/s/W/e/K/J within the protocol relations, and implementation scheduling settings. Prefer the standard library for offline builds. Use loopback by default; ordinary server/client programs must run independently of Codex or private test tools.
+Deliver module `example.com/mixepaxos`, including a reusable consensus Node, standalone server processes, real network transport, a client library and CLI, tests and documentation. Support multiple independent concurrent clients. Configure the member list, each replica's address and f/s/W/e/K; derive n from the member list. Parameters must satisfy protocol.md.
 
-Implement deterministic single-key Put, Get and Delete through consensus, with documented results, errors and conflict classification under protocol.md §4.1. Expose the request identity, execution, retry and deduplication semantics of §§3,7,9.6 consistently through the client and service APIs. The service guarantee and its premises are those in §10. Distinguish rejection before admission, pending work, application outcomes, ALREADY_EXECUTED and unknown outcomes. ALREADY_EXECUTED confirms prior execution without promising the original result; it must not trigger automatic resubmission with a new rid. Permanent exact-result retrieval is not required. Reject malformed input and known contradictory request reuse before admission without corrupting legal work or creating dependencies on rejected inputs. Concrete encodings and client waiting/backoff policies are implementation choices.
+Implement deterministic single-key Put, Get and Delete through consensus. Define their inputs, effects, return values and error meanings, and derive the command conflict relation accordingly. Reject malformed inputs and known contradictory rid reuse before admission; legal commands must not depend on rejected input. Client session identities must be unique, and concurrent RequestSeq allocation must not produce duplicates; choose the allocation and encoding mechanisms.
 
-Use the failure, recovery and storage scope in protocol.md §§2,3,9,11. A general storage engine and a deployment platform remain outside scope.
+## 2. Client results and retries
 
-## Runtime capabilities
+First execution returns the actual application result to clients waiting for that request. An already executed duplicate request returns ALREADY_EXECUTED, meaning the request has executed without including its original execution result in this reply.
 
-The Node owns background progress after startup using real time; applications do not manually tick or pump transitions in ordinary use. Support concurrent client requests, incoming messages, timers and application work. Keep transport replaceable and consensus usable without sockets. Provide cancellation and shutdown interfaces, and document their effects together with backpressure and admission pauses on queued, admitted and already issued work. Background progress must satisfy the supplied protocol rules while other work waits.
+Distinguish rejection before admission, incomplete work, actual application results, ALREADY_EXECUTED and an unknown outcome; choose concrete status codes and interface representations. At one entry replica, an unexecuted duplicate request reuses existing work without creating another instance. Choose how duplicate callers wait or receive replies, but do not return ALREADY_EXECUTED before execution.
 
-Preserve identities and payloads through codecs. Choose and validate unspecified representations/ranges consistently across components. Bind configured member identity to the actual message source within an explicit trusted-cluster boundary; an unchecked payload field is insufficient. Byzantine tolerance and production PKI are not required. Keep these choices compatible with the evidence and channel model in protocol.md.
+Admitted requests continue through the protocol after a client times out or stops waiting. Choose whether to offer explicit cancellation of client waiting and whether to allow withdrawal of queued requests that have not been admitted. Retrying at another replica preserves the original rid and complete command. Choose client waiting and backoff policies. If a client restarts without its original identity and request records, acquire a new identity for new operations; a persistent client restart log is not required.
 
-Provide documented control and observation interfaces for time, message delivery and relevant runtime events, with a runnable example entering through actual Node/service interfaces. Controlled and ordinary operation must use the same protocol implementation. The example must identify the runtime paths it exercises and the mechanisms it replaces or bypasses. Control over every goroutine is not required.
+Determine request completion from execution records, not the presence of a result cache. Continue delivering original-result replies already prepared. An entry replica may admit a rid unknown locally; retries at different entry replicas may create different instances, but state-machine execution must deduplicate by rid.
 
-## Delivery
+## 3. Real runtime and testability
 
-Provide server/client commands, automated tests runnable with `go test ./...`, and instructions to build, launch, use and clean up a local multi-process cluster. Include the protocol's seven-member parameter example, concurrent clients and same-request retry. Show execution results and expose unknown outcomes consistently with the protocol.
+After starting, Node makes progress autonomously using real time. Support multiple replicas receiving client requests concurrently and multiple consensus instances progressing concurrently within each replica, including protocol message handling, timers and application execution. Subject to dependency ordering, atomicity and admission limits, when one instance waits for network replies or missing data, other instances and background tasks that can make progress must continue. Transport must be replaceable, and the consensus component must be able to run without sockets.
 
-Include a README covering configuration, application/client interfaces, commands, service semantics, operating conditions and known limits. Include `DESIGN.md` describing the delivered architecture, state ownership, important interfaces and consequential implementation choices. Document resource limits and their effects on clients and admitted work, including retained state and checkpoint costs under protocol.md §§9,11. Explain the chosen incremental snapshot and reclamation mechanisms, including how required ancestry and unfinished operations remain supported. No fixed benchmark or throughput target is prescribed. Report actual checks, unmet requirements and remaining limitations; supplied requirements cannot be removed by documenting a limitation.
+Choose queues, threads, locks, task lifecycles, retries, caches and evidence retrieval mechanisms while preserving the protocol's atomic transitions, current authority checks and fair progress. Support node shutdown and limiting new requests under overload; explain how these operations handle requests before and after admission.
+
+Within an explicit trusted-cluster boundary, associate configured member identities with actual message sources and preserve identities and payloads through encoding. Do not simply trust unchecked member fields in messages. Explain how actual timing and sending mechanisms correspond to protocol.md's window and heartbeat assumptions; naming an event a local enqueue or function return does not establish those assumptions. State operating conditions and locally detectable violations without treating them as a proof of the global window assumption.
+
+Provide interfaces for controlling and observing time, message delivery and relevant runtime events, plus a runnable example through the real Node or service entry point. Controlled and ordinary operation must use the same protocol implementation. Explain which real paths the example exercises and which mechanisms it replaces or bypasses. Control of every goroutine is not required.
+
+## 4. Performance and resource use
+
+Implement conflict queries, dependency expansion and data retention according to protocol.md. Use suitable indexes for ordinary conflict queries rather than scanning the entire history each time. Reuse available data and completed checks, reduce duplicate transfers and tasks, and release temporary state once no longer needed. Bound queued and concurrent work while keeping background tasks progressing.
+
+Provide actual measurements of throughput, latency and resource usage as request concurrency increases; choose the workloads and test methods yourself.
+
+Explain how the time, communication and memory costs of ordinary requests, dependency expansion and missing-data retrieval change with history size, and how resource limits affect admitted requests. The crash-stop model allows surviving replicas to keep data in memory; disk support for restarting after a crash is not required.
+
+## 5. Delivery
+
+Prefer the standard library and support offline builds. Use loopback addresses by default. Provide server and client programs that start with ordinary commands. Put automated tests in `tests/`, runnable with `go test ./...`.
+
+README must describe configuration, interfaces, service semantics, operating conditions, and commands to build, start, use and clean up a local multi-process cluster. Include a seven-member configuration example, concurrent-client usage and retries of the same request, showing the distinction between application results, duplicates and unknown outcomes.
+
+`DESIGN.md` must describe the delivered architecture, state ownership, important interfaces and consequential choices, including timing, conflict indexes, dependency expansion, data retrieval and retention. Report actual checks, unmet requirements and known limitations; documenting a limitation does not remove a supplied requirement.

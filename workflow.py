@@ -135,6 +135,10 @@ class Runtime:
             raise ValueError('Audit returned an unexpected run directory')
         if response['stop'] == 'cancelled':
             raise StopWorkflow('interrupted', 'Audit was cancelled')
+        if response['stop'] == 'external_error' and context is None:
+            # End this session. Discovery may still have archived findings to repair;
+            # an interrupted verification must never close issues by this route.
+            return audit_run
         allowed = {'total_deadline', 'agent_call_limit', 'turn_timeout', 'budget_wrap_up'} | ({'review_complete'} if context else set())
         if response['stop'] not in allowed:
             raise StopWorkflow('audit_failed', f"Auditor stopped with {response['stop']}; see {audit_run}")
@@ -175,6 +179,9 @@ def record_audit_progress(root, entry):
             entry['audit_reason'] = data['reason']
         if data.get('agents'):
             entry['agents'] = {**data['agents'], 'run_dir': str(audit_run)}
+        if entry.get('report_status') == 'interrupted' and entry.get('finding_import', {}).get('status') == 'imported':
+            entry.pop('pending_report', None)
+            return
         last_completed = max((t['number'] for t in data['turns'] if t['status'] == 'completed'), default=0)
         has_supplement = any(t['number'] > last_completed for t in data['turns'])
         if entry['status'] in {'running', 'not_started'} or entry['status'] == 'returned' and not has_supplement:
@@ -197,19 +204,45 @@ def record_audit_progress(root, entry):
         entry['retained_output_error'] = str(exc)
 
 
-def execute(root, runtime=None):
+def resumable_audit(root, record):
+    """Select a failed discovery handoff, not an arbitrary interrupted process."""
+    if record['status'] not in {'audit_failed', 'audit_incomplete'} or not record['stages']:
+        raise ValueError('Resume requires a failed discovery audit with a retained candidate')
+    entry = record['stages'][-1]
+    if entry['kind'] not in {'audit', 'final_audit'} or entry.get('finding_import', {}).get('status') != 'failed':
+        raise ValueError('Resume requires an unimported discovery audit; repair/review continuation is not supported')
+    record_audit_progress(root, entry)
+    if entry.get('audit_stop') != 'external_error' or not entry.get('audit_run'):
+        raise ValueError('Resume supports retained external-error discovery audits only; it never retries the stopped session')
+    candidate = record['current_candidate']
+    if candidate_commit(Path(candidate['path'])) != candidate['commit']:
+        raise ValueError('Candidate changed before resume')
+    return entry
+
+
+def execute(root, runtime=None, *, resume=False):
     root = Path(root).resolve()
     runtime = runtime or Runtime()
     with exclusive_run(root):
         record = read_json(root / 'experiment.json')
-        if record['status'] != 'prepared':
+        resumed_entry = resumable_audit(root, record) if resume else None
+        if not resume and record['status'] != 'prepared':
             raise ValueError('Experiment already started; prepare a fresh experiment, never overwrite retained evidence')
         settings = from_dict(record['settings'] | {'audit_prompt': str(root / 'inputs/AUDIT.md'),
                                                    'review_prompt': str(root / 'inputs/VERIFY.md')}, root)
-        issues = []
-        catalog = []
+        issues = read_json(root / 'issues.json')['issues'] if resume else []
+        catalog = read_json(root / 'evidence-index.json')['entries'] if resume else []
+        previous_elapsed = record.get('elapsed_seconds', 0) if resume else 0
         start = time.monotonic()
-        record.update(status='running', started_at=utc_now(), evidence_index='evidence-index.json')
+        if resume:
+            record.setdefault('resumptions', []).append({
+                **{key: record.get(key) for key in ('status', 'reason', 'ended_at', 'elapsed_seconds')},
+                'resumed_at': utc_now(), 'audit_run': resumed_entry['audit_run']})
+            for key in ('stop_reason', 'reason', 'ended_at'):
+                record.pop(key, None)
+        else:
+            record['started_at'] = utc_now()
+        record.update(status='running', evidence_index='evidence-index.json')
 
         def save():
             imports = [stage['finding_import'] for stage in record['stages'] if 'finding_import' in stage]
@@ -291,14 +324,21 @@ def execute(root, runtime=None):
             save()
             if not record['environment']['ready']:
                 raise StopWorkflow('environment_blocked', 'Local tool/dependency checks failed; no generation started')
-            stage = run_agent('generation')
-            candidate = capture(stage, 0)
-            repairs, number, forced_stop = 0, 0, None
+            if resumed_entry:
+                candidate = record['current_candidate']
+                repairs = record.get('repairs_completed', 0)
+                number = resumed_entry['finding_import']['audit_number']
+            else:
+                stage = run_agent('generation')
+                candidate = capture(stage, 0)
+                repairs, number = 0, 0
+            forced_stop = None
             while True:
                 audit_seconds = settings.initial_audit_seconds if number == 0 else settings.audit_seconds
                 final = repairs + 1 >= settings.max_repairs
                 folder = root / 'audits' / f'{number:03d}'
-                entry = phase('final_audit' if final else 'audit', folder)
+                entry = resumed_entry or phase('final_audit' if final else 'audit', folder)
+                handoff_name = f'{number:03d}' + (f'-resume-{len(record["resumptions"]):03d}' if resumed_entry else '')
                 imported = {'audit_number': number, 'candidate_commit': candidate['commit'],
                             'status': 'pending', 'issue_count': None}
                 entry['finding_import'] = imported
@@ -310,21 +350,31 @@ def execute(root, runtime=None):
                 entry['allocated_seconds'] = seconds
                 if candidate_commit(Path(candidate['path'])) != candidate['commit']:
                     raise ValueError('Candidate changed before audit')
-                audit_run = runtime.audit(settings, candidate, folder, seconds, seconds + 10)
+                if resumed_entry:
+                    audit_run = Path(resumed_entry['audit_run'])
+                    resumed_entry = None
+                    print(f'[resume handoff] {audit_run}', flush=True)
+                else:
+                    audit_run = runtime.audit(settings, candidate, folder, seconds, seconds + 10)
                 if (audit_run / 'run.json').is_file():
                     agents = read_json(audit_run / 'run.json').get('agents')
                     if agents:
                         entry['agents'] = {**agents, 'run_dir': str(audit_run)}
-                entry.update(status='returned', audit_run=str(audit_run), ended_at=utc_now())
+                entry.update(status='returned', audit_run=str(audit_run))
+                entry.setdefault('ended_at', utc_now())
+                record_audit_progress(root, entry)
                 record['last_audit'] = str(audit_run)
                 save()
-                handoff_path = root / 'handoffs' / f'{number:03d}'
+                handoff_path = root / 'handoffs' / handoff_name
                 try:
-                    handoff = prepare_handoff(audit_run, candidate, handoff_path)
+                    handoff = prepare_handoff(audit_run, candidate, handoff_path, allow_partial=True)
                     entry.update(handoff=str(handoff_path / 'handoff.json'),
-                                 last_completed_turn=handoff['last_completed_turn'])
+                                 last_completed_turn=handoff['last_completed_turn'],
+                                 report_status=handoff['report_status'])
                     imported['findings_path'] = str(handoff_path / 'audit-work/findings.json')
                     coverage, discovered = findings(handoff_path, candidate, number)
+                    if handoff['report_status'] == 'interrupted' and not discovered and not repairable(issues):
+                        raise ValueError('Interrupted audit has no indexed findings to repair; this is not a clean audit')
                 except (ValueError, OSError) as exc:
                     imported.update(status='failed', error=str(exc))
                     entry.update(status='incomplete', reason=str(exc))
@@ -335,6 +385,9 @@ def execute(root, runtime=None):
                 if note:
                     catalog.append(note)
                 imported.update(status='imported', issue_count=len(discovered))
+                if handoff['report_status'] == 'interrupted':
+                    entry.update(status='interrupted', reason=handoff['audit_reason'])
+                    entry.pop('pending_report', None)
                 entry.update(handoff=str(handoff_path / 'handoff.json'),
                              last_completed_turn=handoff['last_completed_turn'], coverage=coverage,
                              discovered_issues=[issue['id'] for issue in discovered], final_discovery=final)
@@ -436,7 +489,7 @@ def execute(root, runtime=None):
                     if entry.get('finding_import', {}).get('status') == 'pending':
                         entry['finding_import'].update(status='failed', error=record.get('reason', 'No completed import'))
                     record_audit_progress(root, entry)
-                record.update(ended_at=utc_now(), elapsed_seconds=time.monotonic() - start)
+                record.update(ended_at=utc_now(), elapsed_seconds=previous_elapsed + time.monotonic() - start)
                 save()
             finally:
                 signal.signal(signal.SIGINT, old_int)

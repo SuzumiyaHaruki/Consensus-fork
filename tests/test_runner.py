@@ -79,7 +79,8 @@ class RunnerTests(unittest.TestCase):
         self.assertFalse((first / "workspace" / "evaluation").exists())
         self.assertNotIn('trace_helper', read_json(first / 'run.json'))
         for folder in ('inputs', 'workspace'):
-            self.assertEqual((first / folder / 'pseudocode.md').read_bytes(), (ROOT / 'inputs/pseudocode.md').read_bytes())
+            self.assertEqual((first / folder / 'protocol.md').read_bytes(), (ROOT / 'inputs/protocol.md').read_bytes())
+            self.assertFalse((first / folder / 'pseudocode.md').exists())
         self.assertEqual((first / 'inputs/schedule.py').read_bytes(), (ROOT / 'runtime/schedule.py').read_bytes())
         self.assertFalse((first / 'workspace/schedule.py').exists())
         self.assertEqual(read_json(first / 'run.json')['schedule_helper'], 'inputs/schedule.py')

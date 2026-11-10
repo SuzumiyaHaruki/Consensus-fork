@@ -19,7 +19,7 @@ def main(argv=None):
         child.add_argument('--max-repairs', type=int)
         if name != 'doctor':
             child.add_argument('--label', default='sol-high-system')
-    for name in ('execute', 'inspect'):
+    for name in ('execute', 'resume', 'inspect'):
         child = sub.add_parser(name)
         child.add_argument('experiment_dir', type=Path)
     args = parser.parse_args(argv)
@@ -39,7 +39,7 @@ def main(argv=None):
         if args.action == 'inspect':
             print(json.dumps(workflow.inspect(root), ensure_ascii=False, indent=2))
             return 0
-        result = workflow.execute(root)
+        result = workflow.execute(root, resume=args.action == 'resume')
         print(json.dumps(workflow.inspect(root), ensure_ascii=False, indent=2))
         if result['status'] == 'cycle_complete':
             return 0

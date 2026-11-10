@@ -25,7 +25,7 @@ __version__ = "0.2.0"
 
 
 REQUIRED_INPUTS = (
-    "AGENTS.md", "TASK.md", "protocol.md", "pseudocode.md", "system.md",
+    "AGENTS.md", "TASK.md", "protocol.md", "system.md",
 )
 
 

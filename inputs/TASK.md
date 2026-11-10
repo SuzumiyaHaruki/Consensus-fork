@@ -1,6 +1,6 @@
 # Implement the supplied consensus system
 
-Implement the complete system described by `protocol.md`, `pseudocode.md` and `system.md`. Read all three documents in full. Deliver runnable programs, reusable components, tests and documentation as specified; a library or a plan alone is insufficient. Follow `AGENTS.md` for implementation and evidence practices.
+Implement the complete system described by `protocol.md` and `system.md`. Read both documents in full. Deliver runnable programs, reusable components, tests and documentation as specified; a library or a plan alone is insufficient. Follow `AGENTS.md` for implementation and evidence practices.
 
 Start `DESIGN.md` with a short sketch and revise it alongside the code. Build in small runnable additions: first take one normal request from the client through replica communication, decision and application execution to its response; then extend the same implementation to the concurrency, fault handling and lifecycle behavior required by the materials. This construction order does not reduce the final scope. Check component interactions as behavior is added, and review code organization before delivery.
 

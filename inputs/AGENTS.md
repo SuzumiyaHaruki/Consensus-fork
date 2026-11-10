@@ -1,6 +1,6 @@
 # Shared workspace instructions for generation and repair
 
-These instructions apply to both generation and repair. Follow the current task prompt: `TASK.md` defines initial generation; `REPAIR.md` defines repair of the supplied candidate and assigned issues. Read `protocol.md`, `pseudocode.md` and `system.md` together as the given design and target requirements.
+These instructions apply to both generation and repair. Follow the current task prompt: `TASK.md` defines initial generation; `REPAIR.md` defines repair of the supplied candidate and assigned issues. Read `protocol.md` and `system.md` together as the given design and target requirements.
 
 Choose your plan and code organization to suit the assigned task. Use this Codex session to implement, run tests, and fix problems. Delegate independent work to native Codex subagents when useful, using the same model and reasoning effort within the existing permissions. Coordinate shared-file edits, integrate their results, and finish or stop delegated work before completing your reply. Internal delegation does not replace the separate audit and repair-review stages. Do not start nested Codex CLI sessions or invoke external model services. You may write your own local scripts and test tools.
 

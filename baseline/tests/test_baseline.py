@@ -35,13 +35,13 @@ class BaselineTests(unittest.TestCase):
         record = run.inspect(root)
         self.assertEqual(record['condition'], run.CONDITION)
         self.assertIsNone(record['settings']['timeout_seconds'])
-        self.assertEqual(record['input_files'], ['AGENTS.md', 'TASK.md', 'protocol.md', 'pseudocode.md', 'system.md'])
+        self.assertEqual(record['input_files'], ['AGENTS.md', 'TASK.md', 'protocol.md', 'system.md'])
         self.assertEqual(set(p.name for p in (root/'workspace').glob('*.md')), set(run.INPUTS))
         for name in run.INPUTS:
             self.assertEqual((root/'inputs'/name).read_bytes(), (self.root/'inputs'/name).read_bytes())
             self.assertEqual((root/'workspace'/name).read_bytes(), (root/'inputs'/name).read_bytes())
         self.assertEqual((root/'inputs/schedule.py').read_bytes(), (run.PROJECT/'runtime/schedule.py').read_bytes())
-        for name in ('protocol.md', 'pseudocode.md', 'system.md'):
+        for name in ('protocol.md', 'system.md'):
             self.assertEqual((root/'inputs'/name).read_bytes(), (run.PROJECT/'inputs'/name).read_bytes())
         self.assertFalse((root/'events.jsonl').exists())
         self.assertTrue((root/'workspace/.git').is_dir())

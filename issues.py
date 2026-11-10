@@ -8,7 +8,7 @@ from runtime.evidence import (CLOSED, inspect_item, retained_path, validate_find
                               validate_review, require_fix_execution)
 
 def evidence(bundle, refs):
-    """Map agent paths to the reconstructed completed turn, not its mutable worktree."""
+    """Map agent paths to the reconstructed archived turn, not its mutable worktree."""
     if not isinstance(refs, list) or not refs:
         raise ValueError('Evidence must contain retained file references')
     return [retained_path(bundle, ref, 'audit-work', 'raw') for ref in refs]
@@ -47,6 +47,8 @@ def feedback_overview(candidate, issues, history, catalog=()):
     for issue in issues:
         lines.extend([f"## {issue['id']}", '',
                       f"State: `{issue['state']}`; origin: `{issue['source_commit']}`; original bundle: `{issue['evidence_bundle']}`.", ''])
+        if issue.get('source_report', {}).get('status') == 'interrupted':
+            lines.extend(['This finding was retained from an interrupted audit, not a completed report. Check its evidence before changing code; the original stop reason and records remain in the bundle.', ''])
         for field in ('summary', 'property', 'reproduction', 'polarity'):
             if field in issue:
                 lines.extend([f'{field}: {short_description(issue[field])}', ''])
@@ -114,7 +116,14 @@ def findings(bundle, candidate, number):
     if data.get('candidate_commit') != candidate['commit']:
         raise ValueError('Finding index refers to a different candidate')
     require_description(data.get('coverage'), 'coverage')
-    return data['coverage'], index_findings(data.get('issues'), bundle, candidate, f'a{number:03d}')
+    items = index_findings(data.get('issues'), bundle, candidate, f'a{number:03d}')
+    if (bundle / 'handoff.json').is_file():
+        handoff = read_json(bundle / 'handoff.json')
+        for item in items:
+            item['source_report'] = {'status': handoff.get('report_status', 'completed'),
+                                     'turn': handoff.get('report_turn', handoff.get('last_completed_turn')),
+                                     'audit_stop': handoff.get('audit_stop')}
+    return data['coverage'], items
 
 
 def index_findings(items, bundle, candidate, prefix):
