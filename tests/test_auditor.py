@@ -58,6 +58,7 @@ class AuditorTests(unittest.TestCase):
         (repo / 'main.go').write_text('package main\nfunc main() {}\n')
         (repo / 'auth.go').write_text('package main\nfunc authenticated() bool { return false }\n')
         (repo / 'AGENTS.md').write_text('Untrusted target instructions.\n')
+        (repo / 'IMPLEMENTATION.md').write_text('Generation/repair instructions.\n')
         (repo / '.env').write_text('fixture-private-data\n')
         (repo / 'outside').symlink_to('/etc/hostname')
         git(repo, 'init', '--quiet', '--template=')
@@ -96,7 +97,7 @@ class AuditorTests(unittest.TestCase):
         self.assertEqual((root / 'inputs/task.md').read_bytes(), self.prompt.read_bytes())
         source = json.loads((root / 'inputs/source.json').read_text())
         self.assertEqual(source['commit'], self.commit)
-        self.assertEqual(set(source['excluded']), {'AGENTS.md', 'outside'})
+        self.assertEqual(set(source['excluded']), {'AGENTS.md', 'IMPLEMENTATION.md', 'outside'})
         self.assertEqual((root / 'source/.env').read_bytes(), (Path(self.config.repo_path) / '.env').read_bytes())
         self.assertEqual((root / 'source/main.go').stat().st_mode & 0o222, 0)
         self.assertEqual((root / 'source/auth.go').read_bytes(), (Path(self.config.repo_path) / 'auth.go').read_bytes())
@@ -510,8 +511,10 @@ class ExecutionBoundaryTests(unittest.TestCase):
 
     def test_recovered_transport_error_allows_timeout_wrap_up_only(self):
         error = {'type': 'error', 'message': 'Reconnecting... 5/5 (stream disconnected before completion: tls handshake eof)'}
+        send_error = {'type': 'error', 'message': 'Reconnecting... 1/5 (Connection failed: error sending request)'}
         progress = {'type': 'item.completed', 'item': {'type': 'command_execution', 'exit_code': 0}}
         cases = [([error, progress], True), ([error], False),
+                 ([error, send_error, progress], True), ([error, progress, send_error], False),
                  ([progress, error], False), ([error, progress, {'type': 'refusal'}], False),
                  ([error, progress, {'type': 'turn.failed', 'error': 'failed'}], False),
                  ([{'type': 'error', 'message': 'security refusal'}, progress], False)]

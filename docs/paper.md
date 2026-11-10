@@ -1,6 +1,6 @@
 # 论文思路与研究记录
 
-本文件持续记录实验和分析过程中形成的论文想法，区分已有观察、拟采用的方法表述和待验证的主张。它不是 agent 输入，也不自动改变协议、提示词或控制流。具体数据与各版本问题见 [2026-11-10 对比报告](comparison-20261110.md)，评估方法见 [evaluation.md](evaluation.md)，仍待讨论的设计选择见 [design-issues.md](design-issues.md)。
+本文件持续记录实验和分析过程中形成的论文想法，区分已有观察、拟采用的方法表述和待验证的主张。它不是 agent 输入，也不自动改变协议、提示词或控制流。最近的测量与版本问题见 [v000 与 v003 评测](exploratory-1110.md)，评估方法见 [evaluation.md](evaluation.md)，仍待讨论的设计选择见 [design-issues.md](design-issues.md)。
 
 ## 1. 当前研究主线
 
@@ -75,7 +75,7 @@ Violates_r(τ)            观察足以支持违反要求 r 的结论
 
 v001 为解决失败目标队列饥饿，引入了保留队列和取消机制，却把 Collect 完成与初始任务结束混为一谈；v003 仍保留该行为。七副本场景中，大门槛 L=4，快路径门槛 F=6，剩余首次发送被取消后无法产生所需快票。请求最终仍能通过慢路径完成，因此原缺陷检查和普通成功断言可能通过。
 
-已有定向对照中，W=500ms，后三个 PreAccept 延迟 80ms；v000 约 83ms 完成，v003 约 522ms，让 v003 的排队 PreAccept 继续完成后约 88ms。最后一项是传输诊断对照，不是已交付的修正版。它把实现机制、实际执行和性能后果连接起来；完整测量和源码依据见 [对比报告第 6 节](comparison-20261110.md#6-preaccept-取消协议偏离及性能回归)。
+已有定向对照中，W=500ms，后三个 PreAccept 延迟 80ms；v000 约 83ms 完成，v003 约 522ms，让 v003 的排队 PreAccept 继续完成后约 88ms。最后一项是传输诊断对照，不是已交付的修正版。它把实现机制、实际执行和性能后果连接起来；见 [定向测试](../experiments/three-way-evaluation-20261110T004523Z/work/templates/fastcancel_test.go)、[原始观察](../experiments/three-way-evaluation-20261110T004523Z/work/supplemental/v003-fast-cancel-observations.json)及[候选源码](../experiments/three-way-evaluation-20261110T004523Z/work/sources/v003/protocol.go)。
 
 这个案例支持“协议符合性需要单独检查”，也说明独立会话仍可能共同接受错误的生命周期解释。它应当用于提出问题、解释方法和分析失败。新方法能否更早发现或阻止此类回归，需要后续实验，不能把已经用于修改提示的案例当作未见场景成绩。
 
@@ -119,3 +119,37 @@ baseline 应得到与 Forge 相同的协议和系统目标、相同工具能力�
 用户提出 SYSSPEC 的优点在于清晰、形式化，并把看似简单的工程组织成方法论。当前采用的方向是先明确研究对象、语义关系、阶段操作与可检验主张，再将提示词和 Python 解释为实现载体。上述对象和记号是研究表述草案，不是新增运行要求。
 
 同日已核对上一轮中英文提示同步：`protocol.md` 明确 Collect 完成不单独终止未完成 PreAccept；`AUDIT.md` 区分协议符合性、正确性和性能；`REPAIR.md` 与 `VERIFY.md` 要求按修改影响检查条件、消息义务及后续路径。baseline 的共同协议已同步。协议澄清和方法提示的收益需由新实验判断。
+
+### 2026-11-10：用轻量文档结构帮助推理与交接
+
+已在中英文角色提示中落实少量信息类别：`DESIGN.md` 组织系统结构、关键实现选择与检查缺口，关键选择串联要求、机制、符合性解释和证据；审计报告组织范围、发现、未完成或已排除的调查，每项发现分清要求、场景、观察、原因与复现。修复沿用现有 summary/reason，复核沿问题 ID 对照原要求、前后观察与相关影响。
+
+标题可以合并或调整，相关内容通过引用复用，不要求填空式逐函数说明，也没有新增控制器格式校验或交付文件。共同协议与 baseline 提示保持原样。待检验的作用是让作者更容易发现自己的推理缺口，并让接收者更容易定位依据、复用证据和核查改动；文档整齐本身不计作方法有效的证据。
+
+### 2026-11-10：参考公开工作的提示词组织
+
+查阅对象为各项目当前公开材料，不能将仓库当前内容直接等同于论文实验时使用的完整输入。以下仅归纳组织方式，不从文件长短推断效果。
+
+| 工作 | 查到的组织方式 | 对本项目的启发 |
+| --- | --- | --- |
+| SYSSPEC | 通用生成、评审和演化任务与模块规格分开；生成器按 PROMPT、RELY、GUARANTEE、SPECIFICATION 等部分解释输入。[生成代码](https://github.com/LLMNativeOS/specfs-ae/blob/main/tools/gencode.py) | 详细协议语义保留在设计材料，角色提示集中说明当前任务及如何使用输入 |
+| Agora | Strategy 与 TestGen 分工，协议约束、缺陷模式和仓库上下文分别组织；模式细节可按需查询。TestGen 自身仍有较长的工具与错误处理说明。[Strategy](https://github.com/lebronlambert/Agora/blob/main/agent/prompts/strategy.py)、[TestGen](https://github.com/lebronlambert/Agora/blob/main/agent/prompts/testgen.py) | 可以学习角色职责和输入输出的清楚划分，不照搬固定调查模式或大量示例 |
+| Specula | 短 SKILL 入口指向阶段 guide，guide 明确输入输出，并按阶段引用详细方法和格式资料。[入口](https://github.com/specula-org/Specula/blob/main/skills/spec_generation/SKILL.md)、[指南](https://github.com/specula-org/Specula/blob/main/skills/spec_generation/guide.md) | 区分任务正文与参考资料；不能只缩短入口而忽略后续实际读取的内容 |
+
+当前英文文件按空白分词统计：AGENTS 880、TASK 526、AUDIT 1391、REPAIR 1087、VERIFY 1212，共 5096 词；protocol 3950、system 872 词另计。这不是 token 数，也不是每个阶段都读取全部文件。初始生成的通用指导是 AGENTS+TASK，修复是 AGENTS+REPAIR；审计、复核分别接收自己的角色提示及设计材料，另有工具说明和运行简报。
+
+建议先直接合并同一会话中的重复要求，按任务、工作方法、执行与交付分组；压缩工具手册式段落，保留实际接口、证据引用、断言极性和版本语义。跨独立会话必需的要求可以重复。保留刚加入的轻量文档结构，不将内容移入一份所有角色仍须全文读取的文件来制造表面上的缩短。
+
+命名建议：将 Forge 的 `inputs/AGENTS.md` 改为 `IMPLEMENTATION.md`，明确它服务生成和修复。当时该文件由 `generator/client.py` 显式读入 developer instructions，自动项目说明发现已关闭，因此名字并非加载所必需；改名需同步材料复制、完整性检查和候选导出，仓库根部的 AGENTS.md 继续服务维护任务。此段为精简前的建议，落实情况见下条。
+
+### 2026-11-10：精简角色提示并统一实现侧文件名
+
+已将 Forge 的共用实现要求改为 IMPLEMENTATION.md，中英文同步；初始生成、审计、修复和复核提示按任务、方法、执行与交付重新组织。保留轻量文档结构、协议符合性、实际路径、断言极性、版本与证据关联及独立复核要求，合并重复表述和工具手册式段落。protocol.md 与 system.md 没有改动。
+
+精简初稿的英文角色提示按相同空白分词口径从 5096 词变为 2945 词，减少约 42%：IMPLEMENTATION 549、TASK 233、AUDIT 764、REPAIR 601、VERIFY 798。统计包含首次与续轮文本，不等于每次调用的实际 token；分节后的物理行数可能增加。
+
+baseline 仅同步实现侧文件名，提示内容保持不变。按用户要求，新版直接删除旧命名，不增加兼容分支；历史材料通过对应 Git 版本使用。加载与候选导出同步改名，不增加文档格式检查。精简后的方法效果仍需后续实验检验。
+
+### 2026-11-10：可读性优先于压缩比例
+
+用户指出精简初稿把完整动作压成名词列表，并混淆了给定的协议设计与 agent 编写的实现说明。本轮将中文角色提示中的生硬缩略改为完整句子，明确 protocol.md、system.md 是输入要求，DESIGN.md 是由实现者维护、随代码更新的说明。保留比较可行方案并解释取舍的要求，同步修改英文实现指引。此前的词数统计仅描述精简初稿，不再作为后续编辑目标；精简应去除重复，而不省略理解所需的主语、动作和对象。

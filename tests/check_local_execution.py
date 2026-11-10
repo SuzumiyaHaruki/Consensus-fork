@@ -159,7 +159,7 @@ def main():
         control = json.loads((stage/'execution-control.json').read_text())
         # Deliberately conflicting host, ancestor and project instructions must not be loaded.
         unwanted = 'FORGE_UNWANTED_LOCAL_INSTRUCTIONS'
-        (stage / 'inputs/AGENTS.md').write_text('FORGE_SUPPLIED_INSTRUCTIONS')
+        (stage / 'inputs/IMPLEMENTATION.md').write_text('FORGE_SUPPLIED_INSTRUCTIONS')
         (stage / 'AGENTS.md').write_text(unwanted)
         (stage / 'workspace/AGENTS.md').write_text(unwanted)
         (stage / 'workspace/.codex').mkdir()

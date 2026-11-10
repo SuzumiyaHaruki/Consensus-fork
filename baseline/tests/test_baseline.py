@@ -35,7 +35,7 @@ class BaselineTests(unittest.TestCase):
         record = run.inspect(root)
         self.assertEqual(record['condition'], run.CONDITION)
         self.assertIsNone(record['settings']['timeout_seconds'])
-        self.assertEqual(record['input_files'], ['AGENTS.md', 'TASK.md', 'protocol.md', 'system.md'])
+        self.assertEqual(record['input_files'], ['IMPLEMENTATION.md', 'TASK.md', 'protocol.md', 'system.md'])
         self.assertEqual(set(p.name for p in (root/'workspace').glob('*.md')), set(run.INPUTS))
         for name in run.INPUTS:
             self.assertEqual((root/'inputs'/name).read_bytes(), (self.root/'inputs'/name).read_bytes())

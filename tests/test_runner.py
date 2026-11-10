@@ -110,7 +110,7 @@ class RunnerTests(unittest.TestCase):
         self.assertFalse(Path(env['CODEX_HOME']).exists())
         self.assertFalse(list(run.glob('.client-*')))
         config = read_json(run / 'client-settings.json')
-        self.assertEqual(config['developer_instructions'], (self.inputs / 'AGENTS.md').read_text())
+        self.assertEqual(config['developer_instructions'], (self.inputs / 'IMPLEMENTATION.md').read_text())
         self.assertEqual(config['project_doc_max_bytes'], 0)
 
     def test_no_stage_deadline_completes_and_keeps_action_timeout(self):

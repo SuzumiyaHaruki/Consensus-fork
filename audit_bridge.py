@@ -29,7 +29,7 @@ def export(workspace, destination):
         if relative.is_absolute() or '..' in relative.parts:
             raise ValueError('Unsafe candidate path')
         path = workspace / relative
-        if (set(relative.parts) & excluded_dirs or path.name in {'AGENTS.md', 'SKILL.md', 'TASK.md'}
+        if (set(relative.parts) & excluded_dirs or path.name in {'AGENTS.md', 'IMPLEMENTATION.md', 'SKILL.md', 'TASK.md'}
                 or path.suffix in {'.test', '.pyc'} or path.name == 'coverage.out'):
             excluded[name] = 'instructions, feedback, or transient output'
             continue

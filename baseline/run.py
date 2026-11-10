@@ -16,7 +16,7 @@ sys.path.insert(0, str(PROJECT))
 from generator.config import settings_from_dict
 from generator import runner
 
-INPUTS = ('AGENTS.md', 'TASK.md', 'protocol.md', 'system.md')
+INPUTS = ('IMPLEMENTATION.md', 'TASK.md', 'protocol.md', 'system.md')
 CONDITION = 'native-codex-system-generation'
 OPTIONS = {'model', 'reasoning_effort', 'timeout_seconds', 'action_seconds', 'codex'}
 
@@ -48,7 +48,7 @@ def prepare(settings, label='sol-high-generation'):
               'created_at': runner.utc_now(), 'settings': settings.to_dict(),
               'workspace': str(root/'workspace'), 'input_files': list(INPUTS),
               'environment': {'mode': 'host', 'read_isolation': False, 'user_config': 'private',
-                  'user_instructions_and_skills': 'disabled', 'project_instructions': 'explicit inputs/AGENTS.md',
+                  'user_instructions_and_skills': 'disabled', 'project_instructions': 'explicit inputs/IMPLEMENTATION.md',
                   'sandbox': 'workspace-write', 'approval_policy': 'never',
                   'shared_daemon': False, 'subagents': 'native_allowed'}}
     runner.write_json(root/'run.json', record)

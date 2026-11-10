@@ -18,7 +18,7 @@ class Client:
             raise FileNotFoundError('Codex CLI is unavailable: ' + settings.codex)
         if settings.profile:
             raise ValueError('Host Codex profiles are not supported by isolated generation')
-        instructions = (stage / 'inputs/AGENTS.md').read_text()
+        instructions = (stage / 'inputs/IMPLEMENTATION.md').read_text()
         self.private = tempfile.TemporaryDirectory(prefix='.client-', dir=stage)
         self.home = Path(self.private.name)
         self.client_home = self.home / 'codex'

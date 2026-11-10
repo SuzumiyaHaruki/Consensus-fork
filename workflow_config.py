@@ -22,10 +22,8 @@ class WorkflowSettings:
     repair_prompt: str = str(ROOT / 'inputs/REPAIR.md')
     review_prompt: str = str(ROOT / 'inputs/VERIFY.md')
     output_root: str = str(ROOT / 'experiments')
-    initial_audit_seconds: float = 3600
-    audit_seconds: float = 1800
-    verification_seconds: float = 1800
-    repair_verification_seconds: float = 900
+    audit_seconds: float = 3600
+    repair_verification_seconds: float = 1800
     audit_turn_seconds: float = 900
     action_seconds: float = 300
     audit_calls: int = 20
@@ -42,9 +40,6 @@ def from_dict(values, base):
     if unknown:
         raise ValueError('Unknown workflow settings: ' + ', '.join(sorted(unknown)))
     merged = WorkflowSettings().to_dict() | values
-    # Older saved experiments used audit_seconds for the first audit too.
-    if 'initial_audit_seconds' not in values and 'audit_seconds' in values:
-        merged['initial_audit_seconds'] = values['audit_seconds']
     for key, value in merged.items():
         if key.endswith('_seconds'):
             if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value <= 0:

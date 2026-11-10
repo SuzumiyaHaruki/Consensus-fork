@@ -9,7 +9,7 @@ baseline/
   run.py                 独立的 prepare/run/execute/inspect/doctor 入口
   config.json            本条件的模型与时间配置
   inputs/
-    AGENTS.md            工作范围、权限、委派和测试目录要求
+    IMPLEMENTATION.md    工作范围、权限、委派和测试目录要求
     TASK.md              自主实现、自测和交付任务
     protocol.md          与主流程相同的协议规范及内嵌伪代码
     system.md            与主流程相同的服务、运行时能力和交付目标

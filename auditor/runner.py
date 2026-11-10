@@ -107,12 +107,12 @@ def capture_source(repo, destination, deadline):
         if path.is_absolute() or ".." in path.parts:
             raise ValueError("Unsafe Git tree path")
         if (mode == '160000' and not (set(path.parts) & EXCLUDED)
-                and path.name not in {'AGENTS.md', 'SKILL.md'}):
+                and path.name not in {'AGENTS.md', 'IMPLEMENTATION.md', 'SKILL.md'}):
             nested = capture_source(repo/path, destination/path, deadline)
             files.update({str(path/key):value for key,value in nested['files'].items()})
             excluded.update({str(path/key):value for key,value in nested['excluded'].items()})
             continue
-        if (set(path.parts) & EXCLUDED or path.name in {"AGENTS.md", "SKILL.md"}
+        if (set(path.parts) & EXCLUDED or path.name in {"AGENTS.md", "IMPLEMENTATION.md", "SKILL.md"}
                 or mode not in {"100644", "100755"} or kind != "blob"):
             excluded[name] = "instruction, private, excluded directory, link, or submodule"
         else:

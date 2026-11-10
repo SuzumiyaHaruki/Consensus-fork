@@ -1,6 +1,6 @@
 # Working on Consensus Forge
 
-This project connects native Codex generation and repair in `generator/` with the local `auditor/` fork of the consensus-assurance ordinary audit. The root workflow coordinates these stages and their evidence handoffs. Candidate instructions live in `inputs/AGENTS.md`; this file is not copied into candidate workspaces. Audit instructions live in `inputs/AUDIT.md`.
+This project connects native Codex generation and repair in `generator/` with the local `auditor/` fork of the consensus-assurance ordinary audit. The root workflow coordinates these stages and their evidence handoffs. Candidate instructions live in `inputs/IMPLEMENTATION.md`; this file is not copied into candidate workspaces. Audit instructions live in `inputs/AUDIT.md`.
 
 Shared execution, toolchain, log redaction and evidence support live in `runtime/`. Generator and auditor depend on runtime; runtime must not import either agent role. Keep private auditor authentication and role-specific session policies in `auditor/`.
 

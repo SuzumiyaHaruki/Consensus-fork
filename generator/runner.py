@@ -25,7 +25,7 @@ __version__ = "0.2.0"
 
 
 REQUIRED_INPUTS = (
-    "AGENTS.md", "TASK.md", "protocol.md", "system.md",
+    "IMPLEMENTATION.md", "TASK.md", "protocol.md", "system.md",
 )
 
 
@@ -116,7 +116,7 @@ def prepare(settings: Settings, label: str = "native") -> Path:
         "environment": {
             "mode": "host", "read_isolation": False,
             "user_config": "private", "user_instructions_and_skills": "disabled",
-            "project_instructions": "explicit inputs/AGENTS.md",
+            "project_instructions": "explicit inputs/IMPLEMENTATION.md",
             "sandbox": "workspace-write", "approval_policy": "never",
             "shared_daemon": False,
             "subagents": "native_allowed",

@@ -1,6 +1,6 @@
 # 系统与协议的待讨论问题
 
-本文件供研究者讨论，不作为实验 agent 的额外提示词。当前具体要求以 [protocol.md](../inputs/protocol.md) 和 [system.md](../inputs/system.md) 为准。这里只保留对当前混合 EPaxos 和实验方法仍有意义的问题；已退出本轮设计的检查点、跨 epoch 和旧同步协议剪枝讨论不再维护。列为待讨论不代表已经发现错误，也不授权 agent 在实验过程中修改给定设计。具体实现问题及证据见 [最近一次对比报告](comparison-20261110.md)。
+本文件供研究者讨论，不作为实验 agent 的额外提示词。当前具体要求以 [protocol.md](../inputs/protocol.md) 和 [system.md](../inputs/system.md) 为准。这里只保留对当前混合 EPaxos 和实验方法仍有意义的问题；已退出本轮设计的检查点、跨 epoch 和旧同步协议剪枝讨论不再维护。列为待讨论不代表已经发现错误，也不授权 agent 在实验过程中修改给定设计。具体实现问题及证据见 [最近一次评测报告](exploratory-1110.md)。
 
 ## 1. 每个阶段新建 agent，还是复用已有会话
 

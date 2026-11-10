@@ -50,8 +50,10 @@ def prepare_handoff(audit_run, candidate, destination, *, allow_partial=False):
         raise ValueError('Audit source commit does not match candidate')
     completed = [turn for turn in record['turns'] if turn['status'] == 'completed']
     last_completed = max((turn['number'] for turn in completed), default=0)
-    partial = allow_partial and record['stop'] == 'external_error' and bool(record['turns'])
     report_ref = record.get('last_completed_report')
+    partial = allow_partial and bool(record['turns']) and (
+        record['stop'] == 'external_error'
+        or record['stop'] == 'turn_timeout' and (not completed or not report_ref))
     if not partial and (not completed or not report_ref):
         raise ValueError('Audit has no completed report; partial work remains in the original audit run')
     last = max(turn['number'] for turn in record['turns']) if partial else last_completed

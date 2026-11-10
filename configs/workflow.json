@@ -9,13 +9,11 @@
   "inputs_dir": "../inputs",
   "repair_prompt": "../inputs/REPAIR.md",
   "output_root": "../experiments",
-  "initial_audit_seconds": 3600,
-  "audit_seconds": 1800,
-  "verification_seconds": 1800,
+  "audit_seconds": 3600,
   "audit_turn_seconds": 900,
   "action_seconds": 300,
   "audit_calls": 20,
   "max_repairs": 3,
   "review_prompt": "../inputs/VERIFY.md",
-  "repair_verification_seconds": 900
+  "repair_verification_seconds": 1800
 }

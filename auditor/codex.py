@@ -119,7 +119,7 @@ def decode(folder, result, session_id=None):
                   for e in events if isinstance(e.get("item", {}), dict))
     errors = [(n, e) for n, e in enumerate(events) if e.get('type') in {'turn.failed', 'error'}]
     recovered_transport = bool(errors) and all(e.get('type') == 'error' and re.fullmatch(
-        r'Reconnecting\.\.\. \d+/\d+ \(stream disconnected before completion: tls handshake eof\)',
+        r'Reconnecting\.\.\. \d+/\d+ \((?:stream disconnected before completion: tls handshake eof|Connection failed: error sending request)\)',
         str(e.get('message', ''))) for _, e in errors) and any(
             e.get('type') == 'item.completed' and isinstance(e.get('item'), dict) and e['item'].get('type') in
             {'command_execution', 'file_change', 'mcp_tool_call'} for e in events[errors[-1][0] + 1:])
