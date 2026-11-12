@@ -437,6 +437,8 @@ execHi[R] 是最大的 i，使得 R.1 到 R.i 都已在本地执行，初始为 
 
 未知编号须取回命令后判断是否冲突，不能因超时就认定不存在或无冲突。不冲突的命令无需等待其决定或执行。依赖成环时，按强连通分量（SCC）执行，无须先单独执行环内的依赖目标。
 
+就绪且彼此没有依赖关系的 SCC 可以并行执行；状态变化和每条命令的返回结果须等价于遵守依赖关系及 SCC 内规定顺序的串行执行。共享应用状态、去重记录和执行元数据的同步方式由实现端选择。
+
 ```text
 upon a decided instance x needs execution do:
     expand its unexecuted dependency closure using the table above
@@ -444,23 +446,28 @@ upon a decided instance x needs execution do:
     announce NeedRecover for known but undecided instances
 
 upon a dependency closure is fully known and all its unexecuted instances are decided do:
-    for each SCC C in dependency-first order:
-        atomic, serialized with other component executions:
-            if C is already executed:
-                continue to the next component
-            for x in C sorted by (final seq, instance ID):
-                rid ← x.cmd.rid
-                require existing rid bindings agree with x.cmd
-                if rid is in executedRequests:
-                    prepare ALREADY_EXECUTED for current waiters
-                else:
-                    response ← apply(x.cmd)
-                    executedRequests[rid] ← x.cmd
-                    prepare response for current waiters
-            publish all of C's executed flags together
-            advance each replica's contiguous execHi
-            release this replica's slots for C exactly once
-        send replies under section 8.3
+    register its SCCs and schedule those whose external dependencies have executed
+
+upon an SCC C is ready for execution do:
+    atomic:
+        if any instance in C is already executing or executed:
+            stop this execution task
+        mark C's instances as executing
+    for x in C sorted by (final seq, instance ID):
+        rid ← x.cmd.rid
+        require existing rid bindings agree with x.cmd
+        if rid is in executedRequests:
+            prepare ALREADY_EXECUTED for current waiters
+        else:
+            response ← apply(x.cmd)
+            executedRequests[rid] ← x.cmd
+            prepare response for current waiters
+    atomic:
+        publish all of C's executed flags together
+        advance each replica's contiguous execHi
+        release this replica's slots for C exactly once
+    schedule newly ready dependent SCCs
+    send replies under section 8.3
 ```
 
 ### 6.3 最终恢复者 Omega

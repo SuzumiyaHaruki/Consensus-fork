@@ -437,6 +437,8 @@ execHi[R] is the largest i such that R.1 through R.i have all executed locally, 
 
 Fetch commands at unknown positions before determining conflicts; a timeout does not establish nonexistence or lack of conflict. Nonconflicting commands need not be decided or executed before proceeding. Execute cycles as strongly connected components (SCCs), without requiring a dependency inside the same SCC to execute separately first.
 
+Independent ready SCCs may execute in parallel; state changes and each command's result must be equivalent to a serial execution respecting dependencies and the prescribed order within each SCC. The implementation chooses how to synchronize shared application state, deduplication records and execution metadata.
+
 ```text
 upon a decided instance x needs execution do:
     expand its unexecuted dependency closure using the table above
@@ -444,23 +446,28 @@ upon a decided instance x needs execution do:
     announce NeedRecover for known but undecided instances
 
 upon a dependency closure is fully known and all its unexecuted instances are decided do:
-    for each SCC C in dependency-first order:
-        atomic, serialized with other component executions:
-            if C is already executed:
-                continue to the next component
-            for x in C sorted by (final seq, instance ID):
-                rid ← x.cmd.rid
-                require existing rid bindings agree with x.cmd
-                if rid is in executedRequests:
-                    prepare ALREADY_EXECUTED for current waiters
-                else:
-                    response ← apply(x.cmd)
-                    executedRequests[rid] ← x.cmd
-                    prepare response for current waiters
-            publish all of C's executed flags together
-            advance each replica's contiguous execHi
-            release this replica's slots for C exactly once
-        send replies under section 8.3
+    register its SCCs and schedule those whose external dependencies have executed
+
+upon an SCC C is ready for execution do:
+    atomic:
+        if any instance in C is already executing or executed:
+            stop this execution task
+        mark C's instances as executing
+    for x in C sorted by (final seq, instance ID):
+        rid ← x.cmd.rid
+        require existing rid bindings agree with x.cmd
+        if rid is in executedRequests:
+            prepare ALREADY_EXECUTED for current waiters
+        else:
+            response ← apply(x.cmd)
+            executedRequests[rid] ← x.cmd
+            prepare response for current waiters
+    atomic:
+        publish all of C's executed flags together
+        advance each replica's contiguous execHi
+        release this replica's slots for C exactly once
+    schedule newly ready dependent SCCs
+    send replies under section 8.3
 ```
 
 ### 6.3 Eventual recovery coordinator Omega

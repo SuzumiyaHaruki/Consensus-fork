@@ -22,6 +22,8 @@ Determine request completion from execution records, not the presence of a resul
 
 After starting, Node makes progress autonomously using real time. Support multiple replicas receiving client requests concurrently and multiple consensus instances progressing concurrently within each replica, including protocol message handling, timers and application execution. Subject to dependency ordering, atomicity and admission limits, when one instance waits for network replies or missing data, other instances and background tasks that can make progress must continue. Transport must be replaceable, and the consensus component must be able to run without sockets.
 
+Support a configurable upper bound on task parallelism within each replica. With sufficient CPU resources and where the protocol permits, a replica must be able to process consensus work for different instances in parallel on multiple CPU cores along ordinary request paths, including protocol-message processing at the same stage. Necessary shared-state operations may be serialized; preserve the protocol's required atomicity, ordering and dependencies. Choose the task partitioning and synchronization mechanisms yourself.
+
 Choose queues, threads, locks, task lifecycles, retries, caches and evidence retrieval mechanisms while preserving the protocol's atomic transitions, current authority checks and fair progress. Support node shutdown and limiting new requests under overload; explain how these operations handle requests before and after admission.
 
 Within an explicit trusted-cluster boundary, associate configured member identities with actual message sources and preserve identities and payloads through encoding. Do not simply trust unchecked member fields in messages. Explain how actual timing and sending mechanisms correspond to protocol.md's window and heartbeat assumptions; naming an event a local enqueue or function return does not establish those assumptions. State operating conditions and locally detectable violations without treating them as a proof of the global window assumption.
@@ -32,7 +34,9 @@ Provide interfaces for controlling and observing time, message delivery and rele
 
 Implement conflict queries, dependency expansion and data retention according to protocol.md. Use suitable indexes for ordinary conflict queries rather than scanning the entire history each time. Reuse available data and completed checks, reduce duplicate transfers and tasks, and release temporary state once no longer needed. Bound queued and concurrent work while keeping background tasks progressing.
 
-Provide actual measurements of throughput, latency and resource usage as request concurrency increases; choose the workloads and test methods yourself.
+Measure throughput, latency and resource usage as consensus concurrency increases: count active, undecided instances across the system, not client requests awaiting replies. Distinguish target concurrency from observed concurrency; choose the workloads and test methods yourself.
+
+Check intra-replica parallelism through ordinary Node processing paths. Identify which main protocol-processing steps can execute simultaneously, which remain serial and why. Measure throughput, latency and replica CPU usage under comparable workloads with different parallelism settings. Worker counts, parallel transport or auxiliary preparation alone, task overlap at test barriers, and speedups across replicas do not by themselves establish intra-replica consensus parallelism.
 
 Explain how the time, communication and memory costs of ordinary requests, dependency expansion and missing-data retrieval change with history size, and how resource limits affect admitted requests. The crash-stop model allows surviving replicas to keep data in memory; disk support for restarting after a crash is not required.
 
