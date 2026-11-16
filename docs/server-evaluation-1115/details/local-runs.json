@@ -1,0 +1,48 @@
+{
+  "go": "go1.25.8",
+  "available_logical_cpus": 8,
+  "GOMAXPROCS": 20,
+  "package": "/home/nitro/Desktop/consensus-server-evaluation-1111/implementations/v003",
+  "flags": [
+    "-p=1",
+    "-race",
+    "./tests",
+    "-run",
+    "^TestRepairCrossTaskNack$",
+    "-v"
+  ],
+  "runs": [
+    {
+      "log": "local-nack-repeat.log",
+      "overlay": null,
+      "count": 10,
+      "passed": 8,
+      "failed": 2,
+      "exit_code": 1
+    },
+    {
+      "log": "local-nack-wait250.log",
+      "overlay": "diagnostic-wait250-overlay.json",
+      "count": 10,
+      "passed": 10,
+      "failed": 0,
+      "exit_code": 0
+    },
+    {
+      "log": "local-nack-diagnostic.log",
+      "overlay": "diagnostic-overlay.json",
+      "count": 20,
+      "passed": 17,
+      "failed": 3,
+      "exit_code": 1
+    },
+    {
+      "log": "local-nack-ordered.log",
+      "overlay": "diagnostic-ordered-overlay.json",
+      "count": 10,
+      "passed": 10,
+      "failed": 0,
+      "exit_code": 0
+    }
+  ]
+}

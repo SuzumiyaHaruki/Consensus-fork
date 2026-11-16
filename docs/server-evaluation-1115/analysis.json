@@ -1,0 +1,603 @@
+{
+  "planned": 6140,
+  "completed": 6140,
+  "job_elapsed_hours": 47.08965766933229,
+  "versions": {
+    "baseline": {
+      "performance_tasks": 1515,
+      "nonsuccess_tasks": 325,
+      "missing_decision_tasks": 158,
+      "issued": 10323573.0,
+      "successful_replies": 10280822.0,
+      "unknown": 33885.0,
+      "incomplete": 8866.0,
+      "other_replies": 42751.0,
+      "missing_decisions_after_drain": 12020.0,
+      "cpu": {
+        "1c1t-g1": {
+          "tasks": 505,
+          "nonsuccess_tasks": 136,
+          "missing_decision_tasks": 77,
+          "unknown": 14269.0,
+          "incomplete": 3759.0,
+          "other_replies": 18028.0,
+          "missing_decisions_after_drain": 5722.0
+        },
+        "2c2t-g2": {
+          "tasks": 505,
+          "nonsuccess_tasks": 98,
+          "missing_decision_tasks": 33,
+          "unknown": 10749.0,
+          "incomplete": 1772.0,
+          "other_replies": 12521.0,
+          "missing_decisions_after_drain": 2721.0
+        },
+        "2c4t-g4": {
+          "tasks": 505,
+          "nonsuccess_tasks": 91,
+          "missing_decision_tasks": 48,
+          "unknown": 8867.0,
+          "incomplete": 3335.0,
+          "other_replies": 12202.0,
+          "missing_decisions_after_drain": 3577.0
+        }
+      },
+      "groups": {
+        "native": {
+          "passed": 5
+        },
+        "correctness": {
+          "passed": 345,
+          "observed_failure": 15
+        },
+        "performance": {
+          "measured": 1515
+        },
+        "history": {
+          "measured": 120,
+          "passed": 15,
+          "observed_failure": 30
+        }
+      },
+      "uncompleted_history": {
+        "cold": 30,
+        "pending": 5
+      }
+    },
+    "v000": {
+      "performance_tasks": 1515,
+      "nonsuccess_tasks": 115,
+      "missing_decision_tasks": 103,
+      "issued": 44704843.0,
+      "successful_replies": 44678930.0,
+      "unknown": 25323.0,
+      "incomplete": 590.0,
+      "other_replies": 25913.0,
+      "missing_decisions_after_drain": 5119.0,
+      "cpu": {
+        "1c1t-g1": {
+          "tasks": 505,
+          "nonsuccess_tasks": 43,
+          "missing_decision_tasks": 42,
+          "unknown": 9390.0,
+          "incomplete": 179.0,
+          "other_replies": 9569.0,
+          "missing_decisions_after_drain": 2083.0
+        },
+        "2c2t-g2": {
+          "tasks": 505,
+          "nonsuccess_tasks": 35,
+          "missing_decision_tasks": 24,
+          "unknown": 6950.0,
+          "incomplete": 179.0,
+          "other_replies": 7129.0,
+          "missing_decisions_after_drain": 1210.0
+        },
+        "2c4t-g4": {
+          "tasks": 505,
+          "nonsuccess_tasks": 37,
+          "missing_decision_tasks": 37,
+          "unknown": 8983.0,
+          "incomplete": 232.0,
+          "other_replies": 9215.0,
+          "missing_decisions_after_drain": 1826.0
+        }
+      },
+      "groups": {
+        "native": {
+          "passed": 5
+        },
+        "correctness": {
+          "passed": 360
+        },
+        "performance": {
+          "measured": 1515
+        },
+        "history": {
+          "measured": 120,
+          "passed": 45
+        }
+      },
+      "uncompleted_history": {
+        "cold": 0,
+        "pending": 30
+      }
+    },
+    "v003": {
+      "performance_tasks": 1515,
+      "nonsuccess_tasks": 133,
+      "missing_decision_tasks": 68,
+      "issued": 40826537.0,
+      "successful_replies": 40799796.0,
+      "unknown": 23524.0,
+      "incomplete": 3217.0,
+      "other_replies": 26741.0,
+      "missing_decisions_after_drain": 3403.0,
+      "cpu": {
+        "1c1t-g1": {
+          "tasks": 505,
+          "nonsuccess_tasks": 80,
+          "missing_decision_tasks": 35,
+          "unknown": 14058.0,
+          "incomplete": 3083.0,
+          "other_replies": 17141.0,
+          "missing_decisions_after_drain": 1457.0
+        },
+        "2c2t-g2": {
+          "tasks": 505,
+          "nonsuccess_tasks": 23,
+          "missing_decision_tasks": 16,
+          "unknown": 3345.0,
+          "incomplete": 2.0,
+          "other_replies": 3347.0,
+          "missing_decisions_after_drain": 964.0
+        },
+        "2c4t-g4": {
+          "tasks": 505,
+          "nonsuccess_tasks": 30,
+          "missing_decision_tasks": 17,
+          "unknown": 6121.0,
+          "incomplete": 132.0,
+          "other_replies": 6253.0,
+          "missing_decisions_after_drain": 982.0
+        }
+      },
+      "groups": {
+        "native": {
+          "passed": 9,
+          "observed_failure": 1
+        },
+        "correctness": {
+          "passed": 360
+        },
+        "performance": {
+          "measured": 1515
+        },
+        "history": {
+          "measured": 120,
+          "passed": 45
+        }
+      },
+      "uncompleted_history": {
+        "cold": 0,
+        "pending": 30
+      }
+    }
+  },
+  "failed_jobs": [
+    {
+      "job": "0011-v003-original-suites-native-r4",
+      "version": "v003",
+      "case": "original-suites",
+      "cpu_layout": "native",
+      "repeat": "4",
+      "status": "observed_failure",
+      "path": "jobs/0011-v003-original-suites-native-r4/result.json"
+    },
+    {
+      "job": "0286-baseline-overload-2c4t-g4-r1",
+      "version": "baseline",
+      "case": "overload",
+      "cpu_layout": "2c4t-g4",
+      "repeat": "1",
+      "status": "observed_failure",
+      "path": "jobs/0286-baseline-overload-2c4t-g4-r1/result.json"
+    },
+    {
+      "job": "0289-baseline-overload-2c2t-g2-r1",
+      "version": "baseline",
+      "case": "overload",
+      "cpu_layout": "2c2t-g2",
+      "repeat": "1",
+      "status": "observed_failure",
+      "path": "jobs/0289-baseline-overload-2c2t-g2-r1/result.json"
+    },
+    {
+      "job": "0292-baseline-overload-1c1t-g1-r1",
+      "version": "baseline",
+      "case": "overload",
+      "cpu_layout": "1c1t-g1",
+      "repeat": "1",
+      "status": "observed_failure",
+      "path": "jobs/0292-baseline-overload-1c1t-g1-r1/result.json"
+    },
+    {
+      "job": "0297-baseline-overload-2c2t-g2-r2",
+      "version": "baseline",
+      "case": "overload",
+      "cpu_layout": "2c2t-g2",
+      "repeat": "2",
+      "status": "observed_failure",
+      "path": "jobs/0297-baseline-overload-2c2t-g2-r2/result.json"
+    },
+    {
+      "job": "0300-baseline-overload-1c1t-g1-r2",
+      "version": "baseline",
+      "case": "overload",
+      "cpu_layout": "1c1t-g1",
+      "repeat": "2",
+      "status": "observed_failure",
+      "path": "jobs/0300-baseline-overload-1c1t-g1-r2/result.json"
+    },
+    {
+      "job": "0303-baseline-overload-2c4t-g4-r2",
+      "version": "baseline",
+      "case": "overload",
+      "cpu_layout": "2c4t-g4",
+      "repeat": "2",
+      "status": "observed_failure",
+      "path": "jobs/0303-baseline-overload-2c4t-g4-r2/result.json"
+    },
+    {
+      "job": "0305-baseline-overload-1c1t-g1-r3",
+      "version": "baseline",
+      "case": "overload",
+      "cpu_layout": "1c1t-g1",
+      "repeat": "3",
+      "status": "observed_failure",
+      "path": "jobs/0305-baseline-overload-1c1t-g1-r3/result.json"
+    },
+    {
+      "job": "0308-baseline-overload-2c4t-g4-r3",
+      "version": "baseline",
+      "case": "overload",
+      "cpu_layout": "2c4t-g4",
+      "repeat": "3",
+      "status": "observed_failure",
+      "path": "jobs/0308-baseline-overload-2c4t-g4-r3/result.json"
+    },
+    {
+      "job": "0311-baseline-overload-2c2t-g2-r3",
+      "version": "baseline",
+      "case": "overload",
+      "cpu_layout": "2c2t-g2",
+      "repeat": "3",
+      "status": "observed_failure",
+      "path": "jobs/0311-baseline-overload-2c2t-g2-r3/result.json"
+    },
+    {
+      "job": "0313-baseline-overload-2c4t-g4-r4",
+      "version": "baseline",
+      "case": "overload",
+      "cpu_layout": "2c4t-g4",
+      "repeat": "4",
+      "status": "observed_failure",
+      "path": "jobs/0313-baseline-overload-2c4t-g4-r4/result.json"
+    },
+    {
+      "job": "0316-baseline-overload-2c2t-g2-r4",
+      "version": "baseline",
+      "case": "overload",
+      "cpu_layout": "2c2t-g2",
+      "repeat": "4",
+      "status": "observed_failure",
+      "path": "jobs/0316-baseline-overload-2c2t-g2-r4/result.json"
+    },
+    {
+      "job": "0319-baseline-overload-1c1t-g1-r4",
+      "version": "baseline",
+      "case": "overload",
+      "cpu_layout": "1c1t-g1",
+      "repeat": "4",
+      "status": "observed_failure",
+      "path": "jobs/0319-baseline-overload-1c1t-g1-r4/result.json"
+    },
+    {
+      "job": "0324-baseline-overload-2c2t-g2-r5",
+      "version": "baseline",
+      "case": "overload",
+      "cpu_layout": "2c2t-g2",
+      "repeat": "5",
+      "status": "observed_failure",
+      "path": "jobs/0324-baseline-overload-2c2t-g2-r5/result.json"
+    },
+    {
+      "job": "0327-baseline-overload-1c1t-g1-r5",
+      "version": "baseline",
+      "case": "overload",
+      "cpu_layout": "1c1t-g1",
+      "repeat": "5",
+      "status": "observed_failure",
+      "path": "jobs/0327-baseline-overload-1c1t-g1-r5/result.json"
+    },
+    {
+      "job": "0330-baseline-overload-2c4t-g4-r5",
+      "version": "baseline",
+      "case": "overload",
+      "cpu_layout": "2c4t-g4",
+      "repeat": "5",
+      "status": "observed_failure",
+      "path": "jobs/0330-baseline-overload-2c4t-g4-r5/result.json"
+    },
+    {
+      "job": "5958-baseline-cold-h1000-2c2t-g2-r1",
+      "version": "baseline",
+      "case": "cold-h1000",
+      "cpu_layout": "2c2t-g2",
+      "repeat": "1",
+      "status": "observed_failure",
+      "path": "jobs/5958-baseline-cold-h1000-2c2t-g2-r1/result.json"
+    },
+    {
+      "job": "5961-baseline-cold-h1000-2c4t-g4-r1",
+      "version": "baseline",
+      "case": "cold-h1000",
+      "cpu_layout": "2c4t-g4",
+      "repeat": "1",
+      "status": "observed_failure",
+      "path": "jobs/5961-baseline-cold-h1000-2c4t-g4-r1/result.json"
+    },
+    {
+      "job": "5964-baseline-cold-h1000-1c1t-g1-r1",
+      "version": "baseline",
+      "case": "cold-h1000",
+      "cpu_layout": "1c1t-g1",
+      "repeat": "1",
+      "status": "observed_failure",
+      "path": "jobs/5964-baseline-cold-h1000-1c1t-g1-r1/result.json"
+    },
+    {
+      "job": "5966-baseline-cold-h1000-2c4t-g4-r2",
+      "version": "baseline",
+      "case": "cold-h1000",
+      "cpu_layout": "2c4t-g4",
+      "repeat": "2",
+      "status": "observed_failure",
+      "path": "jobs/5966-baseline-cold-h1000-2c4t-g4-r2/result.json"
+    },
+    {
+      "job": "5969-baseline-cold-h1000-1c1t-g1-r2",
+      "version": "baseline",
+      "case": "cold-h1000",
+      "cpu_layout": "1c1t-g1",
+      "repeat": "2",
+      "status": "observed_failure",
+      "path": "jobs/5969-baseline-cold-h1000-1c1t-g1-r2/result.json"
+    },
+    {
+      "job": "5972-baseline-cold-h1000-2c2t-g2-r2",
+      "version": "baseline",
+      "case": "cold-h1000",
+      "cpu_layout": "2c2t-g2",
+      "repeat": "2",
+      "status": "observed_failure",
+      "path": "jobs/5972-baseline-cold-h1000-2c2t-g2-r2/result.json"
+    },
+    {
+      "job": "5974-baseline-cold-h1000-1c1t-g1-r3",
+      "version": "baseline",
+      "case": "cold-h1000",
+      "cpu_layout": "1c1t-g1",
+      "repeat": "3",
+      "status": "observed_failure",
+      "path": "jobs/5974-baseline-cold-h1000-1c1t-g1-r3/result.json"
+    },
+    {
+      "job": "5977-baseline-cold-h1000-2c2t-g2-r3",
+      "version": "baseline",
+      "case": "cold-h1000",
+      "cpu_layout": "2c2t-g2",
+      "repeat": "3",
+      "status": "observed_failure",
+      "path": "jobs/5977-baseline-cold-h1000-2c2t-g2-r3/result.json"
+    },
+    {
+      "job": "5980-baseline-cold-h1000-2c4t-g4-r3",
+      "version": "baseline",
+      "case": "cold-h1000",
+      "cpu_layout": "2c4t-g4",
+      "repeat": "3",
+      "status": "observed_failure",
+      "path": "jobs/5980-baseline-cold-h1000-2c4t-g4-r3/result.json"
+    },
+    {
+      "job": "5985-baseline-cold-h1000-2c2t-g2-r4",
+      "version": "baseline",
+      "case": "cold-h1000",
+      "cpu_layout": "2c2t-g2",
+      "repeat": "4",
+      "status": "observed_failure",
+      "path": "jobs/5985-baseline-cold-h1000-2c2t-g2-r4/result.json"
+    },
+    {
+      "job": "5988-baseline-cold-h1000-2c4t-g4-r4",
+      "version": "baseline",
+      "case": "cold-h1000",
+      "cpu_layout": "2c4t-g4",
+      "repeat": "4",
+      "status": "observed_failure",
+      "path": "jobs/5988-baseline-cold-h1000-2c4t-g4-r4/result.json"
+    },
+    {
+      "job": "5991-baseline-cold-h1000-1c1t-g1-r4",
+      "version": "baseline",
+      "case": "cold-h1000",
+      "cpu_layout": "1c1t-g1",
+      "repeat": "4",
+      "status": "observed_failure",
+      "path": "jobs/5991-baseline-cold-h1000-1c1t-g1-r4/result.json"
+    },
+    {
+      "job": "5993-baseline-cold-h1000-2c4t-g4-r5",
+      "version": "baseline",
+      "case": "cold-h1000",
+      "cpu_layout": "2c4t-g4",
+      "repeat": "5",
+      "status": "observed_failure",
+      "path": "jobs/5993-baseline-cold-h1000-2c4t-g4-r5/result.json"
+    },
+    {
+      "job": "5996-baseline-cold-h1000-1c1t-g1-r5",
+      "version": "baseline",
+      "case": "cold-h1000",
+      "cpu_layout": "1c1t-g1",
+      "repeat": "5",
+      "status": "observed_failure",
+      "path": "jobs/5996-baseline-cold-h1000-1c1t-g1-r5/result.json"
+    },
+    {
+      "job": "5999-baseline-cold-h1000-2c2t-g2-r5",
+      "version": "baseline",
+      "case": "cold-h1000",
+      "cpu_layout": "2c2t-g2",
+      "repeat": "5",
+      "status": "observed_failure",
+      "path": "jobs/5999-baseline-cold-h1000-2c2t-g2-r5/result.json"
+    },
+    {
+      "job": "6001-baseline-cold-h5000-2c4t-g4-r1",
+      "version": "baseline",
+      "case": "cold-h5000",
+      "cpu_layout": "2c4t-g4",
+      "repeat": "1",
+      "status": "observed_failure",
+      "path": "jobs/6001-baseline-cold-h5000-2c4t-g4-r1/result.json"
+    },
+    {
+      "job": "6004-baseline-cold-h5000-2c2t-g2-r1",
+      "version": "baseline",
+      "case": "cold-h5000",
+      "cpu_layout": "2c2t-g2",
+      "repeat": "1",
+      "status": "observed_failure",
+      "path": "jobs/6004-baseline-cold-h5000-2c2t-g2-r1/result.json"
+    },
+    {
+      "job": "6007-baseline-cold-h5000-1c1t-g1-r1",
+      "version": "baseline",
+      "case": "cold-h5000",
+      "cpu_layout": "1c1t-g1",
+      "repeat": "1",
+      "status": "observed_failure",
+      "path": "jobs/6007-baseline-cold-h5000-1c1t-g1-r1/result.json"
+    },
+    {
+      "job": "6012-baseline-cold-h5000-2c2t-g2-r2",
+      "version": "baseline",
+      "case": "cold-h5000",
+      "cpu_layout": "2c2t-g2",
+      "repeat": "2",
+      "status": "observed_failure",
+      "path": "jobs/6012-baseline-cold-h5000-2c2t-g2-r2/result.json"
+    },
+    {
+      "job": "6015-baseline-cold-h5000-1c1t-g1-r2",
+      "version": "baseline",
+      "case": "cold-h5000",
+      "cpu_layout": "1c1t-g1",
+      "repeat": "2",
+      "status": "observed_failure",
+      "path": "jobs/6015-baseline-cold-h5000-1c1t-g1-r2/result.json"
+    },
+    {
+      "job": "6018-baseline-cold-h5000-2c4t-g4-r2",
+      "version": "baseline",
+      "case": "cold-h5000",
+      "cpu_layout": "2c4t-g4",
+      "repeat": "2",
+      "status": "observed_failure",
+      "path": "jobs/6018-baseline-cold-h5000-2c4t-g4-r2/result.json"
+    },
+    {
+      "job": "6020-baseline-cold-h5000-1c1t-g1-r3",
+      "version": "baseline",
+      "case": "cold-h5000",
+      "cpu_layout": "1c1t-g1",
+      "repeat": "3",
+      "status": "observed_failure",
+      "path": "jobs/6020-baseline-cold-h5000-1c1t-g1-r3/result.json"
+    },
+    {
+      "job": "6023-baseline-cold-h5000-2c4t-g4-r3",
+      "version": "baseline",
+      "case": "cold-h5000",
+      "cpu_layout": "2c4t-g4",
+      "repeat": "3",
+      "status": "observed_failure",
+      "path": "jobs/6023-baseline-cold-h5000-2c4t-g4-r3/result.json"
+    },
+    {
+      "job": "6026-baseline-cold-h5000-2c2t-g2-r3",
+      "version": "baseline",
+      "case": "cold-h5000",
+      "cpu_layout": "2c2t-g2",
+      "repeat": "3",
+      "status": "observed_failure",
+      "path": "jobs/6026-baseline-cold-h5000-2c2t-g2-r3/result.json"
+    },
+    {
+      "job": "6028-baseline-cold-h5000-2c4t-g4-r4",
+      "version": "baseline",
+      "case": "cold-h5000",
+      "cpu_layout": "2c4t-g4",
+      "repeat": "4",
+      "status": "observed_failure",
+      "path": "jobs/6028-baseline-cold-h5000-2c4t-g4-r4/result.json"
+    },
+    {
+      "job": "6031-baseline-cold-h5000-2c2t-g2-r4",
+      "version": "baseline",
+      "case": "cold-h5000",
+      "cpu_layout": "2c2t-g2",
+      "repeat": "4",
+      "status": "observed_failure",
+      "path": "jobs/6031-baseline-cold-h5000-2c2t-g2-r4/result.json"
+    },
+    {
+      "job": "6034-baseline-cold-h5000-1c1t-g1-r4",
+      "version": "baseline",
+      "case": "cold-h5000",
+      "cpu_layout": "1c1t-g1",
+      "repeat": "4",
+      "status": "observed_failure",
+      "path": "jobs/6034-baseline-cold-h5000-1c1t-g1-r4/result.json"
+    },
+    {
+      "job": "6039-baseline-cold-h5000-2c2t-g2-r5",
+      "version": "baseline",
+      "case": "cold-h5000",
+      "cpu_layout": "2c2t-g2",
+      "repeat": "5",
+      "status": "observed_failure",
+      "path": "jobs/6039-baseline-cold-h5000-2c2t-g2-r5/result.json"
+    },
+    {
+      "job": "6042-baseline-cold-h5000-1c1t-g1-r5",
+      "version": "baseline",
+      "case": "cold-h5000",
+      "cpu_layout": "1c1t-g1",
+      "repeat": "5",
+      "status": "observed_failure",
+      "path": "jobs/6042-baseline-cold-h5000-1c1t-g1-r5/result.json"
+    },
+    {
+      "job": "6045-baseline-cold-h5000-2c4t-g4-r5",
+      "version": "baseline",
+      "case": "cold-h5000",
+      "cpu_layout": "2c4t-g4",
+      "repeat": "5",
+      "status": "observed_failure",
+      "path": "jobs/6045-baseline-cold-h5000-2c4t-g4-r5/result.json"
+    }
+  ]
+}

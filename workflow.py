@@ -87,6 +87,39 @@ def prepare(settings, label='system'):
     return root
 
 
+def branch(source_root, candidate_name, label='audit-branch'):
+    """Start one fresh audit/repair/review cycle from a retained candidate."""
+    source_root = Path(source_root).resolve()
+    if not re.fullmatch(r'v[0-9]{3,}', candidate_name):
+        raise ValueError('Candidate name must look like v002')
+    source = read_json(source_root / 'experiment.json')
+    version = int(candidate_name[1:])
+    candidate = next((c for c in source['candidates'] if c['version'] == version), None)
+    if candidate is None:
+        raise ValueError(f'No retained candidate {candidate_name}')
+    path = inside(source_root, str(Path(candidate['path']).relative_to(source_root)))
+    if candidate_commit(path) != candidate['commit']:
+        raise ValueError('Source candidate identity changed')
+    settings = from_dict(source['settings'] | {
+        'inputs_dir': str(source_root / 'inputs'), 'audit_prompt': str(source_root / 'inputs/AUDIT.md'),
+        'repair_prompt': str(source_root / 'inputs/REPAIR.md'), 'review_prompt': str(source_root / 'inputs/VERIFY.md'),
+        'max_repairs': 1}, source_root)
+    root = prepare(settings, label)
+    destination = root / 'candidates' / candidate_name
+    copy_tree(path, destination)
+    if candidate_commit(destination) != candidate['commit']:
+        raise ValueError('Copied candidate identity differs from its source')
+    initial = {k: candidate[k] for k in ('commit', 'version', 'files', 'excluded') if k in candidate}
+    initial['path'] = str(destination)
+    record = read_json(root / 'experiment.json')
+    record.update(condition='candidate-audit-repair', candidates=[initial], current_candidate=initial,
+                  origin={'experiment_dir': str(source_root), 'candidate_version': version,
+                          'candidate_commit': candidate['commit'],
+                          'scope': 'Fresh audit session; source candidate and saved inputs only. Parent audit, repair and review records are not imported.'})
+    write_json(root / 'experiment.json', record)
+    return root
+
+
 class Runtime:
     """Only these operations launch subprocesses; tests substitute offline executions."""
     def check(self, settings):
@@ -228,24 +261,38 @@ def resumable_stage(root, record):
     return entry
 
 
-def execute(root, runtime=None, *, resume=False):
+def execute(root, runtime=None, *, resume=False, handoff_generation=False):
     root = Path(root).resolve()
     runtime = runtime or Runtime()
     with exclusive_run(root):
         record = read_json(root / 'experiment.json')
+        if resume and handoff_generation:
+            raise ValueError('Choose either audit resume or generation handoff')
         resumed_entry = resumable_stage(root, record) if resume else None
-        if not resume and record['status'] != 'prepared':
+        retained_generation = None
+        if handoff_generation:
+            if (record['status'] != 'interrupted' or len(record['stages']) != 1
+                    or record['stages'][0]['kind'] != 'generation'
+                    or record['stages'][0]['status'] != 'interrupted' or record['candidates']):
+                raise ValueError('Generation handoff requires a stopped, interrupted initial generation without a candidate')
+            retained_generation = inside(root, str(Path(record['stages'][0]['path']).relative_to(root)))
+            with exclusive_run(retained_generation):
+                if read_json(retained_generation / 'run.json')['status'] != 'interrupted':
+                    raise ValueError('Generation runner has not finished saving its interruption')
+        continuing = resume or handoff_generation
+        if not continuing and record['status'] != 'prepared':
             raise ValueError('Experiment already started; prepare a fresh experiment, never overwrite retained evidence')
         settings = from_dict(record['settings'] | {'audit_prompt': str(root / 'inputs/AUDIT.md'),
                                                    'review_prompt': str(root / 'inputs/VERIFY.md')}, root)
-        issues = read_json(root / 'issues.json')['issues'] if resume else []
-        catalog = read_json(root / 'evidence-index.json')['entries'] if resume else []
-        previous_elapsed = record.get('elapsed_seconds', 0) if resume else 0
+        issues = read_json(root / 'issues.json')['issues'] if continuing else []
+        catalog = read_json(root / 'evidence-index.json')['entries'] if continuing else []
+        previous_elapsed = (record.get('elapsed_seconds') or 0) if continuing else 0
         start = time.monotonic()
-        if resume:
+        if continuing:
             record.setdefault('resumptions', []).append({
                 **{key: record.get(key) for key in ('status', 'reason', 'ended_at', 'elapsed_seconds')},
-                'resumed_at': utc_now(), 'audit_run': resumed_entry['audit_run']})
+                'resumed_at': utc_now(), 'audit_run': resumed_entry['audit_run'] if resumed_entry else None,
+                'action': 'handoff_generation' if handoff_generation else 'resume_audit'})
             for key in ('stop_reason', 'reason', 'ended_at'):
                 record.pop(key, None)
         else:
@@ -332,11 +379,25 @@ def execute(root, runtime=None, *, resume=False):
             save()
             if not record['environment']['ready']:
                 raise StopWorkflow('environment_blocked', 'Local tool/dependency checks failed; no generation started')
-            if resumed_entry:
+            if retained_generation:
+                with exclusive_run(retained_generation):
+                    note = retained_generation / 'workspace/GENERATION_HANDOFF.md'
+                    with note.open('x', encoding='utf-8') as stream:
+                        stream.write('# Initial generation handoff\n\nThe operator stopped generation before a final agent response and submitted the retained workspace for independent audit. This is a manual handoff, not an agent-completed generation. Existing code, tests and reports are retained; no additional validation was run by the controller for this handoff. Reports and measurements may describe earlier code states; check their applicability to the captured implementation.\n')
+                    record['generation_handoff'] = {'kind': 'manual', 'at': utc_now(),
+                        'source_stage': str(retained_generation), 'source_status': 'interrupted',
+                        'note': note.name, 'reason': 'Operator ended generation and requested continuation into audit.'}
+                    save()
+                    candidate = capture(retained_generation, 0)
+                repairs, number = 0, 0
+            elif resumed_entry:
                 candidate = record['current_candidate']
                 repairs = record.get('repairs_completed', 0)
                 discovery = next(stage for stage in reversed(record['stages']) if 'finding_import' in stage)
                 number = discovery['finding_import']['audit_number']
+            elif record.get('origin'):
+                candidate = record['current_candidate']
+                repairs, number = 0, 0
             else:
                 stage = run_agent('generation')
                 candidate = capture(stage, 0)
@@ -427,7 +488,7 @@ def execute(root, runtime=None, *, resume=False):
                     record['stages'][-1]['repair_claim'] = repair
                     save()
                     previous = candidate
-                    candidate = capture(stage, repairs + 1)
+                    candidate = capture(stage, previous['version'] + 1)
                     candidate['changes'] = delta(previous, candidate)
                     record['stages'][-1]['actual_changes'] = candidate['changes']
                     changed = any(candidate['changes'].values())
@@ -525,6 +586,8 @@ def inspect(root):
         if entry['status'] not in {'running', 'not_started'}:
             record_audit_progress(root, entry)
     return {'experiment_dir': str(root), 'status': record['status'],
+            'origin': record.get('origin'),
+            'generation_handoff': record.get('generation_handoff'),
             'issue_index_status': record.get('issue_index_status',
                                              'incomplete' if record['status'] == 'audit_incomplete' else 'unknown'),
             'reason': record.get('reason'), 'stop_reason': record.get('stop_reason'), 'open_issues': record.get('open_issues', []), 'elapsed_seconds': record.get('elapsed_seconds'),

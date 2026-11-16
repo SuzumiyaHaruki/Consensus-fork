@@ -1,0 +1,9 @@
+{
+  "status": "passed_observed_history",
+  "violations": [],
+  "decided_instances": 0,
+  "scc_count": 0,
+  "replicas_checked": 7,
+  "reply_entries_without_postrun_observations": [],
+  "scope": "Finite recorded histories and public state. No timing/liveness proof; GET conflict policy follows each implementation."
+}

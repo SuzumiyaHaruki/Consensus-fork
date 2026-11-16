@@ -20,6 +20,8 @@ Determine request completion from execution records, not the presence of a resul
 
 ## 3. Real runtime and testability
 
+Deploy each replica as a separate process with its own Go runtime and per-process runtime configuration, including when replicas share one host. Distinguish protocol-worker limits, process-level GOMAXPROCS and actual CPU allocation; document what each setting controls. In-process multi-Node tests can check functionality and controlled schedules, but deployment-performance conclusions require real multiprocess runs with stated resource conditions.
+
 After starting, Node makes progress autonomously using real time. Support multiple replicas receiving client requests concurrently and multiple consensus instances progressing concurrently within each replica, including protocol message handling, timers and application execution. Subject to dependency ordering, atomicity and admission limits, when one instance waits for network replies or missing data, other instances and background tasks that can make progress must continue. Transport must be replaceable, and the consensus component must be able to run without sockets.
 
 Support a configurable upper bound on task parallelism within each replica. With sufficient CPU resources and where the protocol permits, a replica must be able to process consensus work for different instances in parallel on multiple CPU cores along ordinary request paths, including protocol-message processing at the same stage. Necessary shared-state operations may be serialized; preserve the protocol's required atomicity, ordering and dependencies. Choose the task partitioning and synchronization mechanisms yourself.
@@ -34,9 +36,11 @@ Provide interfaces for controlling and observing time, message delivery and rele
 
 Implement conflict queries, dependency expansion and data retention according to protocol.md. Use suitable indexes for ordinary conflict queries rather than scanning the entire history each time. Reuse available data and completed checks, reduce duplicate transfers and tasks, and release temporary state once no longer needed. Bound queued and concurrent work while keeping background tasks progressing.
 
-Measure throughput, latency and resource usage as consensus concurrency increases: count active, undecided instances across the system, not client requests awaiting replies. Distinguish target concurrency from observed concurrency; choose the workloads and test methods yourself.
+Measure throughput, latency and resource usage as consensus concurrency increases: count admitted, undecided instances across the system, not client requests awaiting replies. Distinguish target concurrency from observed concurrency, and report actual load and resource settings; choose the workloads and test methods yourself.
 
-Check intra-replica parallelism through ordinary Node processing paths. Identify which main protocol-processing steps can execute simultaneously, which remain serial and why. Measure throughput, latency and replica CPU usage under comparable workloads with different parallelism settings. Worker counts, parallel transport or auxiliary preparation alone, task overlap at test barriers, and speedups across replicas do not by themselves establish intra-replica consensus parallelism.
+State metric units, which requests are counted and the measurement interval. Report counts by actual reply status, including successes, rejections and unknown or timed-out outcomes, plus requests still awaiting replies. After stopping new submissions, observe outstanding work for a stated interval and report what remains unfinished. When latency or a gap between target and actual concurrency needs explanation, use necessary, low-overhead observations to locate waiting before admission, before decision, before execution or before reply.
+
+Check intra-replica parallelism through ordinary Node processing paths. Identify which main protocol-processing steps can execute simultaneously, which remain serial and why. Measure throughput, latency and replica CPU usage under comparable workloads with different parallelism settings. Distinguish evidence of actual parallel processing from measured scaling, and state local resource limits. Worker counts, parallel transport or auxiliary preparation alone, task overlap at test barriers, and speedups across replicas do not by themselves establish intra-replica consensus parallelism.
 
 Explain how the time, communication and memory costs of ordinary requests, dependency expansion and missing-data retrieval change with history size, and how resource limits affect admitted requests. The crash-stop model allows surviving replicas to keep data in memory; disk support for restarting after a crash is not required.
 
@@ -45,5 +49,7 @@ Explain how the time, communication and memory costs of ordinary requests, depen
 Prefer the standard library and support offline builds. Use loopback addresses by default. Provide server and client programs that start with ordinary commands. Put automated tests in `tests/`, runnable with `go test ./...`.
 
 README must describe configuration, interfaces, service semantics, operating conditions, and commands to build, start, use and clean up a local multi-process cluster. Include a seven-member configuration example, concurrent-client usage and retries of the same request, showing the distinction between application results, duplicates and unknown outcomes.
+
+Retain runnable tests and commands actually used. Make relevant process/runtime settings, workload size, duration and random seed adjustable on another machine without rewriting test logic. Explain what was checked locally and which larger-scale measurements remain unperformed.
 
 `DESIGN.md` must describe the delivered architecture, state ownership, important interfaces and consequential choices, including timing, conflict indexes, dependency expansion, data retrieval and retention. Report actual checks, unmet requirements and known limitations; documenting a limitation does not remove a supplied requirement.

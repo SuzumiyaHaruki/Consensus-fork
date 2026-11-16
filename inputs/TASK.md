@@ -10,6 +10,6 @@ Prioritize demonstrated failures and unexplained runtime behavior over more simi
 
 ## Deliver
 
-Finish when required functionality is integrated, checks addressing important implementation risks are complete, and code, DESIGN.md and operating instructions agree. For unresolved issues, state the evidence, affected requirements and next useful check. Remove obsolete implementation plans and report actual checks and limitations.
+Finish when required functionality is integrated, checks addressing important implementation risks are complete, and code, DESIGN.md and operating instructions agree. Complete feasible local checks and deliver reusable tests for larger-scale evaluation; do not wait for access to another machine. For unresolved issues, state the evidence, affected requirements and next useful check. Remove obsolete implementation plans and report actual checks and limitations.
 
 There is no fixed generation deadline. Continue while work resolves a concrete delivery question; further imaginable scenarios alone do not require another investigation. If you cannot complete the task, explain why, identify unmet requirements and deliver the available result for independent audit. Provide ordinary startup and usage commands so the delivered programs can run without Codex or MCP.

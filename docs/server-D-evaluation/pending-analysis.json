@@ -1,0 +1,842 @@
+{
+  "planned": 45,
+  "recorded": 45,
+  "missing": [],
+  "statuses": {
+    "measured": 40,
+    "incomplete_batch": 5
+  },
+  "elapsed_hours": 1.4568112823035981,
+  "not_reached": [],
+  "observation_notes": [],
+  "groups": [
+    {
+      "case": "pending-h10000-r100",
+      "cpu": "1c1t-g1",
+      "version": "baseline",
+      "recorded": 5,
+      "planned": 5,
+      "statuses": {
+        "incomplete_batch": 5
+      },
+      "complete_batches": 0,
+      "history_complete": 0,
+      "metrics": {
+        "window_ops_s": {
+          "n": 5,
+          "median": 3.2666666666666666,
+          "min": 3.2333333333333334,
+          "max": 4.966666666666667
+        },
+        "batch_ops_s": {
+          "n": 0,
+          "median": null,
+          "min": null,
+          "max": null
+        },
+        "mean_ms": {
+          "n": 0,
+          "median": null,
+          "min": null,
+          "max": null
+        },
+        "p99_ms": {
+          "n": 0,
+          "median": null,
+          "min": null,
+          "max": null
+        },
+        "max_ms": {
+          "n": 0,
+          "median": null,
+          "min": null,
+          "max": null
+        },
+        "drain_s": {
+          "n": 0,
+          "median": null,
+          "min": null,
+          "max": null
+        },
+        "cold_read_s": {
+          "n": 0,
+          "median": null,
+          "min": null,
+          "max": null
+        },
+        "history_drain_s": {
+          "n": 0,
+          "median": null,
+          "min": null,
+          "max": null
+        },
+        "cpu_percent_sum": {
+          "n": 5,
+          "median": 270.57704077278885,
+          "min": 270.30381613696426,
+          "max": 274.20394243471526
+        },
+        "allocated_mib_s_sum": {
+          "n": 5,
+          "median": 258.1687707069766,
+          "min": 256.74093412180645,
+          "max": 266.60658178109367
+        },
+        "peak_rss_sum_mib": {
+          "n": 5,
+          "median": 647.01953125,
+          "min": 645.91796875,
+          "max": 649.72265625
+        },
+        "send_lag_p99_ms": {
+          "n": 5,
+          "median": 1.170298,
+          "min": 1.157603,
+          "max": 1.18197
+        },
+        "actual_send_rate": {
+          "n": 5,
+          "median": 100,
+          "min": 100,
+          "max": 100
+        }
+      }
+    },
+    {
+      "case": "pending-h10000-r100",
+      "cpu": "1c1t-g1",
+      "version": "v000",
+      "recorded": 5,
+      "planned": 5,
+      "statuses": {
+        "measured": 5
+      },
+      "complete_batches": 5,
+      "history_complete": 0,
+      "metrics": {
+        "window_ops_s": {
+          "n": 5,
+          "median": 100,
+          "min": 100,
+          "max": 100
+        },
+        "batch_ops_s": {
+          "n": 5,
+          "median": 100,
+          "min": 100,
+          "max": 100
+        },
+        "mean_ms": {
+          "n": 5,
+          "median": 4.457131995333336,
+          "min": 4.408224983666664,
+          "max": 4.488829866000005
+        },
+        "p99_ms": {
+          "n": 5,
+          "median": 8.637722,
+          "min": 8.347091,
+          "max": 9.078333
+        },
+        "max_ms": {
+          "n": 5,
+          "median": 30.634358,
+          "min": 27.3035,
+          "max": 31.010834
+        },
+        "drain_s": {
+          "n": 5,
+          "median": 0,
+          "min": 0,
+          "max": 0
+        },
+        "cold_read_s": {
+          "n": 0,
+          "median": null,
+          "min": null,
+          "max": null
+        },
+        "history_drain_s": {
+          "n": 0,
+          "median": null,
+          "min": null,
+          "max": null
+        },
+        "cpu_percent_sum": {
+          "n": 5,
+          "median": 228.1231960901372,
+          "min": 227.78893437257724,
+          "max": 228.49105583466965
+        },
+        "allocated_mib_s_sum": {
+          "n": 5,
+          "median": 71.49021768850523,
+          "min": 71.48941762463528,
+          "max": 71.51413618680309
+        },
+        "peak_rss_sum_mib": {
+          "n": 5,
+          "median": 617.89453125,
+          "min": 617.19140625,
+          "max": 618.3515625
+        },
+        "send_lag_p99_ms": {
+          "n": 5,
+          "median": 1.196999,
+          "min": 1.18846,
+          "max": 1.203397
+        },
+        "actual_send_rate": {
+          "n": 5,
+          "median": 100,
+          "min": 100,
+          "max": 100
+        }
+      }
+    },
+    {
+      "case": "pending-h10000-r100",
+      "cpu": "1c1t-g1",
+      "version": "v003",
+      "recorded": 5,
+      "planned": 5,
+      "statuses": {
+        "measured": 5
+      },
+      "complete_batches": 5,
+      "history_complete": 0,
+      "metrics": {
+        "window_ops_s": {
+          "n": 5,
+          "median": 100,
+          "min": 100,
+          "max": 100
+        },
+        "batch_ops_s": {
+          "n": 5,
+          "median": 100,
+          "min": 100,
+          "max": 100
+        },
+        "mean_ms": {
+          "n": 5,
+          "median": 2.5161458536666657,
+          "min": 2.503305741666664,
+          "max": 2.533527240000001
+        },
+        "p99_ms": {
+          "n": 5,
+          "median": 4.936095,
+          "min": 4.743204,
+          "max": 5.231208
+        },
+        "max_ms": {
+          "n": 5,
+          "median": 27.21582,
+          "min": 24.068579,
+          "max": 51.171782
+        },
+        "drain_s": {
+          "n": 5,
+          "median": 0,
+          "min": 0,
+          "max": 0
+        },
+        "cold_read_s": {
+          "n": 0,
+          "median": null,
+          "min": null,
+          "max": null
+        },
+        "history_drain_s": {
+          "n": 0,
+          "median": null,
+          "min": null,
+          "max": null
+        },
+        "cpu_percent_sum": {
+          "n": 5,
+          "median": 212.00440137501133,
+          "min": 211.74859776234163,
+          "max": 212.61746794117892
+        },
+        "allocated_mib_s_sum": {
+          "n": 5,
+          "median": 72.82041315631751,
+          "min": 72.8132416639381,
+          "max": 72.82403091148974
+        },
+        "peak_rss_sum_mib": {
+          "n": 5,
+          "median": 641.6484375,
+          "min": 638.35546875,
+          "max": 644.15625
+        },
+        "send_lag_p99_ms": {
+          "n": 5,
+          "median": 1.20218,
+          "min": 1.182924,
+          "max": 1.221612
+        },
+        "actual_send_rate": {
+          "n": 5,
+          "median": 100,
+          "min": 100,
+          "max": 100
+        }
+      }
+    },
+    {
+      "case": "pending-h10000-r100",
+      "cpu": "2c2t-g2",
+      "version": "baseline",
+      "recorded": 5,
+      "planned": 5,
+      "statuses": {
+        "measured": 5
+      },
+      "complete_batches": 5,
+      "history_complete": 0,
+      "metrics": {
+        "window_ops_s": {
+          "n": 5,
+          "median": 99.86666666666666,
+          "min": 99.16666666666667,
+          "max": 99.9
+        },
+        "batch_ops_s": {
+          "n": 5,
+          "median": 99.88188309435422,
+          "min": 99.10528051061908,
+          "max": 99.93153401469415
+        },
+        "mean_ms": {
+          "n": 5,
+          "median": 30.363079713666664,
+          "min": 22.35070380533331,
+          "max": 32.00344826866668
+        },
+        "p99_ms": {
+          "n": 5,
+          "median": 69.965815,
+          "min": 61.897221,
+          "max": 223.444178
+        },
+        "max_ms": {
+          "n": 5,
+          "median": 82.97957,
+          "min": 75.854915,
+          "max": 280.778922
+        },
+        "drain_s": {
+          "n": 5,
+          "median": 0.035476976,
+          "min": 0.020553868,
+          "max": 0.270839097
+        },
+        "cold_read_s": {
+          "n": 0,
+          "median": null,
+          "min": null,
+          "max": null
+        },
+        "history_drain_s": {
+          "n": 0,
+          "median": null,
+          "min": null,
+          "max": null
+        },
+        "cpu_percent_sum": {
+          "n": 5,
+          "median": 662.6515769304556,
+          "min": 660.7430758322544,
+          "max": 666.1666524128889
+        },
+        "allocated_mib_s_sum": {
+          "n": 5,
+          "median": 460.1836818624548,
+          "min": 459.136955374792,
+          "max": 463.95041817240667
+        },
+        "peak_rss_sum_mib": {
+          "n": 5,
+          "median": 571.09765625,
+          "min": 568.41015625,
+          "max": 573.41796875
+        },
+        "send_lag_p99_ms": {
+          "n": 5,
+          "median": 1.178384,
+          "min": 1.149018,
+          "max": 1.186243
+        },
+        "actual_send_rate": {
+          "n": 5,
+          "median": 100,
+          "min": 100,
+          "max": 100
+        }
+      }
+    },
+    {
+      "case": "pending-h10000-r100",
+      "cpu": "2c2t-g2",
+      "version": "v000",
+      "recorded": 5,
+      "planned": 5,
+      "statuses": {
+        "measured": 5
+      },
+      "complete_batches": 5,
+      "history_complete": 0,
+      "metrics": {
+        "window_ops_s": {
+          "n": 5,
+          "median": 100,
+          "min": 100,
+          "max": 100
+        },
+        "batch_ops_s": {
+          "n": 5,
+          "median": 100,
+          "min": 100,
+          "max": 100
+        },
+        "mean_ms": {
+          "n": 5,
+          "median": 4.542577435999999,
+          "min": 4.5266416873333375,
+          "max": 4.552138667000002
+        },
+        "p99_ms": {
+          "n": 5,
+          "median": 7.827983,
+          "min": 7.614175,
+          "max": 8.454707
+        },
+        "max_ms": {
+          "n": 5,
+          "median": 25.680807,
+          "min": 25.140186,
+          "max": 32.973337
+        },
+        "drain_s": {
+          "n": 5,
+          "median": 0,
+          "min": 0,
+          "max": 0
+        },
+        "cold_read_s": {
+          "n": 0,
+          "median": null,
+          "min": null,
+          "max": null
+        },
+        "history_drain_s": {
+          "n": 0,
+          "median": null,
+          "min": null,
+          "max": null
+        },
+        "cpu_percent_sum": {
+          "n": 5,
+          "median": 299.62394582303597,
+          "min": 299.24625793268353,
+          "max": 299.9798100009629
+        },
+        "allocated_mib_s_sum": {
+          "n": 5,
+          "median": 71.36544210451362,
+          "min": 71.35462556926542,
+          "max": 71.51194091984961
+        },
+        "peak_rss_sum_mib": {
+          "n": 5,
+          "median": 627.06640625,
+          "min": 626.28515625,
+          "max": 628.12109375
+        },
+        "send_lag_p99_ms": {
+          "n": 5,
+          "median": 1.210411,
+          "min": 1.18951,
+          "max": 1.270124
+        },
+        "actual_send_rate": {
+          "n": 5,
+          "median": 100,
+          "min": 100,
+          "max": 100
+        }
+      }
+    },
+    {
+      "case": "pending-h10000-r100",
+      "cpu": "2c2t-g2",
+      "version": "v003",
+      "recorded": 5,
+      "planned": 5,
+      "statuses": {
+        "measured": 5
+      },
+      "complete_batches": 5,
+      "history_complete": 0,
+      "metrics": {
+        "window_ops_s": {
+          "n": 5,
+          "median": 100,
+          "min": 100,
+          "max": 100
+        },
+        "batch_ops_s": {
+          "n": 5,
+          "median": 100,
+          "min": 100,
+          "max": 100
+        },
+        "mean_ms": {
+          "n": 5,
+          "median": 2.1872944916666652,
+          "min": 2.185974369666667,
+          "max": 2.190891993666666
+        },
+        "p99_ms": {
+          "n": 5,
+          "median": 4.166199,
+          "min": 4.059305,
+          "max": 4.300636
+        },
+        "max_ms": {
+          "n": 5,
+          "median": 18.177994,
+          "min": 16.134802,
+          "max": 23.595254
+        },
+        "drain_s": {
+          "n": 5,
+          "median": 0,
+          "min": 0,
+          "max": 0
+        },
+        "cold_read_s": {
+          "n": 0,
+          "median": null,
+          "min": null,
+          "max": null
+        },
+        "history_drain_s": {
+          "n": 0,
+          "median": null,
+          "min": null,
+          "max": null
+        },
+        "cpu_percent_sum": {
+          "n": 5,
+          "median": 281.6559565311318,
+          "min": 280.9997439088063,
+          "max": 281.66432525153243
+        },
+        "allocated_mib_s_sum": {
+          "n": 5,
+          "median": 72.83176515517671,
+          "min": 72.82831595020906,
+          "max": 72.8334548558019
+        },
+        "peak_rss_sum_mib": {
+          "n": 5,
+          "median": 643.51171875,
+          "min": 641.328125,
+          "max": 644.1875
+        },
+        "send_lag_p99_ms": {
+          "n": 5,
+          "median": 1.208063,
+          "min": 1.182629,
+          "max": 1.209711
+        },
+        "actual_send_rate": {
+          "n": 5,
+          "median": 100,
+          "min": 100,
+          "max": 100
+        }
+      }
+    },
+    {
+      "case": "pending-h10000-r100",
+      "cpu": "2c4t-g4",
+      "version": "baseline",
+      "recorded": 5,
+      "planned": 5,
+      "statuses": {
+        "measured": 5
+      },
+      "complete_batches": 5,
+      "history_complete": 0,
+      "metrics": {
+        "window_ops_s": {
+          "n": 5,
+          "median": 99.9,
+          "min": 99.83333333333333,
+          "max": 99.93333333333334
+        },
+        "batch_ops_s": {
+          "n": 5,
+          "median": 99.91010384589853,
+          "min": 99.8917088136077,
+          "max": 99.94801245777015
+        },
+        "mean_ms": {
+          "n": 5,
+          "median": 21.91954590066664,
+          "min": 20.60298475466664,
+          "max": 26.28996905499995
+        },
+        "p99_ms": {
+          "n": 5,
+          "median": 49.132806,
+          "min": 43.808363,
+          "max": 51.317828
+        },
+        "max_ms": {
+          "n": 5,
+          "median": 65.035426,
+          "min": 53.222732,
+          "max": 71.032757
+        },
+        "drain_s": {
+          "n": 5,
+          "median": 0.026993112,
+          "min": 0.015604375,
+          "max": 0.032522575
+        },
+        "cold_read_s": {
+          "n": 0,
+          "median": null,
+          "min": null,
+          "max": null
+        },
+        "history_drain_s": {
+          "n": 0,
+          "median": null,
+          "min": null,
+          "max": null
+        },
+        "cpu_percent_sum": {
+          "n": 5,
+          "median": 1077.675539487299,
+          "min": 1073.6153754314287,
+          "max": 1078.9899056473103
+        },
+        "allocated_mib_s_sum": {
+          "n": 5,
+          "median": 450.54076588656284,
+          "min": 448.68571899734246,
+          "max": 450.90120005276844
+        },
+        "peak_rss_sum_mib": {
+          "n": 5,
+          "median": 563.95703125,
+          "min": 562.30859375,
+          "max": 565.84375
+        },
+        "send_lag_p99_ms": {
+          "n": 5,
+          "median": 1.191736,
+          "min": 1.182348,
+          "max": 1.231849
+        },
+        "actual_send_rate": {
+          "n": 5,
+          "median": 100,
+          "min": 100,
+          "max": 100
+        }
+      }
+    },
+    {
+      "case": "pending-h10000-r100",
+      "cpu": "2c4t-g4",
+      "version": "v000",
+      "recorded": 5,
+      "planned": 5,
+      "statuses": {
+        "measured": 5
+      },
+      "complete_batches": 5,
+      "history_complete": 0,
+      "metrics": {
+        "window_ops_s": {
+          "n": 5,
+          "median": 100,
+          "min": 100,
+          "max": 100
+        },
+        "batch_ops_s": {
+          "n": 5,
+          "median": 100,
+          "min": 100,
+          "max": 100
+        },
+        "mean_ms": {
+          "n": 5,
+          "median": 4.935069767000002,
+          "min": 4.924319814333328,
+          "max": 4.966287731666667
+        },
+        "p99_ms": {
+          "n": 5,
+          "median": 8.583373,
+          "min": 8.268823,
+          "max": 8.905902
+        },
+        "max_ms": {
+          "n": 5,
+          "median": 26.23703,
+          "min": 25.237139,
+          "max": 27.815124
+        },
+        "drain_s": {
+          "n": 5,
+          "median": 0,
+          "min": 0,
+          "max": 0
+        },
+        "cold_read_s": {
+          "n": 0,
+          "median": null,
+          "min": null,
+          "max": null
+        },
+        "history_drain_s": {
+          "n": 0,
+          "median": null,
+          "min": null,
+          "max": null
+        },
+        "cpu_percent_sum": {
+          "n": 5,
+          "median": 459.5192790579073,
+          "min": 459.3549273766115,
+          "max": 459.96405052259246
+        },
+        "allocated_mib_s_sum": {
+          "n": 5,
+          "median": 72.39784838468194,
+          "min": 72.38997267630936,
+          "max": 72.40111549734159
+        },
+        "peak_rss_sum_mib": {
+          "n": 5,
+          "median": 631.5703125,
+          "min": 629.32421875,
+          "max": 631.7890625
+        },
+        "send_lag_p99_ms": {
+          "n": 5,
+          "median": 1.198342,
+          "min": 1.18424,
+          "max": 1.218526
+        },
+        "actual_send_rate": {
+          "n": 5,
+          "median": 100,
+          "min": 100,
+          "max": 100
+        }
+      }
+    },
+    {
+      "case": "pending-h10000-r100",
+      "cpu": "2c4t-g4",
+      "version": "v003",
+      "recorded": 5,
+      "planned": 5,
+      "statuses": {
+        "measured": 5
+      },
+      "complete_batches": 5,
+      "history_complete": 0,
+      "metrics": {
+        "window_ops_s": {
+          "n": 5,
+          "median": 100,
+          "min": 100,
+          "max": 100
+        },
+        "batch_ops_s": {
+          "n": 5,
+          "median": 100,
+          "min": 100,
+          "max": 100
+        },
+        "mean_ms": {
+          "n": 5,
+          "median": 2.1799433903333405,
+          "min": 2.1604421493333286,
+          "max": 2.191834455333333
+        },
+        "p99_ms": {
+          "n": 5,
+          "median": 3.072165,
+          "min": 2.819885,
+          "max": 3.196212
+        },
+        "max_ms": {
+          "n": 5,
+          "median": 13.237354,
+          "min": 11.881783,
+          "max": 23.161902
+        },
+        "drain_s": {
+          "n": 5,
+          "median": 0,
+          "min": 0,
+          "max": 0
+        },
+        "cold_read_s": {
+          "n": 0,
+          "median": null,
+          "min": null,
+          "max": null
+        },
+        "history_drain_s": {
+          "n": 0,
+          "median": null,
+          "min": null,
+          "max": null
+        },
+        "cpu_percent_sum": {
+          "n": 5,
+          "median": 433.6147905312601,
+          "min": 433.0117587186299,
+          "max": 434.28097035052997
+        },
+        "allocated_mib_s_sum": {
+          "n": 5,
+          "median": 72.92296620347867,
+          "min": 72.91599763734612,
+          "max": 72.93530956386392
+        },
+        "peak_rss_sum_mib": {
+          "n": 5,
+          "median": 642.66015625,
+          "min": 641.125,
+          "max": 643.7578125
+        },
+        "send_lag_p99_ms": {
+          "n": 5,
+          "median": 1.242271,
+          "min": 1.220748,
+          "max": 1.291145
+        },
+        "actual_send_rate": {
+          "n": 5,
+          "median": 100,
+          "min": 100,
+          "max": 100
+        }
+      }
+    }
+  ]
+}

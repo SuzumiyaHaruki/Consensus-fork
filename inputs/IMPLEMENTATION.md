@@ -30,9 +30,13 @@ Adapt or merge headings and share explanations. Focus on consequential choices; 
 
 ## Checks and execution
 
+Implementation and checks run on this machine; larger-scale evaluation will run elsewhere. Before resource-sensitive tests, inspect available CPU and memory, process layout and runtime settings. Size workloads to these resources, retain real multiprocess checks, and coordinate resource-heavy runs, including subagent work. A per-process parallelism limit does not reserve CPU capacity.
+
 Exercise actual Node/service handlers. Explain the events controlled and components replaced or bypassed; adapters must not send missing protocol messages, supply absent transitions or hide failures. Inputs and faults must fit the protocol assumptions. Distinguish requested actions from observed events and explain what assertions support. A finite wait without completion does not by itself establish permanent loss of progress.
 
-Retain failing inputs/results and investigate unexplained anomalies; a later pass does not explain an earlier failure. Compare different workload/history scales under comparable conditions, measuring runtime costs when simulation cannot answer the question. Locate the causes of growth, preserve protocol-required work and evidence when optimizing, and recheck affected behavior. Explain whether resource limits reject requests before admission or affect admitted work.
+Choose a small set of contrasting conditions from the implementation's shared state, queues, serial work and waits. Vary conditions that change processing paths or contention, as well as workload/history scale. Use runtime measurements where simulation cannot answer the question, and choose duration to expose the behavior under investigation. Repeat or extend selected measurements when variability or continuing growth needs explanation. When work shares resources, observe both the work being improved and work that may be delayed or accumulate. Explain whether resource limits reject requests before admission or affect admitted work.
+
+Retain failing inputs/results and investigate unexplained anomalies; a later pass does not explain an earlier failure. Compare relevant conditions and inspect code to distinguish implementation costs, resource contention and invalid test assumptions. Preserve and explain earlier observations when changing load, resources or waiting time. Locate causes, preserve protocol-required work and evidence when optimizing, and recheck affected behavior.
 
 Use forge_local.isolated_exec for TCP/multiprocess tests; consult its tool description. Select files with outputs and check result.artifacts to confirm retention. The optional ../inputs/schedule.py helper provides --help; run it inside isolated_exec, using its absolute path with captured source copies. Recorded events and successful replay do not by themselves establish correctness.
 

@@ -118,6 +118,8 @@ class OfflineRuntime(workflow.Runtime):
         # A small fixture export keeps state-machine tests independent of audit dependencies.
         destination.mkdir(parents=True)
         names = ['go.mod', 'server.go', 'README.md', 'protocol.md', 'system.md']
+        if (workspace / 'GENERATION_HANDOFF.md').exists():
+            names.append('GENERATION_HANDOFF.md')
         if (workspace / 'tests/regression_test.go').exists():
             names.append('tests/regression_test.go')
         for name in names:
@@ -251,6 +253,36 @@ class WorkflowTests(unittest.TestCase):
         before = path.read_bytes()
         self.assertNotIn('assessment', workflow.inspect(root))
         self.assertEqual(path.read_bytes(), before)
+
+    def test_candidate_branch_runs_new_audit_without_generation_or_parent_reports(self):
+        source, original = self.run_fixture(OfflineRuntime(), max_repairs=2)
+        source_record = (source / 'experiment.json').read_bytes()
+        candidate = original['candidates'][2]
+        put(source / 'audits/later-only.md', 'Later audit must not enter branch')
+        put(source / 'candidates/v003/future.txt', 'Later repair must not enter branch')
+        root = workflow.branch(source, 'v002', 'branch-test')
+        prepared = read_json(root / 'experiment.json')
+        self.assertEqual(prepared['settings']['max_repairs'], 1)
+        self.assertEqual(prepared['origin']['candidate_commit'], candidate['commit'])
+        self.assertEqual(candidate_commit(root / 'candidates/v002'), candidate['commit'])
+        self.assertFalse((root / 'audits').exists())
+        self.assertFalse((root / 'issues.json').exists())
+        self.assertFalse((root / 'candidates/v003').exists())
+        for name in ('AUDIT.md', 'REPAIR.md', 'VERIFY.md', 'protocol.md', 'system.md'):
+            self.assertEqual((root / 'inputs' / name).read_bytes(), (source / 'inputs' / name).read_bytes())
+        runtime = OfflineRuntime()
+        result = workflow.execute(root, runtime)
+        self.assertEqual(runtime.calls, ['audit', 'repair', 'verify'])
+        self.assertEqual(runtime.budgets, [('audit', self.settings.audit_seconds), ('verify', self.settings.repair_verification_seconds)])
+        self.assertEqual([c['version'] for c in result['candidates']], [2, 3])
+        self.assertEqual(result['repairs_completed'], 1)
+        self.assertEqual(result['open_issues'], [])
+        self.assertEqual(result['status'], 'cycle_complete')
+        self.assertEqual((source / 'experiment.json').read_bytes(), source_record)
+        self.assertEqual(candidate_commit(Path(candidate['path'])), candidate['commit'])
+        self.assertEqual(workflow.inspect(root)['origin'], prepared['origin'])
+        with self.assertRaisesRegex(ValueError, 'No retained candidate'):
+            workflow.branch(source, 'v099')
 
     def test_full_cycle_versions_exact_feedback_models_and_final_review(self):
         runtime = OfflineRuntime()
@@ -765,6 +797,47 @@ class WorkflowTests(unittest.TestCase):
             _, result = self.run_fixture(runtime)
         self.assertEqual(result['status'], 'environment_blocked')
         self.assertEqual(runtime.calls, [])
+
+    def test_manual_generation_handoff_preserves_interruption_and_enters_audit_repair(self):
+        runtime = OfflineRuntime()
+        original = runtime.agent
+        def interrupted(stage):
+            result = original(stage)
+            result['status'] = 'interrupted'
+            write_json(stage / 'run.json', result)
+            put(stage / 'executions/retained/result.json', '{"status":"completed","exit_code":1}\n')
+            return result
+        with patch.object(runtime, 'agent', side_effect=interrupted):
+            root, stopped = self.run_fixture(runtime)
+        self.assertEqual(stopped['status'], 'interrupted')
+        stage = Path(stopped['stages'][0]['path'])
+        retained = {p: p.read_bytes() for p in stage.rglob('*') if p.is_file() and '.git' not in p.parts}
+        # A stale status must not permit capture while the stage runner owns it.
+        with workflow.exclusive_run(stage), self.assertRaisesRegex(ValueError, 'Another runner'):
+            workflow.execute(root, runtime, handoff_generation=True)
+        result = workflow.execute(root, runtime, handoff_generation=True)
+        self.assertEqual(runtime.calls, ['generation', 'audit', 'repair', 'verify'])
+        self.assertEqual(result['status'], 'cycle_complete')
+        self.assertEqual(result['stages'][0]['status'], 'interrupted')
+        self.assertEqual(result['started_at'], stopped['started_at'])
+        self.assertGreater(result['elapsed_seconds'], stopped['elapsed_seconds'])
+        self.assertEqual(result['resumptions'][0]['action'], 'handoff_generation')
+        self.assertEqual(result['generation_handoff']['source_status'], 'interrupted')
+        note = Path(result['candidates'][0]['path']) / 'GENERATION_HANDOFF.md'
+        self.assertIn('not an agent-completed generation', note.read_text())
+        for path, content in retained.items():
+            self.assertEqual(path.read_bytes(), content, str(path))
+        with self.assertRaisesRegex(ValueError, 'Generation handoff requires'):
+            workflow.execute(root, runtime, handoff_generation=True)
+
+    def test_generation_handoff_does_not_start_or_interrupt_generation(self):
+        root = workflow.prepare(self.settings, 'not-interrupted')
+        before = (root / 'experiment.json').read_bytes()
+        runtime = OfflineRuntime()
+        with self.assertRaisesRegex(ValueError, 'Generation handoff requires'):
+            workflow.execute(root, runtime, handoff_generation=True)
+        self.assertEqual(runtime.calls, [])
+        self.assertEqual((root / 'experiment.json').read_bytes(), before)
 
     def test_sigterm_between_children_retains_interrupted_state_and_restores_handler(self):
         runtime = OfflineRuntime()

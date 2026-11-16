@@ -49,6 +49,10 @@ python3 -m venv .venv
 
 `run` / `execute` 会将所选材料与候选源码提供给模型，并允许 agent 在各自既有权限范围内运行程序。Ctrl-C 或 SIGTERM 会停止流程并保留已产生的证据；不要用 SIGKILL 代替正常中断。发现审计因服务端错误、安全拦截，或单回合超时且没有完整报告而停止后，控制器将已有问题及归档证据交给修复，明确标注报告未完成，再独立复核；没有可用问题时保留未完成状态。旧实验如果停在这个交接位置，可以执行 `.venv/bin/python forge.py resume <实验目录>`，从原候选和归档继续，不重新生成或重试被拦截的会话。若独立复核在开始调查前因 `workspace routing discovery failed` 连接失败，同一命令会保留失败记录，使用原来的前后候选和交接材料重新启动独立复核，再继续后续流程。此入口不恢复任意阶段；修订材料或调整配置仍应准备新实验。
 
+初始生成经正常中断并保存完成后，可以执行 `.venv/bin/python forge.py handoff-generation <实验目录>`，将现有工作区导出为 v000，直接进入原配置的审计、修复和独立复核。此操作不重新生成，也不替生成阶段补写成功状态：原阶段仍为 interrupted，实验保留此前耗时与中断记录，并新增 generation_handoff 说明。交付中增加 GENERATION_HANDOFF.md，告知审计该版本由人工提前提交，已有测试和报告不一定覆盖最后的修改。该入口只接收尚无候选的已中断初始生成，不停止正在运行的 agent。
+
+从已有候选另开一次审计—修复—复核，可执行 `.venv/bin/python forge.py branch <原实验目录> --candidate v002 --label audit-branch`，再对输出的新目录执行 `forge.py execute`。分支复制该候选（保留 Git 提交与版本编号）和原实验保存的提示词，沿用模型与阶段预算，只允许一轮修复；不重新生成、不恢复旧会话、不导入父实验的审计或复核记录。候选本身已有的设计、测试与结果仍保留。分支从 v002 开始时，修复结果写入新目录的 v003；原实验不改动。没有发现需修复的问题时，在审计后结束。
+
 ## 默认流程和停止方式
 
 ```mermaid
@@ -121,17 +125,32 @@ flowchart LR
 
 双方得到相同的 `protocol.md` 和 `system.md`，没有提供可运行协议参考实现、研究者测试答案或固定 Go 骨架。baseline 自主组织实现与自测；主流程在角色提示中额外提供工程方法，再安排独立审计、证据修复和复核。两个输入目录独立维护，协议与系统要求的修改应同步，通用方法指导不加入 baseline。比较必须使用同一协议与系统范围，历史实验按各自保存的输入分析，不改写旧材料和证据。中文材料来源与约定见 [inputs-zh/README.md](inputs-zh/README.md)，所有 Markdown 段落保持单行。
 
-研究者待讨论的保证范围与证明义务记录在 [docs/design-issues.md](docs/design-issues.md)，不作为额外 agent 输入。已经明确的协议规则与可自由选择的工程机制分开说明。
-
-论文主线、方法抽象、实验假设和讨论记录放在 [docs/paper.md](docs/paper.md)，具体实验数据仍保留在各次对比报告中。
-
 新版实现侧指令统一命名为 `IMPLEMENTATION.md`，由执行器显式加载，仓库根部的 `AGENTS.md` 仍用于维护本项目。baseline 同步文件名但保留自身提示内容。旧实验使用相应 Git 版本复现，本版不自动迁移旧文件名或材料。
 
 材料平铺在 `inputs/`：TASK 是生成任务，AUDIT 是审计任务，REPAIR 是修复任务，VERIFY 是独立复核任务，IMPLEMENTATION 是生成与修复共用的工作要求；protocol 包含协议正文与伪代码，system 是双方共用的系统目标与交付要求，通用工程指导在角色提示中。初始生成不收到审计、修复、复核任务；各阶段使用当次保存的输入。两份设计材料随候选交付审计，并随前后版本进入修复和复核。角色提示的 `<!-- continuation -->` 分隔首次与续轮任务。
 
-## 结果在哪里
+## 文档导航
 
-最近一次探索性评测见 [v000 与 v003 评测（2026-11-10）](docs/exploratory-1110.md)，包括并发性能、协议符合性、正确性和原始证据入口。该报告是实验后的研究分析，不作为 agent 输入。
+以下文档供维护和研究使用，不作为实验 agent 的额外输入。协议与系统要求由 inputs 中当次保存的材料提供。
+
+| 文档 | 用途 |
+| --- | --- |
+| [workflow.md](docs/workflow.md) | 当前阶段、执行环境、证据交接、预算及中断处理 |
+| [scheduling.md](docs/scheduling.md) | 可选事件调度与重放工具的接口和示例 |
+| [evaluation.md](docs/evaluation.md) | 协议符合性、正确性、性能和成本的评价方法，含新固定速率口径 |
+| [design-issues.md](docs/design-issues.md) | 待讨论的会话组织、设计边界和协议论证范围 |
+| [paper.md](docs/paper.md) | 研究主线、方法机制、案例与论文组织 |
+| [exploratory-1110.md](docs/exploratory-1110.md) | 11 月 10 日实现的探索性协议检查与修复案例 |
+| [comparison-20261113.md](docs/comparison-20261113.md) | 11 月 13 日生成结果与 baseline、上一批 Forge 的本机比较 |
+| [server-evaluation-1115.md](docs/server-evaluation-1115.md) | 11 月 11 日实现的服务器闭环实验，含五次重复和三档 CPU |
+| [server-A-evaluation.md](docs/server-A-evaluation.md) | 新固定速率普通请求，当前 638/768 项；单点和均衡已完成，随机入口仍在进行 |
+| [server-B-evaluation.md](docs/server-B-evaluation.md) | 新固定速率热点与载荷，当前 851/1,263 项；热点已完成，1 KiB 尚差七项，16/64 KiB 尚无结果 |
+| [server-C-evaluation.md](docs/server-C-evaluation.md) | 新固定速率附加延迟与崩溃后服务，993/993 项已结束，含多副本崩溃和负载中途故障 |
+| [server-D-evaluation.md](docs/server-D-evaluation.md) | 新固定速率历史成本与补齐；原 498 项及补测 45 项均已结束，补测场景全部成立，baseline 单核 5 批未收齐回复 |
+
+报告日期与实现日期分开识别。新固定速率方法已收到 server A、B 的阶段结果，以及 server C、D 的完整运行结果；具体矩阵和命令位于桌面的 consensus-server-evaluation-1111 测试包。旧 1112 报告和图表已移出当前文档集，副本保存在桌面 consensus-docs-server-evaluation-1112.tar.gz。
+
+## 结果在哪里
 
 每次完整实验位于 `experiments/<时间>-<标签>-<随机后缀>/`。各模型阶段另有 `agents.json` 和 `agent-records/`，保存主会话与子会话的归属、模型、回合时间和记录到的用量；`experiment.json` 的阶段条目提供对应路径与摘要。包含以下目录：
 
@@ -161,7 +180,7 @@ issues.json                  全部问题的来源版本、证据、状态与复
 
 生成/修复普通 shell 仍使用 Codex `workspace-write`，这次隔离的是配置和自动加载内容，没有增加主机文件读取隔离。因此独立会话仍不构成严格隐藏评测环境。`forge_local.isolated_exec` 保留私有网络、PID 空间、干净环境、受限文件访问和执行记录；可运行 Go race 与多进程 TCP 测试，所有互通进程必须在同一次工具调用中启动。启动前做无模型的 STDIO/TCP 检查，失败则停止，不退回主机执行。本地审计保留原有隔离措施。
 
-新流程准备好后可启动新实验，核查真实多进程测试和独立复核是否产生足够证据。评估边界与后续扩展见 [docs/evaluation.md](docs/evaluation.md) 和 [docs/workflow.md](docs/workflow.md)。
+实验结果按文档导航中的评价方法分析，流程结束状态和逐项复核结论分别保留。
 
 可选的本地真实隔离检查（无认证、无模型调用，需要 Linux 命名空间权限）：
 

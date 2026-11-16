@@ -8,4 +8,6 @@ Work inside this workspace. The supplied documents define the requirements for t
 
 Your scope includes local implementation and testing, starting multi-process clusters, exchanging replica/client messages, injecting faults allowed by the protocol, and cleaning up resources created for these tests. Preserve existing authentication and sandbox protections. Do not change credentials, publish code or packages externally, deploy to remote or production infrastructure, send communications to third parties, or modify unrelated data or resources.
 
+Implementation and checks run on this machine; larger-scale evaluation will run elsewhere. Before resource-sensitive tests, inspect available CPU and memory, process layout and runtime settings. Size workloads to these resources, retain real multiprocess checks, and coordinate resource-heavy runs, including subagent work. A per-process parallelism limit does not reserve CPU capacity.
+
 Put automated test code in `tests/`. Keep Markdown paragraphs on one physical line. Keep dependency and configuration files free of credentials. Use loopback addresses for local experiments and stop child services before finishing. Report the actual test commands, outcomes and remaining limitations.

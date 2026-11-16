@@ -1,8 +1,8 @@
 # 实际事件调度与重放
 
-`runtime/schedule.py` 是一个可选的标准库工具。它在已有 `isolated_exec` 内启动候选适配器，从适配器报告的待处理动作中选择下一步，并保存实际返回的事件和观察。Python 不计算依赖集、判断换主或补发协议消息；这些仍由候选实现完成。工具也不决定哪些场景应该测，场景和性质判断仍由 agent 负责。
+`runtime/schedule.py` 在已有 isolated_exec 内启动候选适配器，按计划选择待处理动作并保存实际响应。场景、适配器和断言由 agent 选择，协议处理仍由候选实现完成。本文说明接口；执行隔离、源码关联和证据交接见 [workflow.md](workflow.md)。
 
-生成和修复阶段得到 `inputs/schedule.py` 副本，可从 workspace 查看 `python3 -I ../inputs/schedule.py --help`。审计和复核得到只读 `tools/schedule.py`，绝对路径在 run brief 中；交接包保留当时工具。新实验不注入旧逐消息时间检查器。
+生成和修复阶段得到 `inputs/schedule.py` 副本，可从 workspace 查看 `python3 -I ../inputs/schedule.py --help`。审计和复核得到只读 `tools/schedule.py`，绝对路径在 run brief 中；交接包保留当时工具。
 
 ## 三部分各自做什么
 
@@ -14,7 +14,7 @@
 
 适配器通常可以写成候选语言中的小程序，使用标准输入和标准输出交换 JSON 行。候选无需采用框架规定的包结构或公开接口。如果现有接口不能控制某个关键边界，应说明覆盖限制；诊断插桩要保留并解释，不能把绕过真实路径的实验说成生产路径复现。
 
-协议中的发送、窗口和故障规则见 [protocol.md](../inputs/protocol.md)。适配器沿用候选真实事件含义，不能在驱动中补全实际未完成的广播、响应或状态转换。W 从广播开始计时，包含实际收回响应的工作；每个窗口允许 s 个仍存活成员尚未回复，不能把它当作逐消息期限或准确判死。时间推进与回调执行可以是不同事件，记录必须说明所控制的实际边界。故障注入永久停止崩溃副本；正确节点通信和后台工作应符合源模型的公平性。公共调度器不独立验证这些前提。
+发送、窗口、故障与公平性前提以当次 [protocol.md](../inputs/protocol.md) 为准。适配器说明实际控制的边界，例如时间推进和到期回调可以是不同事件；不能替候选补全广播、响应或状态转换。公共工具不独立验证场景合法性。
 
 ## 最小接口与计划
 
@@ -60,7 +60,7 @@ python3 -I HELPER --plan tests/scenario.json -- ADAPTER
 python3 -I HELPER --replay tests/previous.jsonl -- ADAPTER
 ```
 
-标准输出依次记录计划、发出的请求、实际响应和总结，并逐行刷新。既有执行服务会保留完整 `executions/<id>/stdout.txt`，即使超时或临时源码副本被删除，已有输出仍在。使用 `source="candidate"` 或 `source="before"` 时，把计划、适配器和检查代码作为 `overlays` 提供；需要重放时，将原 stdout 复制为工作区中的输入文件并一并提供。执行记录关联原始 Git commit、命令和实际覆盖文件，不需要再加文件哈希或新的版本约定。
+标准输出逐行记录计划、请求、响应与总结，由执行服务保留在 executions/<id>/stdout.txt。使用 source="candidate" 或 source="before" 时，把计划、适配器和检查代码作为 overlays 提供；重放时将原 stdout 作为输入一起提供。日志与起始 commit、命令及覆盖文件通过执行记录关联。
 
 若适配器另写文件，可通过 `isolated_exec` 的 `outputs` 参数选择工作区相对路径，在副本清理前归档，例如 `"outputs": ["results/history.json"]`。保存位置和未保留原因在执行结果的 `artifacts` 中；不要依赖调用结束后仍能访问临时副本。相关限制见 [workflow.md](workflow.md)。
 
@@ -77,7 +77,7 @@ python3 -I HELPER --replay tests/previous.jsonl -- ADAPTER
 
 退出码 0 对应 `completed`，1 对应观察、选择、步数或重放差异，2 对应输入或执行错误。审计报告还应说明断言极性：一次成功运行可能恰好证明了错误行为可复现。修复和独立复核都要检查实际观察与性质，不能只比较退出码。
 
-增量 `events` 和额外适配器字段保留在实际响应记录中，不自动套用协议时间模型。适配器的 `trace_model` 等附加字段仅作为记录保留，总结不生成 `trace_check`。需要解释广播、窗口、阶段与慢成员条件时，由调查者结合真实观察和协议规则给出依据；普通 JSONL 记录直接作为 `evidence` 引用。
+增量 events 和附加字段保留为实际响应，不自动解释成时间模型或 trace_check 结论。调查者结合协议与观察说明性质，JSONL 可直接作为 evidence 引用。
 
 ## 工具检查
 

@@ -19,11 +19,19 @@ def main(argv=None):
         child.add_argument('--max-repairs', type=int)
         if name != 'doctor':
             child.add_argument('--label', default='sol-high-system')
-    for name in ('execute', 'resume', 'inspect'):
+    for name in ('execute', 'resume', 'handoff-generation', 'inspect'):
         child = sub.add_parser(name)
         child.add_argument('experiment_dir', type=Path)
+    child = sub.add_parser('branch')
+    child.add_argument('experiment_dir', type=Path)
+    child.add_argument('--candidate', required=True, help='retained version, for example v002')
+    child.add_argument('--label', default='audit-branch')
     args = parser.parse_args(argv)
     try:
+        if args.action == 'branch':
+            root = workflow.branch(args.experiment_dir, args.candidate, args.label)
+            print(json.dumps({'experiment_dir': str(root), 'status': 'prepared'}), flush=True)
+            return 0
         if args.action in {'prepare', 'run', 'doctor'}:
             settings = load(args.config, {k: getattr(args, k) for k in ('output_root', 'max_repairs') if getattr(args, k) is not None})
             if args.action == 'doctor':
@@ -39,7 +47,8 @@ def main(argv=None):
         if args.action == 'inspect':
             print(json.dumps(workflow.inspect(root), ensure_ascii=False, indent=2))
             return 0
-        result = workflow.execute(root, resume=args.action == 'resume')
+        result = workflow.execute(root, resume=args.action == 'resume',
+                                  handoff_generation=args.action == 'handoff-generation')
         print(json.dumps(workflow.inspect(root), ensure_ascii=False, indent=2))
         if result['status'] == 'cycle_complete':
             return 0

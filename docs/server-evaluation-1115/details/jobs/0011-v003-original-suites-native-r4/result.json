@@ -1,0 +1,584 @@
+{
+  "version": "v003",
+  "case": {
+    "group": "native",
+    "name": "original-suites"
+  },
+  "repeat": 4,
+  "cpu": {},
+  "cpu_layout": "native",
+  "result": {
+    "status": "observed_failure",
+    "commands": [
+      {
+        "argv": [
+          "go",
+          "vet",
+          "-p=1",
+          "./..."
+        ],
+        "exit_code": 0,
+        "status": "completed",
+        "elapsed_seconds": 1.0684595108032227,
+        "process_samples": [
+          {
+            "at_ns": 1794564271599368240,
+            "cpu_seconds": 0.0,
+            "rss_bytes": 991232
+          },
+          {
+            "at_ns": 1794564272099790380,
+            "cpu_seconds": 1.09,
+            "rss_bytes": 23961600
+          },
+          {
+            "at_ns": 1794564272600302186,
+            "cpu_seconds": 1.17,
+            "rss_bytes": 24289280
+          }
+        ],
+        "gomaxprocs_env": "20",
+        "launcher_cpu_affinity": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23,
+          24,
+          25,
+          26,
+          27,
+          28,
+          29,
+          30,
+          31,
+          32,
+          33,
+          34,
+          35,
+          36,
+          37,
+          38,
+          39
+        ],
+        "resource_scope": "GOMAXPROCS applies to each whole test process, including all its in-process Nodes; packages run sequentially."
+      },
+      {
+        "argv": [
+          "go",
+          "test",
+          "-p=1",
+          "-race",
+          "./...",
+          "-count=1",
+          "-timeout=240s",
+          "-v"
+        ],
+        "exit_code": 1,
+        "status": "completed",
+        "elapsed_seconds": 34.12991690635681,
+        "process_samples": [
+          {
+            "at_ns": 1794564272668102554,
+            "cpu_seconds": 0.0,
+            "rss_bytes": 991232
+          },
+          {
+            "at_ns": 1794564273168550254,
+            "cpu_seconds": 1.06,
+            "rss_bytes": 23945216
+          },
+          {
+            "at_ns": 1794564273669078009,
+            "cpu_seconds": 1.15,
+            "rss_bytes": 24272896
+          },
+          {
+            "at_ns": 1794564274169591658,
+            "cpu_seconds": 1.23,
+            "rss_bytes": 24272896
+          },
+          {
+            "at_ns": 1794564274670080175,
+            "cpu_seconds": 1.23,
+            "rss_bytes": 24272896
+          },
+          {
+            "at_ns": 1794564275170468122,
+            "cpu_seconds": 1.23,
+            "rss_bytes": 24272896
+          },
+          {
+            "at_ns": 1794564275670821100,
+            "cpu_seconds": 1.23,
+            "rss_bytes": 24272896
+          },
+          {
+            "at_ns": 1794564276171240471,
+            "cpu_seconds": 1.23,
+            "rss_bytes": 24272896
+          },
+          {
+            "at_ns": 1794564276671729616,
+            "cpu_seconds": 1.23,
+            "rss_bytes": 24272896
+          },
+          {
+            "at_ns": 1794564277172268162,
+            "cpu_seconds": 1.23,
+            "rss_bytes": 24272896
+          },
+          {
+            "at_ns": 1794564277672750366,
+            "cpu_seconds": 1.23,
+            "rss_bytes": 24272896
+          },
+          {
+            "at_ns": 1794564278173191891,
+            "cpu_seconds": 1.23,
+            "rss_bytes": 24272896
+          },
+          {
+            "at_ns": 1794564278673639373,
+            "cpu_seconds": 1.23,
+            "rss_bytes": 24272896
+          },
+          {
+            "at_ns": 1794564279174115868,
+            "cpu_seconds": 1.23,
+            "rss_bytes": 24272896
+          },
+          {
+            "at_ns": 1794564279674583158,
+            "cpu_seconds": 1.23,
+            "rss_bytes": 24272896
+          },
+          {
+            "at_ns": 1794564280175084205,
+            "cpu_seconds": 1.23,
+            "rss_bytes": 24272896
+          },
+          {
+            "at_ns": 1794564280675529679,
+            "cpu_seconds": 1.23,
+            "rss_bytes": 24272896
+          },
+          {
+            "at_ns": 1794564281176093245,
+            "cpu_seconds": 1.23,
+            "rss_bytes": 24272896
+          },
+          {
+            "at_ns": 1794564281676602722,
+            "cpu_seconds": 1.23,
+            "rss_bytes": 24272896
+          },
+          {
+            "at_ns": 1794564282177078706,
+            "cpu_seconds": 1.23,
+            "rss_bytes": 24272896
+          },
+          {
+            "at_ns": 1794564282677519334,
+            "cpu_seconds": 1.23,
+            "rss_bytes": 24272896
+          },
+          {
+            "at_ns": 1794564283178007322,
+            "cpu_seconds": 1.23,
+            "rss_bytes": 24272896
+          },
+          {
+            "at_ns": 1794564283678466550,
+            "cpu_seconds": 1.23,
+            "rss_bytes": 24272896
+          },
+          {
+            "at_ns": 1794564284178947261,
+            "cpu_seconds": 1.23,
+            "rss_bytes": 24272896
+          },
+          {
+            "at_ns": 1794564284679379538,
+            "cpu_seconds": 1.23,
+            "rss_bytes": 24272896
+          },
+          {
+            "at_ns": 1794564285179932941,
+            "cpu_seconds": 1.23,
+            "rss_bytes": 24272896
+          },
+          {
+            "at_ns": 1794564285680409611,
+            "cpu_seconds": 1.23,
+            "rss_bytes": 24272896
+          },
+          {
+            "at_ns": 1794564286180852528,
+            "cpu_seconds": 1.23,
+            "rss_bytes": 24272896
+          },
+          {
+            "at_ns": 1794564286681309842,
+            "cpu_seconds": 1.23,
+            "rss_bytes": 24272896
+          },
+          {
+            "at_ns": 1794564287181749993,
+            "cpu_seconds": 1.23,
+            "rss_bytes": 24272896
+          },
+          {
+            "at_ns": 1794564287682187572,
+            "cpu_seconds": 1.23,
+            "rss_bytes": 24272896
+          },
+          {
+            "at_ns": 1794564288182635541,
+            "cpu_seconds": 1.23,
+            "rss_bytes": 24272896
+          },
+          {
+            "at_ns": 1794564288683109436,
+            "cpu_seconds": 1.23,
+            "rss_bytes": 24272896
+          },
+          {
+            "at_ns": 1794564289183536666,
+            "cpu_seconds": 1.23,
+            "rss_bytes": 24272896
+          },
+          {
+            "at_ns": 1794564289684068012,
+            "cpu_seconds": 1.24,
+            "rss_bytes": 24272896
+          },
+          {
+            "at_ns": 1794564290184541114,
+            "cpu_seconds": 1.24,
+            "rss_bytes": 24272896
+          },
+          {
+            "at_ns": 1794564290685026610,
+            "cpu_seconds": 1.24,
+            "rss_bytes": 24272896
+          },
+          {
+            "at_ns": 1794564291185514634,
+            "cpu_seconds": 1.24,
+            "rss_bytes": 24272896
+          },
+          {
+            "at_ns": 1794564291686190307,
+            "cpu_seconds": 1.24,
+            "rss_bytes": 24272896
+          },
+          {
+            "at_ns": 1794564292186657065,
+            "cpu_seconds": 1.24,
+            "rss_bytes": 24272896
+          },
+          {
+            "at_ns": 1794564292687207201,
+            "cpu_seconds": 1.24,
+            "rss_bytes": 24272896
+          },
+          {
+            "at_ns": 1794564293187718814,
+            "cpu_seconds": 1.24,
+            "rss_bytes": 24272896
+          },
+          {
+            "at_ns": 1794564293688246219,
+            "cpu_seconds": 1.24,
+            "rss_bytes": 24272896
+          },
+          {
+            "at_ns": 1794564294188774662,
+            "cpu_seconds": 1.24,
+            "rss_bytes": 24272896
+          },
+          {
+            "at_ns": 1794564294689235004,
+            "cpu_seconds": 1.24,
+            "rss_bytes": 24272896
+          },
+          {
+            "at_ns": 1794564295189661974,
+            "cpu_seconds": 1.24,
+            "rss_bytes": 24272896
+          },
+          {
+            "at_ns": 1794564295690114983,
+            "cpu_seconds": 1.24,
+            "rss_bytes": 24272896
+          },
+          {
+            "at_ns": 1794564296190574879,
+            "cpu_seconds": 1.24,
+            "rss_bytes": 24272896
+          },
+          {
+            "at_ns": 1794564296691041368,
+            "cpu_seconds": 1.24,
+            "rss_bytes": 24272896
+          },
+          {
+            "at_ns": 1794564297191433262,
+            "cpu_seconds": 1.24,
+            "rss_bytes": 24272896
+          },
+          {
+            "at_ns": 1794564297691924568,
+            "cpu_seconds": 1.24,
+            "rss_bytes": 24272896
+          },
+          {
+            "at_ns": 1794564298192435785,
+            "cpu_seconds": 1.24,
+            "rss_bytes": 24272896
+          },
+          {
+            "at_ns": 1794564298692976756,
+            "cpu_seconds": 1.24,
+            "rss_bytes": 24272896
+          },
+          {
+            "at_ns": 1794564299193425433,
+            "cpu_seconds": 1.24,
+            "rss_bytes": 24272896
+          },
+          {
+            "at_ns": 1794564299693970810,
+            "cpu_seconds": 1.24,
+            "rss_bytes": 24272896
+          },
+          {
+            "at_ns": 1794564300194413265,
+            "cpu_seconds": 1.24,
+            "rss_bytes": 24272896
+          },
+          {
+            "at_ns": 1794564300694927264,
+            "cpu_seconds": 1.24,
+            "rss_bytes": 24272896
+          },
+          {
+            "at_ns": 1794564301195416942,
+            "cpu_seconds": 1.24,
+            "rss_bytes": 24272896
+          },
+          {
+            "at_ns": 1794564301695895049,
+            "cpu_seconds": 1.24,
+            "rss_bytes": 24272896
+          },
+          {
+            "at_ns": 1794564302196322124,
+            "cpu_seconds": 1.24,
+            "rss_bytes": 24272896
+          },
+          {
+            "at_ns": 1794564302696755874,
+            "cpu_seconds": 1.24,
+            "rss_bytes": 24272896
+          },
+          {
+            "at_ns": 1794564303197178914,
+            "cpu_seconds": 1.24,
+            "rss_bytes": 24272896
+          },
+          {
+            "at_ns": 1794564303697617625,
+            "cpu_seconds": 1.24,
+            "rss_bytes": 24272896
+          },
+          {
+            "at_ns": 1794564304198168436,
+            "cpu_seconds": 1.24,
+            "rss_bytes": 24272896
+          },
+          {
+            "at_ns": 1794564304698634003,
+            "cpu_seconds": 1.24,
+            "rss_bytes": 24272896
+          },
+          {
+            "at_ns": 1794564305199107405,
+            "cpu_seconds": 1.24,
+            "rss_bytes": 24272896
+          },
+          {
+            "at_ns": 1794564305699546864,
+            "cpu_seconds": 1.24,
+            "rss_bytes": 24272896
+          },
+          {
+            "at_ns": 1794564306200002729,
+            "cpu_seconds": 1.24,
+            "rss_bytes": 24272896
+          },
+          {
+            "at_ns": 1794564306700487807,
+            "cpu_seconds": 1.24,
+            "rss_bytes": 24272896
+          }
+        ],
+        "gomaxprocs_env": "20",
+        "launcher_cpu_affinity": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23,
+          24,
+          25,
+          26,
+          27,
+          28,
+          29,
+          30,
+          31,
+          32,
+          33,
+          34,
+          35,
+          36,
+          37,
+          38,
+          39
+        ],
+        "resource_scope": "GOMAXPROCS applies to each whole test process, including all its in-process Nodes; packages run sequentially."
+      },
+      {
+        "argv": [
+          "python3",
+          "tests/process_cluster.py",
+          "--mode",
+          "smoke",
+          "--output",
+          "/home/genxin/consensus-server-evaluation-1111/results/evaluation/jobs/0011-v003-original-suites-native-r4/native-process-smoke"
+        ],
+        "exit_code": 0,
+        "status": "completed",
+        "elapsed_seconds": 2.5241336822509766,
+        "process_samples": [
+          {
+            "at_ns": 1794564306798214972,
+            "cpu_seconds": 0.0,
+            "rss_bytes": 335872
+          },
+          {
+            "at_ns": 1794564307298708623,
+            "cpu_seconds": 0.08,
+            "rss_bytes": 23519232
+          },
+          {
+            "at_ns": 1794564307799146958,
+            "cpu_seconds": 0.08,
+            "rss_bytes": 23519232
+          },
+          {
+            "at_ns": 1794564308299622812,
+            "cpu_seconds": 0.17,
+            "rss_bytes": 25812992
+          },
+          {
+            "at_ns": 1794564308800106711,
+            "cpu_seconds": 0.17,
+            "rss_bytes": 25812992
+          },
+          {
+            "at_ns": 1794564309300567759,
+            "cpu_seconds": 0.21,
+            "rss_bytes": 0
+          }
+        ],
+        "gomaxprocs_env": "2",
+        "launcher_cpu_affinity": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23,
+          24,
+          25,
+          26,
+          27,
+          28,
+          29,
+          30,
+          31,
+          32,
+          33,
+          34,
+          35,
+          36,
+          37,
+          38,
+          39
+        ],
+        "resource_scope": "Original multi-process script; no per-replica pinning. Forge scripts set child GOMAXPROCS=4 internally; baseline inherits the environment."
+      }
+    ],
+    "scope": "Original implementation-specific tests. Coverage differs between versions; test counts are not a comparative score."
+  },
+  "elapsed_seconds": 37.72354769706726
+}

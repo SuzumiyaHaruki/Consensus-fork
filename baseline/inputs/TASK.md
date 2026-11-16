@@ -2,7 +2,7 @@
 
 Implement the complete system described by `protocol.md` and `system.md`. Read both documents in full. Deliver the specified runnable programs, reusable components, tests and documentation. Choose your own design, implementation process, tests and self-review. Do not substitute another consensus algorithm or modify the supplied requirements.
 
-Report actual commands/results, unresolved failures, material ambiguities and unmet requirements in the delivery. Choose unspecified implementation mechanisms yourself; report design problems without waiting for a design-agent response.
+Report actual commands/results, unresolved failures, material ambiguities and unmet requirements in the delivery. Complete feasible local checks and deliver reusable tests for larger-scale evaluation; do not wait for access to another machine. Choose unspecified implementation mechanisms yourself; report design problems without waiting for a design-agent response.
 
 With the default configuration, generation has no fixed stage deadline. Judge when to deliver from completion of the requested implementation, appropriate checks and documentation. Address concrete delivery problems, report unresolved work or blockers, and finish; additional possible tests alone do not require continued investigation.
 

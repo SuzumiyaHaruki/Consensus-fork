@@ -1,0 +1,291 @@
+package tests
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"example.com/mixepaxos/consensus"
+	"example.com/mixepaxos/transport"
+)
+
+// Uses the existing real-time wake adapters to create differing, genuine Omega
+// outputs. Only finite packet/wake delays are introduced; no state is injected.
+// PASS requires the old-call NACK to preempt a newer lower task, and checks
+// identity rejection, no lower retransmission and completion after release.
+func TestRepairCrossTaskNack(t *testing.T) {
+	c := config(7)
+	c.WindowMS = 500
+	c.S = 2
+	c.K = 1
+	clocks := []*repairNackWake{{ready: make(chan struct{})}, {ready: make(chan struct{})}}
+	var openTwo bool
+	type heldPacket struct { message consensus.Message; deliver func() }
+	var heldTwo []heldPacket
+	var mu sync.Mutex
+	var all []func()
+	toZero := make(map[uint64][]func())
+	toOne := make(map[uint64][]func())
+	var release bool
+	var firstSeen atomic.Int64
+	var nacked atomic.Int64
+	var validate3 atomic.Int64
+	var nacks []consensus.Message
+	var oldRequest, currentRequest consensus.Message
+	var startHigher time.Time
+	nw := transport.NewMemory()
+	nw.Hook = func(from, to int, m consensus.Message, d func()) {
+		mu.Lock()
+		defer mu.Unlock()
+		if from == 1 && m.Kind == "Validate" && m.B.Round == 3 {
+			validate3.Add(1)
+		}
+		if from == 0 && to == 1 && m.Kind == "NACK" {
+			nacks = append(nacks, m)
+		}
+		if to == 6 && (m.Kind == "Reply" || m.Kind == "NACK" || m.Kind == "Done") {
+			return
+		}
+		if release {
+			d()
+			return
+		}
+		if to == 2 && m.X == (consensus.ID{Replica: 6, Index: 1}) && !openTwo {
+			heldTwo = append(heldTwo, heldPacket{m, d})
+			all = append(all, d)
+			return
+		}
+		hold := to == 1 && from != 0 && m.Kind == "NACK"
+		if (m.Kind == "Bad" || m.Kind == "Complaint") && m.Member == 1 && to == 1 {
+			hold = true
+		}
+		if from == 1 && to == 0 && m.Kind == "Prepare" {
+			toZero[m.B.Round] = append(toZero[m.B.Round], d)
+			hold = true
+			if m.B.Round == 1 {
+				if oldRequest.Attempt == 0 {
+					oldRequest = m
+				}
+			} else {
+				currentRequest = m
+			}
+		}
+		if from == 2 && to == 1 && m.Kind == "Prepare" {
+			toOne[m.B.Round] = append(toOne[m.B.Round], d)
+			hold = true
+		}
+		if from == 2 && m.Kind == "Prepare" && startHigher.IsZero() {
+			startHigher = time.Now()
+		}
+		if (from == 1 || from == 2) && (m.Kind == "Validate" || m.Kind == "Observe" || m.Kind == "Accept") {
+			hold = true
+		}
+		if to == 2 && m.Kind == "Reply" && m.For == "Prepare" {
+			hold = true
+		}
+		if hold {
+			all = append(all, d)
+			return
+		}
+		d()
+	}
+	var ns []*consensus.Node
+	for p := range c.Members {
+		o := consensus.Options{}
+		if p < 2 {
+			o.Clock = clocks[p]
+		}
+
+		if p == 1 {
+			o.Observe = func(e consensus.Event) {
+				if e.Kind == "handled-PreAccept" {
+					firstSeen.CompareAndSwap(0, e.At.UnixNano())
+				}
+				if e.Kind == "nack" && strings.HasPrefix(e.Detail, "Prepare promise=") {
+					nacked.Add(1)
+				}
+			}
+		}
+		n, e := consensus.New(c, p, nw.Endpoint(p), o)
+		if e != nil {
+			t.Fatal(e)
+		}
+		ns = append(ns, n)
+		nw.Add(n)
+	}
+	defer func() {
+		for _, n := range ns {
+			n.Close()
+		}
+	}()
+	x := consensus.ID{Replica: 6, Index: 1}
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Millisecond)
+	r := ns[6].Submit(ctx, cmd(1, "put", "cross-task-nack", "v"))
+	cancel()
+	if r.Status != consensus.Unknown {
+		t.Fatal(r)
+	}
+	for p := 0; p < 6; p++ {
+		if p == 2 {
+			continue
+		}
+		eventually(t, c.Window()/2, func() bool { v, ok := ns[p].Inspect(x); return ok && v.First != nil })
+	}
+	nw.Remove(6)
+	ns[6].Close()
+	eventually(t, 3*c.Window(), func() bool { return ns[1].Stats().Omega == 1 && ns[2].Stats().Omega == 2 })
+	time.Sleep(time.Until(time.Unix(0, firstSeen.Load()).Add(4*c.Window() + time.Millisecond)))
+	clocks[1].release()
+	eventually(t, 2*c.Window(), func() bool { v, _ := ns[1].Inspect(x); return v.TaskBallot.Round == 1 && v.Collection == "Validate" })
+	task1, _ := ns[1].Inspect(x)
+	mu.Lock()
+	two := append([]heldPacket(nil), heldTwo...)
+	mu.Unlock()
+    selected := -1
+    for j, packet := range two {
+        if packet.message.Kind == "Prepare" && packet.message.B == (consensus.Ballot{Round:1, Owner:1}) {
+            selected = j
+            break
+        }
+    }
+    if selected < 0 { t.Fatal("missing genuine Prepare(1,1) for setup") }
+    two[selected].deliver()
+    eventually(t, c.Window()/4, func() bool {
+        view, ok := ns[2].Inspect(x)
+        return ok && !view.Promise.Less(consensus.Ballot{Round:1, Owner:1})
+    })
+    mu.Lock()
+    openTwo = true
+    remaining := append([]heldPacket(nil), heldTwo...)
+    mu.Unlock()
+    for j, packet := range remaining {
+        if j != selected { packet.deliver() }
+    }
+	eventually(t, c.Window()/4, func() bool { mu.Lock(); defer mu.Unlock(); return len(toOne[2]) > 0 })
+	mu.Lock()
+	d2 := toOne[2][0]
+	mu.Unlock()
+	d2()
+	// Node1 is preempted by the genuine (2,2) Prepare, then starts (3,1).
+	// Its genuine Prepare preempts node2, which next starts (4,2).
+	eventually(t, c.Window(), func() bool {
+		v, _ := ns[1].Inspect(x)
+		u, _ := ns[0].Inspect(x)
+		return v.TaskBallot.Round == 3 && v.Collection == "Validate" && u.Promise.Round == 4
+	})
+	before, _ := ns[1].Inspect(x)
+	nackedBefore := nacked.Load()
+	mu.Lock()
+	old := toZero[1][0]
+	mu.Unlock()
+	old()
+	eventually(t, c.Window()/8, func() bool { return nacked.Load() > nackedBefore })
+	after, _ := ns[1].Inspect(x)
+	mu.Lock()
+	elapsed := time.Since(startHigher)
+	oldWire := oldRequest
+	currentWire := currentRequest
+	var oldNack consensus.Message
+	for _, m := range nacks {
+		if m.Attempt == oldWire.Attempt {
+			oldNack = m
+		}
+	}
+	mu.Unlock()
+	b, _ := json.Marshal(map[string]any{"task1": task1, "before": before, "after_old_nack": after, "old_request": oldWire, "old_nack": oldNack, "new_request": currentWire, "omega1": ns[1].Stats().Omega, "omega2": ns[2].Stats().Omega, "higher_to_observation_ms": float64(elapsed.Microseconds()) / 1000, "matched_prepare_nacks": nacked.Load()})
+	fmt.Println(string(b))
+	if oldNack.Kind != "NACK" || oldNack.Attempt != oldWire.Attempt || oldNack.Nonce != oldWire.Nonce || oldNack.B != oldWire.B || oldNack.X != oldWire.X || oldNack.Phase != oldWire.Phase {
+		t.Fatal("not a matching genuine old NACK", oldNack, oldWire)
+	}
+	if after.Promise.Less(oldNack.Promise) || after.Task != "" || !after.Pending || ns[1].Stats().Omega != 1 {
+		t.Fatal("old-call higher NACK did not preempt newer task", after, oldNack)
+	}
+	if elapsed >= c.Window() {
+		t.Fatal("controlled interval exceeded W", elapsed)
+	}
+	// Alter one correlation field at a time. These are API rejection controls,
+	// not protocol-compliant fault traffic, and cannot raise the saved promise.
+	for j := 0; j < 6; j++ {
+		bad := oldNack
+		bad.Promise.Round = 1000
+		switch j {
+		case 0:
+			bad.Attempt++
+		case 1:
+			bad.Nonce++
+		case 2:
+			bad.B.Round++
+		case 3:
+			bad.For = "Accept"
+		case 4:
+			bad.Phase = 2
+		case 5:
+			bad.CallToken = "invalid"
+		}
+		if err := ns[1].Receive(0, bad); err != nil {
+			t.Fatal(err)
+		}
+	}
+	sentBefore := validate3.Load()
+	time.Sleep(c.Window() / 2)
+	check, _ := ns[1].Inspect(x)
+	if check.Promise.Round >= 1000 || validate3.Load() != sentBefore {
+		t.Fatal("bad identity raised promise or lower task retransmitted", check, validate3.Load(), sentBefore)
+	}
+	fmt.Println("old-task NACK saved and stopped lower Validate; altered identities rejected; no lower retransmission")
+	// The current task's already-issued Prepare remains matchable as well.
+	nackedBefore = nacked.Load()
+	mu.Lock()
+	nowReq := toZero[3][0]
+	mu.Unlock()
+	nowReq()
+	eventually(t, c.Window()/8, func() bool {
+		v, _ := ns[1].Inspect(x)
+		return nacked.Load() > nackedBefore && !v.Promise.Less(oldNack.Promise)
+	})
+	control, _ := ns[1].Inspect(x)
+	mu.Lock()
+	var latest consensus.Message
+	for _, m := range nacks {
+		if m.Attempt == currentWire.Attempt {
+			latest = m
+		}
+	}
+	mu.Unlock()
+	if latest.Kind != "NACK" || control.Promise.Less(latest.Promise) || (control.Task != "" && control.TaskBallot.Less(latest.Promise)) {
+		t.Fatal("subsequent genuine NACK did not preempt", control, latest)
+	}
+	mu.Lock()
+	nackCopy := append([]consensus.Message(nil), nacks...)
+	mu.Unlock()
+	b, _ = json.Marshal(map[string]any{"current_task_nack_control": control, "nacks": nackCopy})
+	fmt.Println(string(b))
+	mu.Lock()
+	release = true
+	ds := append([]func(){}, all...)
+	mu.Unlock()
+	for _, d := range ds {
+		d()
+	}
+	clocks[0].release()
+	eventually(t, 3*time.Second, func() bool {
+		for _, n := range ns[:6] {
+			v, _ := n.Inspect(x)
+			if !v.Executed {
+				return false
+			}
+		}
+		return true
+	})
+	for _, n := range ns[:6] {
+		if s := n.Stats(); s.Invariants != 0 || s.WindowMisses != 0 {
+			t.Fatal(s)
+		}
+	}
+	fmt.Println("all held packets released: all six survivors actually executed; no invariant/window-shortfall events")
+}

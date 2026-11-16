@@ -1,0 +1,121 @@
+?   	example.com/mixepaxos/client	[no test files]
+?   	example.com/mixepaxos/cmd/client	[no test files]
+?   	example.com/mixepaxos/cmd/controlled	[no test files]
+?   	example.com/mixepaxos/cmd/server	[no test files]
+?   	example.com/mixepaxos/consensus	[no test files]
+=== RUN   TestAuditMaintenanceCosts
+    audit_maintenance_test.go:57: set MIXEPAXOS_COST_TEST=1 for history cost comparison
+--- SKIP: TestAuditMaintenanceCosts (0.00s)
+=== RUN   TestAuditHTTPMaximumPayload
+PASS: seven real TCP Nodes executed max 128-byte session/256-byte key/65536-byte escaped value Put/Get/Delete; wire max=791418 bytes; Put=293.025818ms; exact retry ALREADY, contradictory/oversized/unknown-field requests rejected before admission; every replica actually executed all 3 instances
+--- PASS: TestAuditHTTPMaximumPayload (2.58s)
+=== RUN   TestAuditReorderedCrashProperties
+=== RUN   TestAuditReorderedCrashProperties/3
+seed=3 four actual closes completed in 54.619453ms, before W=300ms
+seed=3 PASS: 59 actual instances, 64 calls, four owner crashes, three survivors; decisions/conflict coverage/dependency+SCC order/application results/dedup checked; sends=3253
+=== RUN   TestAuditReorderedCrashProperties/17
+seed=17 four actual closes completed in 53.96421ms, before W=300ms
+seed=17 PASS: 59 actual instances, 64 calls, four owner crashes, three survivors; decisions/conflict coverage/dependency+SCC order/application results/dedup checked; sends=3262
+=== RUN   TestAuditReorderedCrashProperties/91
+seed=91 four actual closes completed in 54.02173ms, before W=300ms
+seed=91 PASS: 60 actual instances, 64 calls, four owner crashes, three survivors; decisions/conflict coverage/dependency+SCC order/application results/dedup checked; sends=3509
+--- PASS: TestAuditReorderedCrashProperties (12.83s)
+    --- PASS: TestAuditReorderedCrashProperties/3 (4.20s)
+    --- PASS: TestAuditReorderedCrashProperties/17 (4.05s)
+    --- PASS: TestAuditReorderedCrashProperties/91 (4.59s)
+=== RUN   TestRequestThroughReplicas
+--- PASS: TestRequestThroughReplicas (0.01s)
+=== RUN   TestConcurrentSequenceAllocationAndValidation
+--- PASS: TestConcurrentSequenceAllocationAndValidation (0.01s)
+=== RUN   TestConfigurationRejectsOverflow
+--- PASS: TestConfigurationRejectsOverflow (0.00s)
+=== RUN   TestConcurrentConflictsAndDuplicates
+--- PASS: TestConcurrentConflictsAndDuplicates (0.27s)
+=== RUN   TestCoordinatorCrashRecoveryAndCarry
+--- PASS: TestCoordinatorCrashRecoveryAndCarry (1.13s)
+=== RUN   TestWaitTimeoutRetainsSlotAndSameEntryWork
+--- PASS: TestWaitTimeoutRetainsSlotAndSameEntryWork (0.03s)
+=== RUN   TestManualClockAndReorderedDelivery
+--- PASS: TestManualClockAndReorderedDelivery (0.01s)
+=== RUN   TestHistoryCosts
+    history_test.go:18: opt-in measured history/cold-data workload
+--- SKIP: TestHistoryCosts (0.00s)
+=== RUN   TestOverloadRejectsBeforeAdmissionAndQueuedWorkSurvivesWaiters
+--- PASS: TestOverloadRejectsBeforeAdmissionAndQueuedWorkSurvivesWaiters (0.26s)
+=== RUN   TestShutdownReturnsAndRejectsNewRequests
+--- PASS: TestShutdownReturnsAndRejectsNewRequests (0.01s)
+=== RUN   TestHTTPCluster
+    network_test.go:124: after workload node 0: {Known:29 Registered:29 Undecided:0 OwnUndecided:0 Executed:29 Slots:0 Queued:0 Omega:0 Handlers:612 Busy:0 MaxHandlers:4 WindowMisses:0 HelpRequests:0 Invariants:0 Suspended:0 Missing:0 Staged:0}
+    network_test.go:124: after workload node 1: {Known:29 Registered:29 Undecided:0 OwnUndecided:0 Executed:29 Slots:0 Queued:0 Omega:0 Handlers:612 Busy:0 MaxHandlers:4 WindowMisses:0 HelpRequests:0 Invariants:0 Suspended:0 Missing:0 Staged:0}
+    network_test.go:124: after workload node 2: {Known:29 Registered:29 Undecided:0 OwnUndecided:0 Executed:29 Slots:0 Queued:0 Omega:0 Handlers:584 Busy:0 MaxHandlers:4 WindowMisses:0 HelpRequests:0 Invariants:0 Suspended:0 Missing:0 Staged:0}
+    network_test.go:124: after workload node 3: {Known:29 Registered:29 Undecided:0 OwnUndecided:0 Executed:29 Slots:0 Queued:0 Omega:0 Handlers:547 Busy:0 MaxHandlers:4 WindowMisses:0 HelpRequests:0 Invariants:0 Suspended:0 Missing:0 Staged:0}
+    network_test.go:124: after workload node 4: {Known:29 Registered:29 Undecided:0 OwnUndecided:0 Executed:29 Slots:0 Queued:0 Omega:0 Handlers:581 Busy:0 MaxHandlers:4 WindowMisses:0 HelpRequests:0 Invariants:0 Suspended:0 Missing:0 Staged:0}
+    network_test.go:124: after workload node 5: {Known:29 Registered:29 Undecided:0 OwnUndecided:0 Executed:29 Slots:0 Queued:0 Omega:0 Handlers:558 Busy:0 MaxHandlers:4 WindowMisses:0 HelpRequests:0 Invariants:0 Suspended:0 Missing:0 Staged:0}
+    network_test.go:124: after workload node 6: {Known:29 Registered:29 Undecided:0 OwnUndecided:0 Executed:29 Slots:0 Queued:0 Omega:0 Handlers:559 Busy:0 MaxHandlers:4 WindowMisses:0 HelpRequests:0 Invariants:0 Suspended:0 Missing:0 Staged:0}
+--- PASS: TestHTTPCluster (1.88s)
+=== RUN   TestSmallThresholdTwoPhasesWithFourCrashes
+--- PASS: TestSmallThresholdTwoPhasesWithFourCrashes (0.24s)
+=== RUN   TestLateFastVotesDuringFormalAccept
+--- PASS: TestLateFastVotesDuringFormalAccept (0.27s)
+=== RUN   TestRecoveryInheritsActualAcceptedValue
+--- PASS: TestRecoveryInheritsActualAcceptedValue (1.84s)
+=== RUN   TestValidationHelpForConcurrentBlindInitialValues
+--- PASS: TestValidationHelpForConcurrentBlindInitialValues (2.05s)
+=== RUN   TestCarryAndExecutedRepresentativeDoNotBlockOnNonconflict
+--- PASS: TestCarryAndExecutedRepresentativeDoNotBlockOnNonconflict (0.38s)
+=== RUN   TestRepairExpansionResumesAcrossDataAndDecision
+    repair_a001_expansion_test.go:91: fetched both interior holes; retained earlier conflicting edge; root returned late: {Known:8 Registered:8 Undecided:0 OwnUndecided:0 Executed:8 Slots:0 Queued:0 Omega:0 Handlers:89 Busy:0 MaxHandlers:4 WindowMisses:0 HelpRequests:0 Invariants:0 Suspended:0 Missing:0 Staged:0}
+--- PASS: TestRepairExpansionResumesAcrossDataAndDecision (0.04s)
+=== RUN   TestRepairGrowingHistoryGossip
+{"cold":{"known":101,"registered":101,"undecided":0,"own_undecided":0,"executed":101,"slots":0,"queued":0,"omega":0,"handlers":1261,"busy":0,"max_handlers":4,"window_misses":0,"help_requests":0,"invariants":0,"suspended":0,"missing":0,"staged":0},"elapsed_ms":1194,"history":101,"max_submit_ms":2.49,"old_known":true,"old_learn_attempts":{"0":[9956322,22206018,271992164],"1":[10196017,22517883,270693563],"2":[10245944,24985947,272294982],"3":[10368685,26069161,272321606],"4":[10478127,27610178,274955458],"5":[10253848,29013475,275213462]},"phase":"growing","source":{"known":101,"registered":101,"undecided":0,"own_undecided":0,"executed":101,"slots":0,"queued":0,"omega":0,"handlers":1881,"busy":0,"max_handlers":4,"window_misses":0,"help_requests":0,"invariants":0,"suspended":0,"missing":0,"staged":0}}
+{"cold":{"known":101,"registered":101,"undecided":0,"own_undecided":0,"executed":101,"slots":0,"queued":0,"omega":0,"handlers":1261,"busy":0,"max_handlers":4,"window_misses":0,"help_requests":0,"invariants":0,"suspended":0,"missing":0,"staged":0},"delay_ms":0,"old_known_executed":true,"phase":"after_growth_stops"}
+--- PASS: TestRepairGrowingHistoryGossip (1.20s)
+=== RUN   TestRepairLatePrepareNack
+{"after":{"Record":{"id":{"replica":6,"index":1},"initial":{"cmd":{"rid":{"client":"test-session","seq":1},"op":"put","key":"late-nack","value":"v"},"d":[0,0,0,0,0,0,0],"seq":1}},"First":{"d":[0,0,0,0,0,0,0],"seq":1,"fast":true},"Promise":{"round":2,"owner":2},"Accepted":null,"Decision":null,"Executed":false,"NoFast":false,"Pending":true,"Task":"","TaskBallot":{"round":0,"owner":0},"Collection":"","Phase":0,"RepliesA":0,"RepliesB":0,"Suspended":0},"before":{"Record":{"id":{"replica":6,"index":1},"initial":{"cmd":{"rid":{"client":"test-session","seq":1},"op":"put","key":"late-nack","value":"v"},"d":[0,0,0,0,0,0,0],"seq":1}},"First":{"d":[0,0,0,0,0,0,0],"seq":1,"fast":true},"Promise":{"round":1,"owner":1},"Accepted":null,"Decision":null,"Executed":false,"NoFast":false,"Pending":true,"Task":"validate","TaskBallot":{"round":1,"owner":1},"Collection":"Validate","Phase":1,"RepliesA":1,"RepliesB":0,"Suspended":0},"current_request":{"kind":"Validate","x":{"replica":6,"index":1},"b":{"round":1,"owner":1},"attempt":4,"phase":1,"nonce":5,"call_token":"e46d0e7efe697d11d9afa9c3266d4eb74865b38c68e758251293e619e92cc7ba","record":{"id":{"replica":6,"index":1},"initial":{"cmd":{"rid":{"client":"test-session","seq":1},"op":"put","key":"late-nack","value":"v"},"d":[0,0,0,0,0,0,0],"seq":1}},"promise":{"round":0,"owner":0},"y":{"replica":0,"index":0}},"higher_to_observation_ms":12.732,"nack":{"for":"Prepare","kind":"NACK","x":{"replica":6,"index":1},"b":{"round":1,"owner":1},"attempt":1,"phase":1,"nonce":2,"call_token":"c668d415a928f9fe0b817922ddf4ed9c65b57ae27e8ba0b1a8ff0510a9959766","record":{"id":{"replica":6,"index":1},"initial":{"cmd":{"rid":{"client":"test-session","seq":1},"op":"put","key":"late-nack","value":"v"},"d":[0,0,0,0,0,0,0],"seq":1}},"promise":{"round":2,"owner":2},"y":{"replica":0,"index":0}},"old_request":{"kind":"Prepare","x":{"replica":6,"index":1},"b":{"round":1,"owner":1},"attempt":1,"phase":1,"nonce":2,"call_token":"c668d415a928f9fe0b817922ddf4ed9c65b57ae27e8ba0b1a8ff0510a9959766","record":{"id":{"replica":6,"index":1},"initial":{"cmd":{"rid":{"client":"test-session","seq":1},"op":"put","key":"late-nack","value":"v"},"d":[0,0,0,0,0,0,0],"seq":1}},"promise":{"round":0,"owner":0},"y":{"replica":0,"index":0}},"omega1":1,"omega2":2,"stale_prepare_events":2}
+{"after":{"Record":{"id":{"replica":6,"index":1},"initial":{"cmd":{"rid":{"client":"test-session","seq":1},"op":"put","key":"late-nack","value":"v"},"d":[0,0,0,0,0,0,0],"seq":1}},"First":{"d":[0,0,0,0,0,0,0],"seq":1,"fast":true},"Promise":{"round":2,"owner":2},"Accepted":null,"Decision":null,"Executed":false,"NoFast":false,"Pending":true,"Task":"","TaskBallot":{"round":0,"owner":0},"Collection":"","Phase":0,"RepliesA":0,"RepliesB":0,"Suspended":0},"control":"matching-current-call","nack":{"for":"Validate","kind":"NACK","x":{"replica":6,"index":1},"b":{"round":1,"owner":1},"attempt":4,"phase":1,"nonce":5,"call_token":"e46d0e7efe697d11d9afa9c3266d4eb74865b38c68e758251293e619e92cc7ba","record":{"id":{"replica":6,"index":1},"initial":{"cmd":{"rid":{"client":"test-session","seq":1},"op":"put","key":"late-nack","value":"v"},"d":[0,0,0,0,0,0,0],"seq":1}},"promise":{"round":2,"owner":2},"y":{"replica":0,"index":0}},"preempted_events":1}
+released genuine packets: all six correct replicas executed; no invariant or window-shortfall events
+--- PASS: TestRepairLatePrepareNack (1.06s)
+=== RUN   TestRepairRecoveryStopsOnOmegaChange
+{"after_omega":{"Record":{"id":{"replica":6,"index":1},"initial":{"cmd":{"rid":{"client":"test-session","seq":1},"op":"put","key":"omega-authority","value":"v"},"d":[0,0,0,0,0,0,0],"seq":1}},"First":{"d":[0,0,0,0,0,0,0],"seq":1,"fast":true},"Promise":{"round":1,"owner":0},"Accepted":null,"Decision":null,"Executed":false,"NoFast":false,"Pending":true,"Task":"","TaskBallot":{"round":0,"owner":0},"Collection":"","Phase":0,"RepliesA":0,"RepliesB":0,"Suspended":0},"before":{"Record":{"id":{"replica":6,"index":1},"initial":{"cmd":{"rid":{"client":"test-session","seq":1},"op":"put","key":"omega-authority","value":"v"},"d":[0,0,0,0,0,0,0],"seq":1}},"First":{"d":[0,0,0,0,0,0,0],"seq":1,"fast":true},"Promise":{"round":1,"owner":0},"Accepted":null,"Decision":null,"Executed":false,"NoFast":false,"Pending":true,"Task":"prepare","TaskBallot":{"round":1,"owner":0},"Collection":"Prepare","Phase":1,"RepliesA":1,"RepliesB":0,"Suspended":0},"done":{"Record":{"id":{"replica":6,"index":1},"initial":{"cmd":{"rid":{"client":"test-session","seq":1},"op":"put","key":"omega-authority","value":"v"},"d":[0,0,0,0,0,0,0],"seq":1}},"First":{"d":[0,0,0,0,0,0,0],"seq":1,"fast":true},"Promise":{"round":1,"owner":0},"Accepted":null,"Decision":null,"Executed":false,"NoFast":false,"Pending":true,"Task":"","TaskBallot":{"round":0,"owner":0},"Collection":"","Phase":0,"RepliesA":0,"RepliesB":0,"Suspended":0},"omega":1,"post_omega_requests":null,"recovery_total_ms":19.124,"stats":{"known":1,"registered":1,"undecided":1,"own_undecided":0,"executed":0,"slots":0,"queued":0,"omega":1,"handlers":112,"busy":0,"max_handlers":4,"window_misses":0,"help_requests":0,"invariants":0,"suspended":0,"missing":0,"staged":0}}
+--- PASS: TestRepairRecoveryStopsOnOmegaChange (0.85s)
+=== RUN   TestRepairCrossTaskNack
+    repair_a002_nack_test.go:152: condition not observed before deadline
+--- FAIL: TestRepairCrossTaskNack (2.66s)
+=== RUN   TestRepairCanceledDuplicateAndQueuedWaiters
+    repair_cancellation_test.go:87: held_actual_callbacks=2 released_after=14.115189ms canceled_duplicate={Status:UNKNOWN Value: Found:false Error:waiting ended; retry identical command} canceled_queue={Status:INCOMPLETE Value: Found:false Error:waiting ended; retry identical command} surviving_original=OK queued_instance=1.2/decided/executed final_get={Status:OK Value:second Found:true Error:} stats={Known:3 Registered:3 Undecided:0 OwnUndecided:0 Executed:3 Slots:0 Queued:0 Omega:0 Handlers:14 Busy:0 MaxHandlers:4 WindowMisses:0 HelpRequests:0 Invariants:0 Suspended:0 Missing:0 Staged:0}
+--- PASS: TestRepairCanceledDuplicateAndQueuedWaiters (0.02s)
+=== RUN   TestRepairExpansionKeepsUnknownBelowExecutedRun
+    repair_expansion_test.go:72: 64 executed positions above unknown 0.1; actual Fetch sends=6, root correctly waited then executed; stats={Known:66 Registered:66 Undecided:0 OwnUndecided:0 Executed:66 Slots:0 Queued:0 Omega:0 Handlers:534 Busy:0 MaxHandlers:4 WindowMisses:0 HelpRequests:0 Invariants:0 Suspended:0 Missing:0 Staged:0}
+--- PASS: TestRepairExpansionKeepsUnknownBelowExecutedRun (0.13s)
+=== RUN   TestRepairKnownRIDFromPrepareRejectsContradiction
+    repair_rid_prepare_test.go:85: original caller after crash: {Status:UNKNOWN Value: Found:false Error:waiting ended; retry identical command}
+    repair_rid_prepare_test.go:99: replica2 before contradictory input: stats={Known:1 Registered:0 Undecided:1 OwnUndecided:0 Executed:0 Slots:0 Queued:0 Omega:0 Handlers:23 Busy:0 MaxHandlers:2 WindowMisses:0 HelpRequests:0 Invariants:0 Suspended:0 Missing:0 Staged:0} originalRecord={ID:1.1 Initial:{Cmd:{RID:{Client:known-at-prepare Seq:1} Op:put Key:original Value:v1} D:[0 0 0] Seq:1} Carry:[]}
+    repair_rid_prepare_test.go:110: contradictory response: http=400 result={Status:REJECTED Value: Found:false Error:contradictory rid reuse}
+    repair_rid_prepare_test.go:111: replica2 after input: stats={Known:1 Registered:0 Undecided:1 OwnUndecided:0 Executed:0 Slots:0 Queued:0 Omega:0 Handlers:23 Busy:0 MaxHandlers:2 WindowMisses:0 HelpRequests:0 Invariants:0 Suspended:0 Missing:0 Staged:0} contradictoryRecord={ID:0.0 Initial:{Cmd:{RID:{Client: Seq:0} Op: Key: Value:} D:[] Seq:0} Carry:[]}
+--- PASS: TestRepairKnownRIDFromPrepareRejectsContradiction (0.92s)
+=== RUN   TestRepairHeartbeatRetriesOldExactNumbers
+    repair_scheduler_test.go:83: newest=12 old attempts=map[1:3 2:3 3:3] actual exact ACK transmissions=map[1:1 2:1 3:1]
+--- PASS: TestRepairHeartbeatRetriesOldExactNumbers (0.81s)
+=== RUN   TestRepairSingleSlotMaintenance
+=== RUN   TestRepairSingleSlotMaintenance/1
+    repair_scheduler_test.go:134: queue=1 admitted/formal/executed; next Get={Status:OK Value:v Found:true Error:}; stats={Known:2 Registered:2 Undecided:0 OwnUndecided:0 Executed:2 Slots:0 Queued:0 Omega:1 Handlers:28 Busy:2 MaxHandlers:1 WindowMisses:0 HelpRequests:0 Invariants:0 Suspended:0 Missing:0 Staged:0}
+=== RUN   TestRepairSingleSlotMaintenance/8
+    repair_scheduler_test.go:134: queue=8 admitted/formal/executed; next Get={Status:OK Value:v Found:true Error:}; stats={Known:2 Registered:2 Undecided:0 OwnUndecided:0 Executed:2 Slots:0 Queued:0 Omega:1 Handlers:20 Busy:0 MaxHandlers:1 WindowMisses:0 HelpRequests:0 Invariants:0 Suspended:0 Missing:0 Staged:0}
+--- PASS: TestRepairSingleSlotMaintenance (0.57s)
+    --- PASS: TestRepairSingleSlotMaintenance/1 (0.37s)
+    --- PASS: TestRepairSingleSlotMaintenance/8 (0.21s)
+=== RUN   TestRepairShutdownWhileDataSuspended
+{"admitted_waiter":{"status":"UNKNOWN","error":"waiting ended; retry identical command"},"after":{"known":1,"registered":1,"undecided":1,"own_undecided":1,"executed":0,"slots":1,"queued":1,"omega":0,"handlers":14,"busy":0,"max_handlers":4,"window_misses":0,"help_requests":0,"invariants":0,"suspended":13,"missing":1,"staged":1},"before":{"known":1,"registered":1,"undecided":1,"own_undecided":1,"executed":0,"slots":1,"queued":1,"omega":0,"handlers":14,"busy":0,"max_handlers":4,"window_misses":0,"help_requests":0,"invariants":0,"suspended":13,"missing":1,"staged":1},"close_callers":12,"close_elapsed_us":313,"held_packet_callbacks_released_after_close":13,"post_close_receive_error":"stopped","post_close_submit":{"status":"REJECTED","error":"node stopped"},"queued_waiter":{"status":"INCOMPLETE","error":"waiting ended; retry identical command"}}
+--- PASS: TestRepairShutdownWhileDataSuspended (0.04s)
+=== RUN   TestRepairStagedRIDBinding
+{"admitted_events":0,"after":{"known":0,"registered":0,"undecided":0,"own_undecided":0,"executed":0,"slots":0,"queued":0,"omega":0,"handlers":4,"busy":0,"max_handlers":4,"window_misses":0,"help_requests":0,"invariants":0,"suspended":4,"missing":1,"staged":1},"after_release":{"known":2,"registered":2,"undecided":0,"own_undecided":0,"executed":2,"slots":0,"queued":0,"omega":0,"handlers":31,"busy":0,"max_handlers":4,"window_misses":0,"help_requests":0,"invariants":0,"suspended":0,"missing":0,"staged":0},"before":{"known":0,"registered":0,"undecided":0,"own_undecided":0,"executed":0,"slots":0,"queued":0,"omega":0,"handlers":2,"busy":0,"max_handlers":4,"window_misses":0,"help_requests":0,"invariants":0,"suspended":2,"missing":1,"staged":1},"complete_first":false,"contradictory_instance_cmd":{"rid":{"client":"","seq":0},"op":"","key":""},"contradictory_instance_known":false,"original_root_complete_after_release":true,"remote_deliveries_to_node6":20,"result":{"status":"REJECTED","error":"contradictory rid reuse"}}
+--- PASS: TestRepairStagedRIDBinding (0.12s)
+=== RUN   TestRepairStagedRIDBindingCompleteControl
+{"admitted_events":0,"after":{"known":2,"registered":2,"undecided":0,"own_undecided":0,"executed":2,"slots":0,"queued":0,"omega":0,"handlers":27,"busy":0,"max_handlers":4,"window_misses":0,"help_requests":0,"invariants":0,"suspended":0,"missing":0,"staged":0},"after_release":{"known":2,"registered":2,"undecided":0,"own_undecided":0,"executed":2,"slots":0,"queued":0,"omega":0,"handlers":27,"busy":0,"max_handlers":4,"window_misses":0,"help_requests":0,"invariants":0,"suspended":0,"missing":0,"staged":0},"before":{"known":2,"registered":2,"undecided":0,"own_undecided":0,"executed":2,"slots":0,"queued":0,"omega":0,"handlers":27,"busy":0,"max_handlers":4,"window_misses":0,"help_requests":0,"invariants":0,"suspended":0,"missing":0,"staged":0},"complete_first":true,"contradictory_instance_cmd":{"rid":{"client":"","seq":0},"op":"","key":""},"contradictory_instance_known":false,"original_root_complete_after_release":true,"remote_deliveries_to_node6":20,"result":{"status":"REJECTED","error":"contradictory rid reuse"}}
+--- PASS: TestRepairStagedRIDBindingCompleteControl (0.12s)
+=== RUN   TestServiceAcceptsMaximumEscapedValueAndRejectsMalformed
+--- PASS: TestServiceAcceptsMaximumEscapedValueAndRejectsMalformed (0.12s)
+FAIL
+FAIL	example.com/mixepaxos/tests	32.586s
+?   	example.com/mixepaxos/transport	[no test files]
+FAIL
