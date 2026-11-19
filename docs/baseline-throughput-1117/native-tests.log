@@ -1,0 +1,7 @@
+?   	example.com/mixepaxos/client	[no test files]
+?   	example.com/mixepaxos/cmd/client	[no test files]
+?   	example.com/mixepaxos/cmd/keygen	[no test files]
+?   	example.com/mixepaxos/cmd/server	[no test files]
+?   	example.com/mixepaxos/consensus	[no test files]
+ok  	example.com/mixepaxos/tests	7.359s
+?   	example.com/mixepaxos/transport	[no test files]

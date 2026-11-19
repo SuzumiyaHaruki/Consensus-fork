@@ -11,9 +11,9 @@ DEFAULT = ROOT / 'configs/workflow.json'
 
 @dataclass(frozen=True)
 class WorkflowSettings:
-    generator_model: str = 'gpt-6.1-sol'
+    generator_model: str = 'gpt-6.2-sol'
     generator_reasoning_effort: str = 'high'
-    audit_model: str = 'gpt-6.1-sol'
+    audit_model: str = 'gpt-6.2-sol'
     audit_reasoning_effort: str = 'high'
     codex: str = 'codex'
     audit_python: str = str(ROOT / '.venv/bin/python')
@@ -24,7 +24,6 @@ class WorkflowSettings:
     output_root: str = str(ROOT / 'experiments')
     audit_seconds: float = 3600
     repair_verification_seconds: float = 1800
-    audit_turn_seconds: float = 900
     action_seconds: float = 300
     audit_calls: int = 20
     max_repairs: int = 3

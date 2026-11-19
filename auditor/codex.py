@@ -16,17 +16,18 @@ from pathlib import Path
 from runtime.codex_support import (
     classify_failure, codex_diagnostic, common_settings, DISABLED_FEATURES, codex_options as options,
 )
-from runtime.toolchains import go_environment
+from runtime.toolchains import go_environment, go_tool_roots
 from runtime.toolchains import cargo_tool, cargo_environment, maven_tools, maven_environment
 from runtime.storage import write_json, digest
 from runtime import local_exec
 from runtime import agent_records
 
 
-def process(command, cwd, folder, timeout, *, env, stdin="", secrets=(), execution_control=None):
+def process(command, cwd, folder, deadline, *, env, stdin="", secrets=()):
     """Keep partial bytes and terminate all descendants on every exit path."""
     folder.mkdir(parents=True, exist_ok=True)
     started = time.monotonic()
+    timeout = max(0., deadline - started)
     result = {"status": "completed", "exit_code": None, "timeout_seconds": timeout, "command": command,
               "started_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
     child = None
@@ -36,26 +37,7 @@ def process(command, cwd, folder, timeout, *, env, stdin="", secrets=(), executi
                 raise subprocess.TimeoutExpired(command, timeout)
             child = subprocess.Popen(command, cwd=cwd, env=env, stdin=subprocess.PIPE,
                                      stdout=out, stderr=err, start_new_session=True)
-            payload, remaining = stdin.encode(), timeout
-            control = json.loads(execution_control.read_text()) if execution_control else None
-            while True:
-                if control:
-                    clock = json.loads(Path(control['execution_clock_path']).read_text())
-                    now = time.monotonic()
-                    limits = {control.get('deadline_kind', 'total_seconds'): control['run_deadline'] - now,
-                              'agent_turn_timeout': timeout - (now - started) + local_exec.execution_seconds(clock, now)}
-                    basis = min(limits, key=limits.get)
-                    remaining = limits[basis]
-                    if remaining <= 0:
-                        result['timeout_limit'] = basis
-                        raise subprocess.TimeoutExpired(command, timeout)
-                try:
-                    child.communicate(payload, timeout=min(remaining, .2) if execution_control else remaining)
-                    break
-                except subprocess.TimeoutExpired:
-                    if not execution_control:
-                        raise
-                    payload = None
+            child.communicate(stdin.encode(), timeout=max(0., deadline - time.monotonic()))
             result["exit_code"] = child.returncode
         except subprocess.TimeoutExpired:
             result["status"] = "timeout"
@@ -211,7 +193,7 @@ class Codex:
 
     def local(self, args, name, *, stdin="", offline=True, maximum=30, env=None):
         folder = self.root / "inputs" / name
-        result = process([*self.prefix(offline=offline), *args], self.work, folder, self.limit(maximum),
+        result = process([*self.prefix(offline=offline), *args], self.work, folder, time.monotonic() + self.limit(maximum),
                          env=env or self.environment, stdin=stdin)
         write_json(folder / "result.json", result)
         if result["status"] == "cancelled":
@@ -249,13 +231,10 @@ class Codex:
         backend = self.target["execution_backend"]
         scratch = self.work / '.runtime'
         if backend == 'go_module':
-            discovered = subprocess.run(['go', 'env', 'GOROOT'], capture_output=True, text=True,
-                                        timeout=self.limit(), check=True)
-            tool_roots = [Path(discovered.stdout.strip()).resolve()]
+            tool_roots = go_tool_roots(timeout=self.limit(10))
             cache = Path(self.config.go_mod_cache_dir) if self.config.go_mod_cache_dir else scratch / 'go-mod'
             self.tool_environment.update(go_environment(self.work))
-            self.tool_environment.update(GOCACHE=str(scratch/'go-build'), GOMODCACHE=str(cache),
-                                         GOFLAGS='-mod=readonly -count=1')
+            self.tool_environment.update(GOMODCACHE=str(cache), GOFLAGS='-count=1')
             for name in ('go-build', 'go-mod'):(scratch/name).mkdir(exist_ok=True)
             commands = {'go': ['go', 'version'], 'go_environment':
                 ['go', 'env', 'GOOS', 'GOARCH', 'GOVERSION', 'GOROOT', 'GOMODCACHE', 'GOCACHE', 'GOFLAGS', 'GOWORK']}
@@ -307,7 +286,7 @@ class Codex:
         self.control_path = self.home/'local-exec.json'
         write_json(self.control_path, self.execution_control)
         (self.root/'executions').mkdir(exist_ok=True)
-        self.mcp_settings = local_exec.server_settings(self.control_path, max(self.config.budget.action_timeout, self.config.budget.agent_turn_timeout), self.deadline)
+        self.mcp_settings = local_exec.server_settings(self.control_path, self.config.budget.action_timeout, self.deadline)
         filesystem = {":root": "deny", ":minimal": "read",
                       str(self.root / "source"): "read", str(self.work): "write",
                       str(self.root / "turns"): "read", str(self.root / "inputs/task.md"): "read",
@@ -344,19 +323,10 @@ class Codex:
                 raise ValueError("Catalog does not support the requested reasoning effort")
             if self.config.agent_reasoning_effort is None and (supported or models[0].get("default_reasoning_level")):
                 raise ValueError("null cannot omit reasoning with this catalog's defaults; select an explicit effort")
+            (self.root / "inputs/models.json").write_bytes(raw)
+            self.settings["model_catalog_json"] = str(self.root / "inputs/models.json")
         elif provider or self.config.agent_reasoning_effort is None:
             raise ValueError("Custom models and omitted reasoning require an explicitly verified model catalog")
-        else:
-            result, _ = self.local(["debug", "models", "--bundled"], "bundled-catalog")
-            if result["exit_code"]:
-                raise ValueError("Cannot capture the native bundled model catalog without network")
-            raw = (self.root / "inputs/bundled-catalog/stdout.jsonl").read_bytes()
-            selected = [m for m in json.loads(raw)["models"] if m.get("slug") == self.config.agent_model]
-            if len(selected) != 1 or self.config.agent_reasoning_effort not in {
-                    x["effort"] for x in selected[0].get("supported_reasoning_levels", [])}:
-                raise ValueError("Native model or effort is not advertised by this installed CLI catalog")
-        (self.root / "inputs/models.json").write_bytes(raw)
-        self.settings["model_catalog_json"] = str(self.root / "inputs/models.json")
         self.permission_probe()
         write_json(self.root/'inputs/local-exec.json', local_exec.identity(self.mcp_settings, self.execution_control))
         self.execution_control['allow_experiments'] = self.config.allow_agent_materials and self.config.allow_experiments
@@ -460,7 +430,11 @@ print('PERMISSIONS_VERIFIED')
             raise ValueError("Native subagent setting or required disabled capability could not be verified")
 
     def dependency_probe(self):
-        command = {'go_module': ['go', 'list', '-m', 'all'],
+        # Go checks vendor/modules.txt against go.mod, but cannot enumerate "all" in vendor mode.
+        go_modules = ['go', 'list', '-m']
+        if not (self.work / 'vendor/modules.txt').is_file():
+            go_modules.append('all')
+        command = {'go_module': go_modules,
                    'cargo': ['cargo', 'metadata', '--offline', '--format-version', '1'],
                    'maven': ['mvn', '-o', '-B', '-ntp', '-pl', self.target['execution_package'], '-am', '-DskipTests', 'test-compile']}[self.target['execution_backend']]
         result, _ = self.local(["sandbox", "--include-managed-config", "-P", "codex_plain", *options(self.settings),
@@ -483,7 +457,7 @@ print('PERMISSIONS_VERIFIED')
             self.execution_control['allow_experiments'] = self.config.allow_agent_materials and self.config.allow_experiments
             write_json(self.control_path, self.execution_control)
 
-    def turn(self, folder, prompt, timeout, session_id, *, deadline=None):
+    def turn(self, folder, prompt, session_id, *, deadline):
         # rmdir removes only real empty sandbox residue; it never follows links.
         for name in (".codex", ".agents"):
             path = self.work / name
@@ -499,21 +473,17 @@ print('PERMISSIONS_VERIFIED')
         for path, expected in implementation['reload_inputs'].items():
             if digest(Path(path).read_bytes()) != expected:
                 raise ValueError('Isolated execution implementation changed; start a new run')
-        # Late cleanup from a previous service can only update that turn's private clock.
-        clock_path = self.home / ('execution-clock-' + folder.name + '.json')
-        write_json(clock_path, {'elapsed_seconds': 0.0})
-        turn_deadline = min(self.deadline, deadline if deadline is not None else self.deadline)
+        turn_deadline = min(self.deadline, deadline)
         self.execution_control.update(run_deadline=turn_deadline,
                                       deadline_kind='reporting_reserve' if turn_deadline < self.deadline else 'total_seconds',
-                                      turn=folder.name, execution_clock_path=str(clock_path),
+                                      turn=folder.name,
                                       allow_experiments=True)
         write_json(self.control_path, self.execution_control)
         command = [*self.prefix(), "exec", *(["resume"] if session_id else []), "--strict-config",
                    "--skip-git-repo-check", "--ignore-user-config", "--json",
                    "--output-last-message", str(folder / "final.txt"), *options(self.settings)]
         command += [session_id, "-"] if session_id else ["-"]
-        result = process(command, self.work, folder, timeout, env=self.environment, stdin=prompt, secrets=self.secrets,
-                         execution_control=self.control_path)
+        result = process(command, self.work, folder, turn_deadline, env=self.environment, stdin=prompt, secrets=self.secrets)
         local_exec.reconcile(self.root/'executions', folder.name, 'Codex turn ended: '+result['status'])
         result = decode(folder, result, session_id)
         if result.get('session_id'):

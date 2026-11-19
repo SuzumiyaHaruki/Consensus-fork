@@ -42,18 +42,18 @@ def reconcile(stage):
 def configure(stage, deadline, action_seconds):
     from runtime import local_exec
     from runtime.codex_support import codex_options
-    from runtime.toolchains import go_environment
+    from runtime.toolchains import go_environment, go_tool_roots
     stage = stage.resolve()
     work = stage / 'workspace'
     scratch = work / '.runtime'
     for name in ('home', 'tmp', 'go-build', 'go-mod'):
         (scratch / name).mkdir(parents=True, exist_ok=True)
-    goroot = Path(subprocess.check_output(['go', 'env', 'GOROOT'], text=True, timeout=10).strip()).resolve()
-    environment = {'PATH': str(goroot / 'bin') + ':/usr/bin:/bin', 'HOME': str(scratch / 'home'),
-                   'TMPDIR': str(scratch / 'tmp'), 'LANG': 'C.UTF-8', **go_environment(work),
-                   'GOCACHE': str(scratch / 'go-build'), 'GOMODCACHE': str(scratch / 'go-mod')}
-    control = {'work': str(work), 'records': str(stage / 'executions'), 'tool_roots': [str(goroot)],
-               'read_only_roots': [str(stage / 'inputs')], 'environment': environment,
+    roots = go_tool_roots()
+    tool_path = ':'.join(str(root / 'bin') for root in roots)
+    environment = {'PATH': tool_path + ':/usr/bin:/bin', 'HOME': str(scratch / 'home'),
+                   'TMPDIR': str(scratch / 'tmp'), 'LANG': 'C.UTF-8', **go_environment(work)}
+    control = {'work': str(work), 'records': str(stage / 'executions'), 'tool_roots': list(map(str, roots)),
+            'read_only_roots': [str(stage / 'inputs')], 'environment': environment,
                'action_timeout': action_seconds, 'run_deadline': deadline,
                'turn': 'generation-or-repair', 'allow_experiments': True}
     metadata = json.loads((stage / 'run.json').read_text()) if (stage / 'run.json').is_file() else {}

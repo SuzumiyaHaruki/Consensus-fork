@@ -70,9 +70,20 @@ def maven_environment(scratch, maven, java_home, cache):
             'PATH': str(java_home / 'bin') + ':' + str(maven.parent) + ':' + os.environ.get('PATH', '/usr/bin:/bin')}
 
 
+GO_TOOLS = Path(__file__).resolve().parents[1] / ".toolchains/go"
+
+
+def go_tool_roots(timeout=10):
+    goroot = subprocess.check_output(["go", "env", "GOROOT"], text=True, timeout=timeout).strip()
+    return [Path(goroot).resolve()] + ([GO_TOOLS] if GO_TOOLS.is_dir() else [])
+
+
 def go_environment(workspace):
-    return {"GOCACHE": str(workspace / ".execution/go-build"), "GOPROXY": "off", "GOSUMDB": "off",
-        "GOTOOLCHAIN": "local", "GOFLAGS": "-mod=readonly", "GOWORK": "off", "GOMODCACHE": str(Path.home() / "go/pkg/mod")}
+    scratch = workspace / ".runtime"
+    proxy = GO_TOOLS / "proxy"
+    return {"GOCACHE": str(scratch / "go-build"), "GOMODCACHE": str(scratch / "go-mod"),
+            "GOPROXY": proxy.as_uri() if proxy.is_dir() else "off", "GOSUMDB": "off",
+            "GOTOOLCHAIN": "local", "GOFLAGS": "", "GOWORK": "off"}
 
 
 def go_module(workspace):

@@ -49,7 +49,7 @@ def feedback_overview(candidate, issues, history, catalog=()):
                       f"State: `{issue['state']}`; origin: `{issue['source_commit']}`; original bundle: `{issue['evidence_bundle']}`.", ''])
         if issue.get('source_report', {}).get('status') == 'interrupted':
             lines.extend(['This finding was retained from an interrupted audit, not a completed report. Check its evidence before changing code; the original stop reason and records remain in the bundle.', ''])
-        for field in ('summary', 'property', 'reproduction', 'polarity'):
+        for field in ('summary', 'property', 'assumptions', 'reproduction', 'polarity'):
             if field in issue:
                 lines.extend([f'{field}: {short_description(issue[field])}', ''])
         records = [('Original evidence', issue)]

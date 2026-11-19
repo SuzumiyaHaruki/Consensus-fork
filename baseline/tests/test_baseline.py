@@ -41,8 +41,8 @@ class BaselineTests(unittest.TestCase):
             self.assertEqual((root/'inputs'/name).read_bytes(), (self.root/'inputs'/name).read_bytes())
             self.assertEqual((root/'workspace'/name).read_bytes(), (root/'inputs'/name).read_bytes())
         self.assertEqual((root/'inputs/schedule.py').read_bytes(), (run.PROJECT/'runtime/schedule.py').read_bytes())
-        for name in ('protocol.md', 'system.md'):
-            self.assertEqual((root/'inputs'/name).read_bytes(), (run.PROJECT/'inputs'/name).read_bytes())
+        self.assertEqual((root/'inputs/protocol.md').read_bytes(),
+                         (run.PROJECT/'inputs/protocol.md').read_bytes())
         self.assertFalse((root/'events.jsonl').exists())
         self.assertTrue((root/'workspace/.git').is_dir())
         original = (root/'prompt.txt').read_bytes()
@@ -111,7 +111,7 @@ class BaselineTests(unittest.TestCase):
                 self.assertEqual(result['condition'], run.CONDITION)
                 self.assertEqual((root/'workspace/received-prompt.txt').read_bytes(), (root/'prompt.txt').read_bytes())
                 args = runner.read_json(root/'run.json')['command']
-                self.assertEqual(args[args.index('--model') + 1], 'gpt-6.1-sol')
+                self.assertEqual(args[args.index('--model') + 1], 'gpt-6.2-sol')
                 self.assertIn('features.multi_agent=true', args)
                 self.assertTrue((root/'agents.json').exists())
                 self.assertFalse(any((root/name).exists() for name in ('audits', 'feedback', 'reviews', 'issues.json')))

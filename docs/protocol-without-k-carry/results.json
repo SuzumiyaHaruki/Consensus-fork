@@ -1,0 +1,16 @@
+{
+  "exhaustive_graphs": 100848,
+  "executed_closed_sets": 498768,
+  "validation_intervals": 875508,
+  "random_graphs": 3000,
+  "seed": 20261116,
+  "status": "passed",
+  "examples": [
+    "unrelated_hole",
+    "missing_actual_dependency",
+    "initial_predecessor_required",
+    "validation_must_visit_predecessors",
+    "finite_closure_after_admission_pause"
+  ],
+  "scope": "Dependency-graph refinement and validation-set equivalence under class-based conflicts. Not a proof or simulation of voting, timing, crash recovery, or real Node scheduling."
+}

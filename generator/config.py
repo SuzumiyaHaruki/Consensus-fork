@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 @dataclass(frozen=True)
 class Settings:
-    model: str | None = "gpt-6.1-sol"
+    model: str | None = "gpt-6.2-sol"
     reasoning_effort: str | None = "high"
     timeout_seconds: float | None = None
     codex: str = "codex"

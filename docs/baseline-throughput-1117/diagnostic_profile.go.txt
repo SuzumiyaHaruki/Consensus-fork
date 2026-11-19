@@ -1,0 +1,11 @@
+package main
+import (
+ "net/http"
+ _ "net/http/pprof"
+ "os"
+)
+func init() {
+ if addr := os.Getenv("FORGE_PROFILE_ADDR"); addr != "" {
+  go func(){ _ = http.ListenAndServe(addr, nil) }()
+ }
+}

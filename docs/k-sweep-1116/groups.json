@@ -1,0 +1,1136 @@
+[
+  {
+    "scenario": "ordinary",
+    "version": "baseline",
+    "k": 64,
+    "runs": 3,
+    "complete_runs": 0,
+    "throughput_ops_s": 110.6,
+    "throughput_ops_s_range": [
+      101.1,
+      174.6
+    ],
+    "actual_send_rate": 800,
+    "actual_send_rate_range": [
+      800,
+      800
+    ],
+    "mean_slots": 62.9967688894,
+    "mean_slots_range": [
+      56.7160104118,
+      63.0588958617
+    ],
+    "peak_slots": 64,
+    "peak_slots_range": [
+      64,
+      64
+    ],
+    "full_slots_fraction": 0.5373934729,
+    "full_slots_fraction_range": [
+      0.5079814587,
+      0.558901604
+    ],
+    "admit_decide_mean_ms": 559.1196905188034,
+    "admit_decide_mean_ms_range": [
+      326.7675891325967,
+      609.6809742781395
+    ],
+    "admit_execute_mean_ms": 559.4932942820512,
+    "admit_execute_mean_ms_range": [
+      326.9696232651934,
+      610.0647802037209
+    ],
+    "decide_execute_mean_ms": 0.37360376324786326,
+    "decide_execute_mean_ms_range": [
+      0.2020341325966851,
+      0.38380592558139537
+    ],
+    "completion_fraction": 0.376
+  },
+  {
+    "scenario": "ordinary",
+    "version": "baseline",
+    "k": 128,
+    "runs": 3,
+    "complete_runs": 0,
+    "throughput_ops_s": 22.4,
+    "throughput_ops_s_range": [
+      21.9,
+      23.1
+    ],
+    "actual_send_rate": 800,
+    "actual_send_rate_range": [
+      800,
+      800
+    ],
+    "mean_slots": 126.1839007009,
+    "mean_slots_range": [
+      126.1561259174,
+      126.3356385728
+    ],
+    "peak_slots": 129,
+    "peak_slots_range": [
+      128,
+      129
+    ],
+    "full_slots_fraction": 0.8888067948,
+    "full_slots_fraction_range": [
+      0.8508719278,
+      0.8893386033
+    ],
+    "admit_decide_mean_ms": 5787.363865455414,
+    "admit_decide_mean_ms_range": [
+      5479.5940325676565,
+      5834.108888962617
+    ],
+    "admit_execute_mean_ms": 5789.862692,
+    "admit_execute_mean_ms_range": [
+      5480.8520058481845,
+      5836.48291599377
+    ],
+    "decide_execute_mean_ms": 2.374027031152648,
+    "decide_execute_mean_ms_range": [
+      1.2579732805280528,
+      2.498826544585987
+    ],
+    "completion_fraction": 0.03904166666666667
+  },
+  {
+    "scenario": "ordinary",
+    "version": "baseline",
+    "k": 256,
+    "runs": 3,
+    "complete_runs": 0,
+    "throughput_ops_s": 19.3,
+    "throughput_ops_s_range": [
+      19.2,
+      19.6
+    ],
+    "actual_send_rate": 800,
+    "actual_send_rate_range": [
+      800,
+      800
+    ],
+    "mean_slots": 245.7407483271,
+    "mean_slots_range": [
+      245.4131282239,
+      246.7978679579
+    ],
+    "peak_slots": 257,
+    "peak_slots_range": [
+      256,
+      257
+    ],
+    "full_slots_fraction": 0.0981105301,
+    "full_slots_fraction_range": [
+      0.0936478591,
+      0.1665190298
+    ],
+    "admit_decide_mean_ms": 8075.436526751656,
+    "admit_decide_mean_ms_range": [
+      8023.642473965753,
+      9308.918593334385
+    ],
+    "admit_execute_mean_ms": 8086.390194821192,
+    "admit_execute_mean_ms_range": [
+      8034.144847767123,
+      9317.256180876971
+    ],
+    "decide_execute_mean_ms": 10.502373801369863,
+    "decide_execute_mean_ms_range": [
+      8.337587542586752,
+      10.953668069536423
+    ],
+    "completion_fraction": 0.03795833333333333
+  },
+  {
+    "scenario": "ordinary",
+    "version": "baseline",
+    "k": 512,
+    "runs": 3,
+    "complete_runs": 0,
+    "throughput_ops_s": 18.3,
+    "throughput_ops_s_range": [
+      17.9,
+      20.1
+    ],
+    "actual_send_rate": 800,
+    "actual_send_rate_range": [
+      800,
+      800
+    ],
+    "mean_slots": 474.0787534698,
+    "mean_slots_range": [
+      474.0787534698,
+      474.0787534698
+    ],
+    "peak_slots": 512,
+    "peak_slots_range": [
+      512,
+      512
+    ],
+    "full_slots_fraction": 0.0549736695,
+    "full_slots_fraction_range": [
+      0.0549736695,
+      0.0549736695
+    ],
+    "admit_decide_mean_ms": 9698.99927686842,
+    "admit_decide_mean_ms_range": [
+      9698.99927686842,
+      9698.99927686842
+    ],
+    "admit_execute_mean_ms": 9708.783715759868,
+    "admit_execute_mean_ms_range": [
+      9708.783715759868,
+      9708.783715759868
+    ],
+    "decide_execute_mean_ms": 9.784438891447369,
+    "decide_execute_mean_ms_range": [
+      9.784438891447369,
+      9.784438891447369
+    ],
+    "completion_fraction": 0.03904166666666667
+  },
+  {
+    "scenario": "ordinary",
+    "version": "v000",
+    "k": 64,
+    "runs": 3,
+    "complete_runs": 3,
+    "throughput_ops_s": 799.9,
+    "throughput_ops_s_range": [
+      799.8,
+      799.9
+    ],
+    "actual_send_rate": 800,
+    "actual_send_rate_range": [
+      800,
+      800
+    ],
+    "mean_slots": 0.7882044024,
+    "mean_slots_range": [
+      0.6760943592,
+      0.789189684
+    ],
+    "peak_slots": 20,
+    "peak_slots_range": [
+      13,
+      20
+    ],
+    "full_slots_fraction": 0.0,
+    "full_slots_fraction_range": [
+      0.0,
+      0.0
+    ],
+    "admit_decide_mean_ms": 0.978675268625,
+    "admit_decide_mean_ms_range": [
+      0.838991554625,
+      0.9801999035
+    ],
+    "admit_execute_mean_ms": 0.985338401625,
+    "admit_execute_mean_ms_range": [
+      0.845483373625,
+      0.986510262625
+    ],
+    "decide_execute_mean_ms": 0.006491819,
+    "decide_execute_mean_ms_range": [
+      0.006310359125,
+      0.006663133
+    ],
+    "completion_fraction": 1.0
+  },
+  {
+    "scenario": "ordinary",
+    "version": "v000",
+    "k": 128,
+    "runs": 3,
+    "complete_runs": 3,
+    "throughput_ops_s": 799.9,
+    "throughput_ops_s_range": [
+      799.7,
+      799.9
+    ],
+    "actual_send_rate": 800,
+    "actual_send_rate_range": [
+      800,
+      800
+    ],
+    "mean_slots": 0.826434111,
+    "mean_slots_range": [
+      0.7379413316,
+      0.8541177412
+    ],
+    "peak_slots": 16,
+    "peak_slots_range": [
+      16,
+      20
+    ],
+    "full_slots_fraction": 0.0,
+    "full_slots_fraction_range": [
+      0.0,
+      0.0
+    ],
+    "admit_decide_mean_ms": 1.026469671,
+    "admit_decide_mean_ms_range": [
+      0.915974743125,
+      1.0618427943492936
+    ],
+    "admit_execute_mean_ms": 1.03321608275,
+    "admit_execute_mean_ms_range": [
+      0.922456798,
+      1.0682882139017378
+    ],
+    "decide_execute_mean_ms": 0.006482054875,
+    "decide_execute_mean_ms_range": [
+      0.006445419552444056,
+      0.00674641175
+    ],
+    "completion_fraction": 1.0
+  },
+  {
+    "scenario": "ordinary",
+    "version": "v000",
+    "k": 256,
+    "runs": 3,
+    "complete_runs": 3,
+    "throughput_ops_s": 800,
+    "throughput_ops_s_range": [
+      800,
+      800
+    ],
+    "actual_send_rate": 800,
+    "actual_send_rate_range": [
+      800,
+      800
+    ],
+    "mean_slots": 0.7206852056,
+    "mean_slots_range": [
+      0.6785563003,
+      1.0431645552
+    ],
+    "peak_slots": 14,
+    "peak_slots_range": [
+      9,
+      33
+    ],
+    "full_slots_fraction": 0.0,
+    "full_slots_fraction_range": [
+      0.0,
+      0.0
+    ],
+    "admit_decide_mean_ms": 0.894443601125,
+    "admit_decide_mean_ms_range": [
+      0.841945276125,
+      1.2970329295
+    ],
+    "admit_execute_mean_ms": 0.900856507,
+    "admit_execute_mean_ms_range": [
+      0.848195375375,
+      1.303955694
+    ],
+    "decide_execute_mean_ms": 0.006412905875,
+    "decide_execute_mean_ms_range": [
+      0.00625009925,
+      0.0069227645
+    ],
+    "completion_fraction": 1.0
+  },
+  {
+    "scenario": "ordinary",
+    "version": "v000",
+    "k": 512,
+    "runs": 3,
+    "complete_runs": 3,
+    "throughput_ops_s": 799.9,
+    "throughput_ops_s_range": [
+      799.8,
+      799.9
+    ],
+    "actual_send_rate": 800,
+    "actual_send_rate_range": [
+      799.9,
+      800
+    ],
+    "mean_slots": 0.9347132274,
+    "mean_slots_range": [
+      0.6395147149,
+      1.1473034095
+    ],
+    "peak_slots": 35,
+    "peak_slots_range": [
+      7,
+      37
+    ],
+    "full_slots_fraction": 0.0,
+    "full_slots_fraction_range": [
+      0.0,
+      0.0
+    ],
+    "admit_decide_mean_ms": 1.1620398706088262,
+    "admit_decide_mean_ms_range": [
+      0.793143995375,
+      1.4274296060757594
+    ],
+    "admit_execute_mean_ms": 1.1685376014501814,
+    "admit_execute_mean_ms_range": [
+      0.799393393625,
+      1.4343085504438056
+    ],
+    "decide_execute_mean_ms": 0.00649773084135517,
+    "decide_execute_mean_ms_range": [
+      0.00624939825,
+      0.006878944368046006
+    ],
+    "completion_fraction": 1.0
+  },
+  {
+    "scenario": "ordinary",
+    "version": "v003",
+    "k": 64,
+    "runs": 3,
+    "complete_runs": 3,
+    "throughput_ops_s": 799.9,
+    "throughput_ops_s_range": [
+      799.8,
+      800
+    ],
+    "actual_send_rate": 800,
+    "actual_send_rate_range": [
+      800,
+      800
+    ],
+    "mean_slots": 0.9041564868,
+    "mean_slots_range": [
+      0.8342462005,
+      1.6780388236
+    ],
+    "peak_slots": 18,
+    "peak_slots_range": [
+      17,
+      21
+    ],
+    "full_slots_fraction": 0.0,
+    "full_slots_fraction_range": [
+      0.0,
+      0.0
+    ],
+    "admit_decide_mean_ms": 1.122159757125,
+    "admit_decide_mean_ms_range": [
+      1.035360344,
+      2.089299563875
+    ],
+    "admit_execute_mean_ms": 1.1301956085,
+    "admit_execute_mean_ms_range": [
+      1.042807750625,
+      2.097623113375
+    ],
+    "decide_execute_mean_ms": 0.008035851375,
+    "decide_execute_mean_ms_range": [
+      0.007447406625,
+      0.0083235495
+    ],
+    "completion_fraction": 1.0
+  },
+  {
+    "scenario": "ordinary",
+    "version": "v003",
+    "k": 128,
+    "runs": 3,
+    "complete_runs": 3,
+    "throughput_ops_s": 799.9,
+    "throughput_ops_s_range": [
+      799.9,
+      800
+    ],
+    "actual_send_rate": 800,
+    "actual_send_rate_range": [
+      800,
+      800
+    ],
+    "mean_slots": 0.8015187509,
+    "mean_slots_range": [
+      0.7382286906,
+      0.848904219
+    ],
+    "peak_slots": 19,
+    "peak_slots_range": [
+      9,
+      20
+    ],
+    "full_slots_fraction": 0.0,
+    "full_slots_fraction_range": [
+      0.0,
+      0.0
+    ],
+    "admit_decide_mean_ms": 0.9941967565,
+    "admit_decide_mean_ms_range": [
+      0.915361445375,
+      1.053100845375
+    ],
+    "admit_execute_mean_ms": 1.001904999375,
+    "admit_execute_mean_ms_range": [
+      0.92278586325,
+      1.06113241725
+    ],
+    "decide_execute_mean_ms": 0.007708242875,
+    "decide_execute_mean_ms_range": [
+      0.007424417875,
+      0.008031571875
+    ],
+    "completion_fraction": 1.0
+  },
+  {
+    "scenario": "ordinary",
+    "version": "v003",
+    "k": 256,
+    "runs": 3,
+    "complete_runs": 3,
+    "throughput_ops_s": 799.9,
+    "throughput_ops_s_range": [
+      799.9,
+      799.9
+    ],
+    "actual_send_rate": 800,
+    "actual_send_rate_range": [
+      800,
+      800
+    ],
+    "mean_slots": 0.9115777848,
+    "mean_slots_range": [
+      0.7009138641,
+      1.4810605192
+    ],
+    "peak_slots": 23,
+    "peak_slots_range": [
+      7,
+      62
+    ],
+    "full_slots_fraction": 0.0,
+    "full_slots_fraction_range": [
+      0.0,
+      0.0
+    ],
+    "admit_decide_mean_ms": 1.131514059125,
+    "admit_decide_mean_ms_range": [
+      0.86898930275,
+      1.843659053375
+    ],
+    "admit_execute_mean_ms": 1.139728213625,
+    "admit_execute_mean_ms_range": [
+      0.876142330125,
+      1.851325649
+    ],
+    "decide_execute_mean_ms": 0.007666595625,
+    "decide_execute_mean_ms_range": [
+      0.007153027375,
+      0.0082141545
+    ],
+    "completion_fraction": 1.0
+  },
+  {
+    "scenario": "ordinary",
+    "version": "v003",
+    "k": 512,
+    "runs": 3,
+    "complete_runs": 3,
+    "throughput_ops_s": 799.9,
+    "throughput_ops_s_range": [
+      799.7,
+      799.9
+    ],
+    "actual_send_rate": 800,
+    "actual_send_rate_range": [
+      800,
+      800
+    ],
+    "mean_slots": 0.8125763325,
+    "mean_slots_range": [
+      0.721563378,
+      0.8901457993
+    ],
+    "peak_slots": 17,
+    "peak_slots_range": [
+      10,
+      20
+    ],
+    "full_slots_fraction": 0.0,
+    "full_slots_fraction_range": [
+      0.0,
+      0.0
+    ],
+    "admit_decide_mean_ms": 1.00880003375,
+    "admit_decide_mean_ms_range": [
+      0.894513695125,
+      1.10471565225
+    ],
+    "admit_execute_mean_ms": 1.016480565875,
+    "admit_execute_mean_ms_range": [
+      0.90201417975,
+      1.112696655375
+    ],
+    "decide_execute_mean_ms": 0.007680532125,
+    "decide_execute_mean_ms_range": [
+      0.007500484625,
+      0.007981003125
+    ],
+    "completion_fraction": 1.0
+  },
+  {
+    "scenario": "two-crashed",
+    "version": "baseline",
+    "k": 64,
+    "runs": 3,
+    "complete_runs": 0,
+    "throughput_ops_s": 43.6,
+    "throughput_ops_s_range": [
+      33.5,
+      47.1
+    ],
+    "actual_send_rate": 800,
+    "actual_send_rate_range": [
+      799.9,
+      800
+    ],
+    "mean_slots": 63.3515998117,
+    "mean_slots_range": [
+      63.3030052228,
+      63.4226691531
+    ],
+    "peak_slots": 64,
+    "peak_slots_range": [
+      64,
+      64
+    ],
+    "full_slots_fraction": 0.8696217699,
+    "full_slots_fraction_range": [
+      0.8456840455,
+      0.8974378466
+    ],
+    "admit_decide_mean_ms": 1360.5020738560747,
+    "admit_decide_mean_ms_range": [
+      1358.795884006,
+      1794.7034411278196
+    ],
+    "admit_execute_mean_ms": 1362.2051463570094,
+    "admit_execute_mean_ms_range": [
+      1360.348231812,
+      1795.840546
+    ],
+    "decide_execute_mean_ms": 1.552347806,
+    "decide_execute_mean_ms_range": [
+      1.137104872180451,
+      1.7030725009345795
+    ],
+    "completion_fraction": 0.1245
+  },
+  {
+    "scenario": "two-crashed",
+    "version": "baseline",
+    "k": 128,
+    "runs": 3,
+    "complete_runs": 0,
+    "throughput_ops_s": 6.1,
+    "throughput_ops_s_range": [
+      3,
+      9
+    ],
+    "actual_send_rate": 800,
+    "actual_send_rate_range": [
+      800,
+      800
+    ],
+    "mean_slots": 126.7673075795,
+    "mean_slots_range": [
+      126.7376946657,
+      126.783948086
+    ],
+    "peak_slots": 128,
+    "peak_slots_range": [
+      128,
+      128
+    ],
+    "full_slots_fraction": 0.9700753681,
+    "full_slots_fraction_range": [
+      0.9683123602,
+      0.9771031144
+    ],
+    "admit_decide_mean_ms": 10209.989289576719,
+    "admit_decide_mean_ms_range": [
+      9933.883362310127,
+      11099.732627871559
+    ],
+    "admit_execute_mean_ms": 10213.99486105291,
+    "admit_execute_mean_ms_range": [
+      9938.003896575949,
+      11102.969807399082
+    ],
+    "decide_execute_mean_ms": 4.005571476190476,
+    "decide_execute_mean_ms_range": [
+      3.237179527522936,
+      4.120534265822784
+    ],
+    "completion_fraction": 0.031875
+  },
+  {
+    "scenario": "two-crashed",
+    "version": "baseline",
+    "k": 256,
+    "runs": 3,
+    "complete_runs": 0,
+    "throughput_ops_s": 0,
+    "throughput_ops_s_range": [
+      0,
+      0
+    ],
+    "actual_send_rate": 800,
+    "actual_send_rate_range": [
+      800,
+      800
+    ],
+    "mean_slots": 250.7224791916,
+    "mean_slots_range": [
+      250.6759467702,
+      250.8636893755
+    ],
+    "peak_slots": 256,
+    "peak_slots_range": [
+      256,
+      256
+    ],
+    "full_slots_fraction": 0.9439349608,
+    "full_slots_fraction_range": [
+      0.9205946233,
+      0.9621905718
+    ],
+    "admit_decide_mean_ms": null,
+    "admit_decide_mean_ms_range": null,
+    "admit_execute_mean_ms": null,
+    "admit_execute_mean_ms_range": null,
+    "decide_execute_mean_ms": null,
+    "decide_execute_mean_ms_range": null,
+    "completion_fraction": 0.0
+  },
+  {
+    "scenario": "two-crashed",
+    "version": "baseline",
+    "k": 512,
+    "runs": 3,
+    "complete_runs": 0,
+    "throughput_ops_s": 0,
+    "throughput_ops_s_range": [
+      0,
+      0
+    ],
+    "actual_send_rate": 800,
+    "actual_send_rate_range": [
+      800,
+      800
+    ],
+    "mean_slots": 486.6832542286,
+    "mean_slots_range": [
+      483.5986266336,
+      488.6054021879
+    ],
+    "peak_slots": 512,
+    "peak_slots_range": [
+      512,
+      512
+    ],
+    "full_slots_fraction": 0.9243748035,
+    "full_slots_fraction_range": [
+      0.9047587555,
+      0.9302024977
+    ],
+    "admit_decide_mean_ms": null,
+    "admit_decide_mean_ms_range": null,
+    "admit_execute_mean_ms": null,
+    "admit_execute_mean_ms_range": null,
+    "decide_execute_mean_ms": null,
+    "decide_execute_mean_ms_range": null,
+    "completion_fraction": 0.0
+  },
+  {
+    "scenario": "two-crashed",
+    "version": "v000",
+    "k": 64,
+    "runs": 3,
+    "complete_runs": 0,
+    "throughput_ops_s": 207.5,
+    "throughput_ops_s_range": [
+      207.1,
+      213.8
+    ],
+    "actual_send_rate": 800,
+    "actual_send_rate_range": [
+      800,
+      800
+    ],
+    "mean_slots": 63.7289346251,
+    "mean_slots_range": [
+      63.7274962854,
+      63.7310597748
+    ],
+    "peak_slots": 64,
+    "peak_slots_range": [
+      64,
+      64
+    ],
+    "full_slots_fraction": 0.988832758,
+    "full_slots_fraction_range": [
+      0.9885787113,
+      0.9889338064
+    ],
+    "admit_decide_mean_ms": 302.5150967938289,
+    "admit_decide_mean_ms_range": [
+      293.21043057765667,
+      302.6137927451991
+    ],
+    "admit_execute_mean_ms": 302.53492734876113,
+    "admit_execute_mean_ms_range": [
+      293.2311373751135,
+      302.63483387119436
+    ],
+    "decide_execute_mean_ms": 0.0207067974568574,
+    "decide_execute_mean_ms_range": [
+      0.019830554932211315,
+      0.02104112599531616
+    ],
+    "completion_fraction": 0.7732083333333334
+  },
+  {
+    "scenario": "two-crashed",
+    "version": "v000",
+    "k": 128,
+    "runs": 3,
+    "complete_runs": 0,
+    "throughput_ops_s": 377.6,
+    "throughput_ops_s_range": [
+      112.7,
+      379.8
+    ],
+    "actual_send_rate": 800,
+    "actual_send_rate_range": [
+      800,
+      800
+    ],
+    "mean_slots": 126.9338324849,
+    "mean_slots_range": [
+      126.9335217072,
+      126.9480607111
+    ],
+    "peak_slots": 128,
+    "peak_slots_range": [
+      128,
+      128
+    ],
+    "full_slots_fraction": 0.9781848026,
+    "full_slots_fraction_range": [
+      0.9780506504,
+      0.9819031282
+    ],
+    "admit_decide_mean_ms": 337.5204072323258,
+    "admit_decide_mean_ms_range": [
+      332.94393310366786,
+      1053.7548828342628
+    ],
+    "admit_execute_mean_ms": 337.54330275486683,
+    "admit_execute_mean_ms_range": [
+      332.96725348166075,
+      1053.7788475888447
+    ],
+    "decide_execute_mean_ms": 0.02332037799286806,
+    "decide_execute_mean_ms_range": [
+      0.022895522540983607,
+      0.023964754581673308
+    ],
+    "completion_fraction": 0.6713333333333333
+  },
+  {
+    "scenario": "two-crashed",
+    "version": "v000",
+    "k": 256,
+    "runs": 3,
+    "complete_runs": 0,
+    "throughput_ops_s": 48.4,
+    "throughput_ops_s_range": [
+      42.8,
+      53.7
+    ],
+    "actual_send_rate": 800,
+    "actual_send_rate_range": [
+      800,
+      800
+    ],
+    "mean_slots": 251.8464376971,
+    "mean_slots_range": [
+      251.8425785556,
+      251.8574662874
+    ],
+    "peak_slots": 256,
+    "peak_slots_range": [
+      256,
+      256
+    ],
+    "full_slots_fraction": 0.9670674887,
+    "full_slots_fraction_range": [
+      0.9668598202,
+      0.9671758251
+    ],
+    "admit_decide_mean_ms": 6390.573759221942,
+    "admit_decide_mean_ms_range": [
+      6109.8939042986485,
+      8267.505187681818
+    ],
+    "admit_execute_mean_ms": 6390.616547380832,
+    "admit_execute_mean_ms_range": [
+      6109.93103095,
+      8267.546996746969
+    ],
+    "decide_execute_mean_ms": 0.041809065151515154,
+    "decide_execute_mean_ms_range": [
+      0.037126651351351354,
+      0.042788158890290036
+    ],
+    "completion_fraction": 0.09958333333333333
+  },
+  {
+    "scenario": "two-crashed",
+    "version": "v000",
+    "k": 512,
+    "runs": 3,
+    "complete_runs": 0,
+    "throughput_ops_s": 32.4,
+    "throughput_ops_s_range": [
+      16,
+      35.7
+    ],
+    "actual_send_rate": 800,
+    "actual_send_rate_range": [
+      799.9,
+      800
+    ],
+    "mean_slots": 494.4182762016,
+    "mean_slots_range": [
+      493.3937441888,
+      494.6943558733
+    ],
+    "peak_slots": 512,
+    "peak_slots_range": [
+      512,
+      512
+    ],
+    "full_slots_fraction": 0.920294417,
+    "full_slots_fraction_range": [
+      0.9198754897,
+      0.92684327
+    ],
+    "admit_decide_mean_ms": 10940.026538465518,
+    "admit_decide_mean_ms_range": [
+      8813.170912625204,
+      11863.420227392857
+    ],
+    "admit_execute_mean_ms": 10940.089922318966,
+    "admit_execute_mean_ms_range": [
+      8813.233857394436,
+      11863.49587470982
+    ],
+    "decide_execute_mean_ms": 0.06338385344827586,
+    "decide_execute_mean_ms_range": [
+      0.06294476923076923,
+      0.07564731696428571
+    ],
+    "completion_fraction": 0.07762823450977124
+  },
+  {
+    "scenario": "two-crashed",
+    "version": "v003",
+    "k": 64,
+    "runs": 3,
+    "complete_runs": 0,
+    "throughput_ops_s": 259.5,
+    "throughput_ops_s_range": [
+      253.4,
+      261.8
+    ],
+    "actual_send_rate": 800,
+    "actual_send_rate_range": [
+      800,
+      800
+    ],
+    "mean_slots": 63.7282723397,
+    "mean_slots_range": [
+      63.6795707737,
+      63.7302020543
+    ],
+    "peak_slots": 64,
+    "peak_slots_range": [
+      64,
+      64
+    ],
+    "full_slots_fraction": 0.988008899,
+    "full_slots_fraction_range": [
+      0.9879071742,
+      0.9881234967
+    ],
+    "admit_decide_mean_ms": 243.06324204776232,
+    "admit_decide_mean_ms_range": [
+      241.3126403564504,
+      248.71998077405698
+    ],
+    "admit_execute_mean_ms": 243.07667769274164,
+    "admit_execute_mean_ms_range": [
+      241.32561442319164,
+      248.73267644842187
+    ],
+    "decide_execute_mean_ms": 0.012974066741237883,
+    "decide_execute_mean_ms_range": [
+      0.012695674364896074,
+      0.013435644979315532
+    ],
+    "completion_fraction": 0.8345416666666666
+  },
+  {
+    "scenario": "two-crashed",
+    "version": "v003",
+    "k": 128,
+    "runs": 3,
+    "complete_runs": 0,
+    "throughput_ops_s": 33.9,
+    "throughput_ops_s_range": [
+      32.6,
+      35.7
+    ],
+    "actual_send_rate": 800,
+    "actual_send_rate_range": [
+      800,
+      800
+    ],
+    "mean_slots": 126.9473463202,
+    "mean_slots_range": [
+      126.9464002391,
+      126.9483321768
+    ],
+    "peak_slots": 128,
+    "peak_slots_range": [
+      128,
+      128
+    ],
+    "full_slots_fraction": 0.9834199613,
+    "full_slots_fraction_range": [
+      0.9833707317,
+      0.9835122783
+    ],
+    "admit_decide_mean_ms": 5273.34747019163,
+    "admit_decide_mean_ms_range": [
+      5009.965515039175,
+      5329.2818067494645
+    ],
+    "admit_execute_mean_ms": 5273.357452211454,
+    "admit_execute_mean_ms_range": [
+      5009.978206041237,
+      5329.293976802998
+    ],
+    "decide_execute_mean_ms": 0.012170053533190579,
+    "decide_execute_mean_ms_range": [
+      0.009982019823788546,
+      0.01269100206185567
+    ],
+    "completion_fraction": 0.06158333333333333
+  },
+  {
+    "scenario": "two-crashed",
+    "version": "v003",
+    "k": 256,
+    "runs": 3,
+    "complete_runs": 0,
+    "throughput_ops_s": 12.8,
+    "throughput_ops_s_range": [
+      12.7,
+      15.9
+    ],
+    "actual_send_rate": 800,
+    "actual_send_rate_range": [
+      800,
+      800
+    ],
+    "mean_slots": 251.4198769123,
+    "mean_slots_range": [
+      251.3701356573,
+      251.4995941095
+    ],
+    "peak_slots": 256,
+    "peak_slots_range": [
+      256,
+      256
+    ],
+    "full_slots_fraction": 0.9588340238,
+    "full_slots_fraction_range": [
+      0.9581659228,
+      0.9591331116
+    ],
+    "admit_decide_mean_ms": 11498.29885194517,
+    "admit_decide_mean_ms_range": [
+      11242.971158536458,
+      12441.283541343826
+    ],
+    "admit_execute_mean_ms": 11498.317580339426,
+    "admit_execute_mean_ms_range": [
+      11242.98591460677,
+      12441.314330121066
+    ],
+    "decide_execute_mean_ms": 0.018728394255874675,
+    "decide_execute_mean_ms_range": [
+      0.0147560703125,
+      0.030788777239709443
+    ],
+    "completion_fraction": 0.049166666666666664
+  },
+  {
+    "scenario": "two-crashed",
+    "version": "v003",
+    "k": 512,
+    "runs": 3,
+    "complete_runs": 0,
+    "throughput_ops_s": 15.7,
+    "throughput_ops_s_range": [
+      13.8,
+      16.2
+    ],
+    "actual_send_rate": 800,
+    "actual_send_rate_range": [
+      800,
+      800
+    ],
+    "mean_slots": 489.789394748,
+    "mean_slots_range": [
+      489.7687690786,
+      491.0060350127
+    ],
+    "peak_slots": 512,
+    "peak_slots_range": [
+      512,
+      512
+    ],
+    "full_slots_fraction": 0.9163268868,
+    "full_slots_fraction_range": [
+      0.9157378859,
+      0.9186671133
+    ],
+    "admit_decide_mean_ms": 12062.524867920754,
+    "admit_decide_mean_ms_range": [
+      10741.507070987096,
+      13268.173671306282
+    ],
+    "admit_execute_mean_ms": 12062.53968717736,
+    "admit_execute_mean_ms_range": [
+      10741.521957303226,
+      13268.187171924084
+    ],
+    "decide_execute_mean_ms": 0.014819256603773584,
+    "decide_execute_mean_ms_range": [
+      0.01350061780104712,
+      0.014886316129032257
+    ],
+    "completion_fraction": 0.03958333333333333
+  }
+]

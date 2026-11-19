@@ -1,0 +1,55 @@
+=== RUN   TestSizesAndRoundTrip
+    codec_test.go:46: OriginalPreAccept frame_bytes=59 (payload + 1 RPC byte)
+    codec_test.go:46: OriginalFastOK frame_bytes=5 (payload + 1 RPC byte)
+    codec_test.go:46: OriginalCommitShort frame_bytes=41 (payload + 1 RPC byte)
+    codec_test.go:61: BaselinePreAccept frame_bytes=331 (JSON + 4 length bytes; excludes TLS)
+    codec_test.go:61: BaselinePreReply frame_bytes=380 (JSON + 4 length bytes; excludes TLS)
+    codec_test.go:61: BaselineLearn frame_bytes=450 (JSON + 4 length bytes; excludes TLS)
+--- PASS: TestSizesAndRoundTrip (0.00s)
+=== RUN   TestSizesAndRoundTrip
+    codec_test.go:46: OriginalPreAccept frame_bytes=59 (payload + 1 RPC byte)
+    codec_test.go:46: OriginalFastOK frame_bytes=5 (payload + 1 RPC byte)
+    codec_test.go:46: OriginalCommitShort frame_bytes=41 (payload + 1 RPC byte)
+    codec_test.go:61: BaselinePreAccept frame_bytes=331 (JSON + 4 length bytes; excludes TLS)
+    codec_test.go:61: BaselinePreReply frame_bytes=380 (JSON + 4 length bytes; excludes TLS)
+    codec_test.go:61: BaselineLearn frame_bytes=450 (JSON + 4 length bytes; excludes TLS)
+--- PASS: TestSizesAndRoundTrip (0.00s)
+=== RUN   TestSizesAndRoundTrip
+    codec_test.go:46: OriginalPreAccept frame_bytes=59 (payload + 1 RPC byte)
+    codec_test.go:46: OriginalFastOK frame_bytes=5 (payload + 1 RPC byte)
+    codec_test.go:46: OriginalCommitShort frame_bytes=41 (payload + 1 RPC byte)
+    codec_test.go:61: BaselinePreAccept frame_bytes=331 (JSON + 4 length bytes; excludes TLS)
+    codec_test.go:61: BaselinePreReply frame_bytes=380 (JSON + 4 length bytes; excludes TLS)
+    codec_test.go:61: BaselineLearn frame_bytes=450 (JSON + 4 length bytes; excludes TLS)
+--- PASS: TestSizesAndRoundTrip (0.00s)
+goos: linux
+goarch: amd64
+pkg: codeccompare
+cpu: Intel(R) Core(TM) Ultra 5 245KF
+BenchmarkOriginalBinaryEncode
+BenchmarkOriginalBinaryEncode 	 2752453	       160.0 ns/op	      32 B/op	       2 allocs/op
+BenchmarkOriginalBinaryEncode 	 3494622	       152.1 ns/op	      32 B/op	       2 allocs/op
+BenchmarkOriginalBinaryEncode 	 3259542	       126.1 ns/op	      32 B/op	       2 allocs/op
+BenchmarkOriginalBinaryDecode
+BenchmarkOriginalBinaryDecode 	 2201007	       197.8 ns/op	      56 B/op	       3 allocs/op
+BenchmarkOriginalBinaryDecode 	 1760486	       244.9 ns/op	      56 B/op	       3 allocs/op
+BenchmarkOriginalBinaryDecode 	 2721842	       124.8 ns/op	      56 B/op	       3 allocs/op
+BenchmarkJSON
+BenchmarkJSON/OriginalSchemaEncode
+BenchmarkJSON/OriginalSchemaEncode         	  843510	       857.5 ns/op	     128 B/op	       1 allocs/op
+BenchmarkJSON/OriginalSchemaEncode         	  834590	       983.5 ns/op	     128 B/op	       1 allocs/op
+BenchmarkJSON/OriginalSchemaEncode         	  642718	       764.7 ns/op	     128 B/op	       1 allocs/op
+BenchmarkJSON/OriginalSchemaDecode
+BenchmarkJSON/OriginalSchemaDecode         	   51478	      7352 ns/op	     384 B/op	       9 allocs/op
+BenchmarkJSON/OriginalSchemaDecode         	   58856	      6036 ns/op	     384 B/op	       9 allocs/op
+BenchmarkJSON/OriginalSchemaDecode         	   98820	      6242 ns/op	     384 B/op	       9 allocs/op
+BenchmarkJSON/BaselineEncode
+BenchmarkJSON/BaselineEncode               	  159079	      2156 ns/op	     352 B/op	       1 allocs/op
+BenchmarkJSON/BaselineEncode               	  213912	      2467 ns/op	     352 B/op	       1 allocs/op
+BenchmarkJSON/BaselineEncode               	  306555	      1978 ns/op	     352 B/op	       1 allocs/op
+BenchmarkJSON/BaselineDecode
+BenchmarkJSON/BaselineDecode               	   27490	     12353 ns/op	     912 B/op	      19 allocs/op
+BenchmarkJSON/BaselineDecode               	   28854	     13243 ns/op	     912 B/op	      19 allocs/op
+BenchmarkJSON/BaselineDecode               	   35215	     10824 ns/op	     912 B/op	      19 allocs/op
+PASS
+ok  	codeccompare	10.692s

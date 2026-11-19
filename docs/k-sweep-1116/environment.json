@@ -1,0 +1,79 @@
+{
+  "platform": "Linux-6.8.0-149-generic-x86_64-with-glibc2.35",
+  "cpu_topology": [
+    {
+      "package": 0,
+      "core": 0,
+      "logical_cpus": [
+        0
+      ]
+    },
+    {
+      "package": 2,
+      "core": 0,
+      "logical_cpus": [
+        1
+      ]
+    },
+    {
+      "package": 4,
+      "core": 0,
+      "logical_cpus": [
+        2
+      ]
+    },
+    {
+      "package": 6,
+      "core": 0,
+      "logical_cpus": [
+        3
+      ]
+    },
+    {
+      "package": 8,
+      "core": 0,
+      "logical_cpus": [
+        4
+      ]
+    },
+    {
+      "package": 10,
+      "core": 0,
+      "logical_cpus": [
+        5
+      ]
+    },
+    {
+      "package": 12,
+      "core": 0,
+      "logical_cpus": [
+        6
+      ]
+    },
+    {
+      "package": 14,
+      "core": 0,
+      "logical_cpus": [
+        7
+      ]
+    }
+  ],
+  "cpuinfo": "processor\t: 0\nvendor_id\t: GenuineIntel\ncpu family\t: 6\nmodel\t\t: 198\nmodel name\t: Intel(R) Core(TM) Ultra 5 245KF\nstepping\t: 2\nmicrocode\t: 0xffffffff\ncpu MHz\t\t: 4185.602\ncache size\t: 24576 KB\nphysical id\t: 0\nsiblings\t: 1\ncore id\t\t: 0\ncpu cores\t: 1\napicid\t\t: 0\ninitial apicid\t: 0\nfpu\t\t: yes\nfpu_exception\t: yes\ncpuid level\t: 35\nwp\t\t: yes\nflags\t\t: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ss syscall nx pdpe1gb rdtscp lm constant_tsc arch_perfmon rep_good nopl xtopology tsc_reliable nonstop_tsc cpuid tsc_known_freq pni pclmulqdq ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm abm 3dnowprefetch pti ssbd ibrs ibpb stibp fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid rdseed adx smap clflushopt clwb sha_ni xsaveopt xsavec xgetbv1 xsaves avx_vnni arat umip gfni vaes vpclmulqdq rdpid movdiri movdir64b fsrm md_clear serialize flush_l1d arch_capabilities\nbugs\t\t: cpu_meltdown spectre_v1 spectre_v2 spec_store_bypass l1tf mds swapgs mmio_unknown retbleed bhi its\nbogomips\t: 8371.20\nclflush size\t: 64\ncache_alignment\t: 64\naddress sizes\t: 45 bits physical, 48 bits virtual\npower management:\n\nprocessor\t: 1\nvendor_id\t: GenuineIntel\ncpu family\t: 6\nmodel\t\t: 198\nmodel name\t: Intel(R) Core(TM) Ultra 5 245KF\nstepping\t: 2\nmicrocode\t: 0xffffffff\ncpu MHz\t\t: 4185.602\ncache size\t: 24576 KB\nphysical id\t: 2\nsiblings\t: 1\ncore id\t\t: 0\ncpu cores\t: 1\napicid\t\t: 2\ninitial apicid\t: 2\nfpu\t\t: yes\nfpu_exception\t: yes\ncpuid level\t: 35\nwp\t\t: yes\nflags\t\t: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ss syscall nx pdpe1gb rdtscp lm constant_tsc arch_perfmon rep_good nopl xtopology tsc_reliable nonstop_tsc cpuid tsc_known_freq pni pclmulqdq ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm abm 3dnowprefetch pti ssbd ibrs ibpb stibp fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid rdseed adx smap clflushopt clwb sha_ni xsaveopt xsavec xgetbv1 xsaves avx_vnni arat umip gfni vaes vpclmulqdq rdpid movdiri movdir64b fsrm md_clear serialize flush_l1d arch_capabilities\nbugs\t\t: cpu_meltdown spectre_v1 spectre_v2 spec_store_bypass l1tf mds swapgs mmio_unknown retbleed bhi its\nbogomips\t: 8371.20\nclflush size\t: 64\ncache_alignment\t: 64\naddress sizes\t: 45 bits physical, 48 bits virtual\npower management:\n\nprocessor\t: 2\nvendor_id\t: GenuineIntel\ncpu family\t: 6\nmodel\t\t: 198\nmodel name\t: Intel(R) Core(TM) Ultra 5 245KF\nstepping\t: 2\nmicrocode\t: 0xffffffff\ncpu MHz\t\t: 4185.602\ncache size\t: 24576 KB\nphysical id\t: 4\nsiblings\t: 1\ncore id\t\t: 0\ncpu cores\t: 1\napicid\t\t: 4\ninitial apicid\t: 4\nfpu\t\t: yes\nfpu_exception\t: yes\ncpuid level\t: 35\nwp\t\t: yes\nflags\t\t: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ss syscall nx pdpe1gb rdtscp lm constant_tsc arch_perfmon rep_good nopl xtopology tsc_reliable nonstop_tsc cpuid tsc_known_freq pni pclmulqdq ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm abm 3dnowprefetch pti ssbd ibrs ibpb stibp fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid rdseed adx smap clflushopt clwb sha_ni xsaveopt xsavec xgetbv1 xsaves avx_vnni arat umip gfni vaes vpclmulqdq rdpid movdiri movdir64b fsrm md_clear serialize flush_l1d arch_capabilities\nbugs\t\t: cpu_meltdown spectre_v1 spectre_v2 spec_store_bypass l1tf mds swapgs mmio_unknown retbleed bhi its\nbogomips\t: 8371.20\nclflush size\t: 64\ncache_alignment\t: 64\naddress sizes\t: 45 bits physical, 48 bits virtual\npower management:\n\nprocessor\t: 3\nvendor_id\t: GenuineIntel\ncpu family\t: 6\nmodel\t\t: 198\nmodel name\t: Intel(R) Core(TM) Ultra 5 245KF\nstepping\t: 2\nmicrocode\t: 0xffffffff\ncpu MHz\t\t: 4185.602\ncache size\t: 24576 KB\nphysical id\t: 6\nsiblings\t: 1\ncore id\t\t: 0\ncpu cores\t: 1\napicid\t\t: 6\ninitial apicid\t: 6\nfpu\t\t: yes\nfpu_exception\t: yes\ncpuid level\t: 35\nwp\t\t: yes\nflags\t\t: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ss syscall nx pdpe1gb rdtscp lm constant_tsc arch_perfmon rep_good nopl xtopology tsc_reliable nonstop_tsc cpuid tsc_known_freq pni pclmulqdq ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm abm 3dnowprefetch pti ssbd ibrs ibpb stibp fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid rdseed adx smap clflushopt clwb sha_ni xsaveopt xsavec xgetbv1 xsaves avx_vnni arat umip gfni vaes vpclmulqdq rdpid movdiri movdir64b fsrm md_clear serialize flush_l1d arch_capabilities\nbugs\t\t: cpu_meltdown spectre_v1 spectre_v2 spec_store_bypass l1tf mds swapgs mmio_unknown retbleed bhi its\nbogomips\t: 8371.20\nclflush size\t: 64\ncache_alignment\t: 64\naddress sizes\t: 45 bits physical, 48 bits virtual\npower management:\n\nprocessor\t: 4\nvendor_id\t: GenuineIntel\ncpu family\t: 6\nmodel\t\t: 198\nmodel name\t: Intel(R) Core(TM) Ultra 5 245KF\nstepping\t: 2\nmicrocode\t: 0xffffffff\ncpu MHz\t\t: 4185.602\ncache size\t: 24576 KB\nphysical id\t: 8\nsiblings\t: 1\ncore id\t\t: 0\ncpu cores\t: 1\napicid\t\t: 8\ninitial apicid\t: 8\nfpu\t\t: yes\nfpu_exception\t: yes\ncpuid level\t: 35\nwp\t\t: yes\nflags\t\t: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ss syscall nx pdpe1gb rdtscp lm constant_tsc arch_perfmon rep_good nopl xtopology tsc_reliable nonstop_tsc cpuid tsc_known_freq pni pclmulqdq ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm abm 3dnowprefetch pti ssbd ibrs ibpb stibp fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid rdseed adx smap clflushopt clwb sha_ni xsaveopt xsavec xgetbv1 xsaves avx_vnni arat umip gfni vaes vpclmulqdq rdpid movdiri movdir64b fsrm md_clear serialize flush_l1d arch_capabilities\nbugs\t\t: cpu_meltdown spectre_v1 spectre_v2 spec_store_bypass l1tf mds swapgs mmio_unknown retbleed bhi its\nbogomips\t: 8371.20\nclflush size\t: 64\ncache_alignment\t: 64\naddress sizes\t: 45 bits physical, 48 bits virtual\npower management:\n\nprocessor\t: 5\nvendor_id\t: GenuineIntel\ncpu family\t: 6\nmodel\t\t: 198\nmodel name\t: Intel(R) Core(TM) Ultra 5 245KF\nstepping\t: 2\nmicrocode\t: 0xffffffff\ncpu MHz\t\t: 4185.602\ncache size\t: 24576 KB\nphysical id\t: 10\nsiblings\t: 1\ncore id\t\t: 0\ncpu cores\t: 1\napicid\t\t: 10\ninitial apicid\t: 10\nfpu\t\t: yes\nfpu_exception\t: yes\ncpuid level\t: 35\nwp\t\t: yes\nflags\t\t: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ss syscall nx pdpe1gb rdtscp lm constant_tsc arch_perfmon rep_good nopl xtopology tsc_reliable nonstop_tsc cpuid tsc_known_freq pni pclmulqdq ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm abm 3dnowprefetch pti ssbd ibrs ibpb stibp fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid rdseed adx smap clflushopt clwb sha_ni xsaveopt xsavec xgetbv1 xsaves avx_vnni arat umip gfni vaes vpclmulqdq rdpid movdiri movdir64b fsrm md_clear serialize flush_l1d arch_capabilities\nbugs\t\t: cpu_meltdown spectre_v1 spectre_v2 spec_store_bypass l1tf mds swapgs mmio_unknown retbleed bhi its\nbogomips\t: 8371.20\nclflush size\t: 64\ncache_alignment\t: 64\naddress sizes\t: 45 bits physical, 48 bits virtual\npower management:\n\nprocessor\t: 6\nvendor_id\t: GenuineIntel\ncpu family\t: 6\nmodel\t\t: 198\nmodel name\t: Intel(R) Core(TM) Ultra 5 245KF\nstepping\t: 2\nmicrocode\t: 0xffffffff\ncpu MHz\t\t: 4185.602\ncache size\t: 24576 KB\nphysical id\t: 12\nsiblings\t: 1\ncore id\t\t: 0\ncpu cores\t: 1\napicid\t\t: 12\ninitial apicid\t: 12\nfpu\t\t: yes\nfpu_exception\t: yes\ncpuid level\t: 35\nwp\t\t: yes\nflags\t\t: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ss syscall nx pdpe1gb rdtscp lm constant_tsc arch_perfmon rep_good nopl xtopology tsc_reliable nonstop_tsc cpuid tsc_known_freq pni pclmulqdq ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm abm 3dnowprefetch pti ssbd ibrs ibpb stibp fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid rdseed adx smap clflushopt clwb sha_ni xsaveopt xsavec xgetbv1 xsaves avx_vnni arat umip gfni vaes vpclmulqdq rdpid movdiri movdir64b fsrm md_clear serialize flush_l1d arch_capabilities\nbugs\t\t: cpu_meltdown spectre_v1 spectre_v2 spec_store_bypass l1tf mds swapgs mmio_unknown retbleed bhi its\nbogomips\t: 8371.20\nclflush size\t: 64\ncache_alignment\t: 64\naddress sizes\t: 45 bits physical, 48 bits virtual\npower management:\n\nprocessor\t: 7\nvendor_id\t: GenuineIntel\ncpu family\t: 6\nmodel\t\t: 198\nmodel name\t: Intel(R) Core(TM) Ultra 5 245KF\nstepping\t: 2\nmicrocode\t: 0xffffffff\ncpu MHz\t\t: 4185.602\ncache size\t: 24576 KB\nphysical id\t: 14\nsiblings\t: 1\ncore id\t\t: 0\ncpu cores\t: 1\napicid\t\t: 14\ninitial apicid\t: 14\nfpu\t\t: yes\nfpu_exception\t: yes\ncpuid level\t: 35\nwp\t\t: yes\nflags\t\t: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ss syscall nx pdpe1gb rdtscp lm constant_tsc arch_perfmon rep_good nopl xtopology tsc_reliable nonstop_tsc cpuid tsc_known_freq pni pclmulqdq ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm abm 3dnowprefetch pti ssbd ibrs ibpb stibp fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid rdseed adx smap clflushopt clwb sha_ni xsaveopt xsavec xgetbv1 xsaves avx_vnni arat umip gfni vaes vpclmulqdq rdpid movdiri movdir64b fsrm md_clear serialize flush_l1d arch_capabilities\nbugs\t\t: cpu_meltdown spectre_v1 spectre_v2 spec_store_bypass l1tf mds swapgs mmio_unknown retbleed bhi its\nbogomips\t: 8371.20\nclflush size\t: 64\ncache_alignment\t: 64\naddress sizes\t: 45 bits physical, 48 bits virtual\npower management:\n\n",
+  "meminfo": "MemTotal:       12329380 kB\nMemFree:         5399852 kB\nMemAvailable:    9370208 kB\nBuffers:          813420 kB\nCached:          2934060 kB\nSwapCached:       110960 kB\nActive:          2822532 kB\nInactive:        3050736 kB\nActive(anon):    1960000 kB\nInactive(anon):   170344 kB\nActive(file):     862532 kB\nInactive(file):  2880392 kB\nUnevictable:           0 kB\nMlocked:               0 kB\nSwapTotal:       2097148 kB\nSwapFree:        1049280 kB\nZswap:                 0 kB\nZswapped:              0 kB\nDirty:               312 kB\nWriteback:             0 kB\nAnonPages:       2044836 kB\nMapped:           391180 kB\nShmem:              4756 kB\nKReclaimable:     549336 kB\nSlab:             769916 kB\nSReclaimable:     549336 kB\nSUnreclaim:       220580 kB\nKernelStack:       16192 kB\nPageTables:        65608 kB\nSecPageTables:         0 kB\nNFS_Unstable:          0 kB\nBounce:                0 kB\nWritebackTmp:          0 kB\nCommitLimit:     8261836 kB\nCommitted_AS:    7225516 kB\nVmallocTotal:   34359738367 kB\nVmallocUsed:       38488 kB\nVmallocChunk:          0 kB\nPercpu:           115200 kB\nHardwareCorrupted:     0 kB\nAnonHugePages:         0 kB\nShmemHugePages:        0 kB\nShmemPmdMapped:        0 kB\nFileHugePages:         0 kB\nFilePmdMapped:         0 kB\nUnaccepted:            0 kB\nHugePages_Total:       0\nHugePages_Free:        0\nHugePages_Rsvd:        0\nHugePages_Surp:        0\nHugepagesize:       2048 kB\nHugetlb:               0 kB\nDirectMap4k:      245568 kB\nDirectMap2M:     5128192 kB\nDirectMap1G:     8388608 kB\n",
+  "go": "go version go1.25.8 linux/amd64",
+  "options": {
+    "seconds_override": 10.0,
+    "idle_seconds": 10,
+    "cpu_per_replica": 1,
+    "threads_per_core": 1,
+    "replica_gomaxprocs": 1,
+    "native_gomaxprocs": 8,
+    "driver_cpus": 1,
+    "pin": true,
+    "drain_seconds": 20.0,
+    "history_drain_seconds": 30,
+    "preparation_seconds": 30,
+    "observation_seconds": 2
+  },
+  "scope": "VM-local sensitivity test; one pinned vCPU and Go P=1 per replica, one vCPU for driver. No batching or candidate changes."
+}

@@ -1,6 +1,6 @@
 # Consensus Forge
 
-本分支围绕混合同步 EPaxos 设计，组织“生成系统 → 审计 → 修复 → 独立复核”的实验；修复轮次允许时继续新的审计，最后审计仍可修复并以独立复核收尾。Python 负责材料、预算、版本和记录；实现与审计交给 Codex CLI。生成、修复、审计和复核模型均为 `gpt-6.1-sol`，推理强度为 `high`。
+本分支围绕混合同步 EPaxos 设计，组织“生成系统 → 审计 → 修复 → 独立复核”的实验；修复轮次允许时继续新的审计，最后审计仍可修复并以独立复核收尾。Python 负责材料、预算、版本和记录；实现与审计交给 Codex CLI。生成、修复、审计和复核模型均为 `gpt-6.2-sol`，推理强度为 `high`。
 
 统一使用 `forge.py` 启动实验，配置位于 `configs/workflow.json`，运行产物统一写入 `experiments/`。实验目录按需创建；已有实验记录保留，新配置只用于新准备的实验。
 
@@ -8,7 +8,7 @@
 
 生成可运行的 Go KV 共识服务：可复用 Node、独立服务器进程、真实网络、多客户端并发、执行结果、后台真实计时、可控执行、测试与启动文档。客户端使用相同请求号和载荷跨入口重试；协议实例号与请求号分离，实例分别执行完成，应用效果与结果按请求去重。所有自动化测试代码放在 `tests/`，具体测试和实现组织由 agent 选择。
 
-共同设计材料是 [protocol.md](inputs/protocol.md) 和 [system.md](inputs/system.md)，分别定义协议及内嵌伪代码、系统目标。当前英文材料由审阅后的中文稿同步，协议依据桌面的“剪枝2”设计，采用 W/s 广播窗口、Collect、PreAccept/Accept、ballot 恢复、HELP、Omega、依赖向量和 carry。范围为固定成员、crash-stop；执行后释放本地准入槽，仍保留后续扫描和恢复所需的历史，不包含旧版 epoch 或检查点流程。
+[protocol.md](inputs/protocol.md) 和 [system.md](inputs/system.md) 分别定义协议及内嵌伪代码、系统目标；baseline 独立维护自己的材料，协议与系统能力目标对齐，文档交付要求可不同。当前英文材料由审阅后的中文稿同步，协议采用 W/s 广播窗口、Collect、PreAccept/Accept、ballot 恢复、HELP、Omega 和依赖向量。范围为固定成员、crash-stop；执行后仍保留后续扫描和恢复所需的历史，不提供检查点。
 
 K 限制每个副本已经准入但尚未在本地执行完成的实例数，不是历史容量上限。测试规模按具体问题选择，实际成本需随历史规模观察，不预设恒定内存或任意规模下的固定延迟。已执行的重复请求返回 ALREADY_EXECUTED，不要求永久保存原结果。
 
@@ -28,13 +28,15 @@ python3 -m venv .venv
 .venv/bin/python -m unittest discover -s tests -v
 ```
 
+在新的 Linux x86_64 实验机上，运行 `./scripts/prepare-go-tools.sh` 准备两组实验共用的离线工具。脚本把 protoc 33.1、标准定义、protoc-gen-go v1.36.11 和固定版本的公开 Go 模块安装到本仓库的 `.toolchains/go/`。若已下载官方编译器压缩包，可把文件路径作为脚本参数。安装会复用本机已有模块，缺失时从配置的 Go 模块源获取。实验期间，隔离执行以只读方式挂载该目录，各工作区使用自己的模块缓存，Go 可直接构建带有 `vendor/` 的交付物。
+
 只准备当次材料和配置，不调用模型：
 
 ```bash
 .venv/bin/python forge.py prepare --label preview
 ```
 
-启动完整实验，使用默认的双模型 `gpt-6.1-sol / high` 配置：
+启动完整实验，使用默认的双模型 `gpt-6.2-sol / high` 配置：
 
 ```bash
 .venv/bin/python forge.py run --label sol-high-system-01
@@ -51,7 +53,7 @@ python3 -m venv .venv
 
 初始生成经正常中断并保存完成后，可以执行 `.venv/bin/python forge.py handoff-generation <实验目录>`，将现有工作区导出为 v000，直接进入原配置的审计、修复和独立复核。此操作不重新生成，也不替生成阶段补写成功状态：原阶段仍为 interrupted，实验保留此前耗时与中断记录，并新增 generation_handoff 说明。交付中增加 GENERATION_HANDOFF.md，告知审计该版本由人工提前提交，已有测试和报告不一定覆盖最后的修改。该入口只接收尚无候选的已中断初始生成，不停止正在运行的 agent。
 
-从已有候选另开一次审计—修复—复核，可执行 `.venv/bin/python forge.py branch <原实验目录> --candidate v002 --label audit-branch`，再对输出的新目录执行 `forge.py execute`。分支复制该候选（保留 Git 提交与版本编号）和原实验保存的提示词，沿用模型与阶段预算，只允许一轮修复；不重新生成、不恢复旧会话、不导入父实验的审计或复核记录。候选本身已有的设计、测试与结果仍保留。分支从 v002 开始时，修复结果写入新目录的 v003；原实验不改动。没有发现需修复的问题时，在审计后结束。
+从已有 v000 另开审计并继续最多三轮修复，执行 `.venv/bin/python forge.py branch <原实验目录> --candidate v000 --max-repairs 3 --label audit-branch`，然后对输出的新目录执行 `forge.py execute`。分支从新审计会话开始，沿用原候选、归档提示词、模型和阶段预算。每轮修复后独立复核，有可修问题时依次产生 v001、v002、v003，达到原流程的收尾条件可提前结束。父实验的审计和复核记录留在原目录。省略 `--max-repairs` 时分支默认最多一轮修复。
 
 ## 默认流程和停止方式
 
@@ -77,7 +79,7 @@ flowchart LR
 | 每次发现审计（包括首次、后续及末次） | 60 分钟 |
 | 每次修复 | agent 判断交付时机 |
 | 每次修复后的独立复核 | 30 分钟，完成任务可提前结束 |
-| 每次审计中的模型回合 | 最多 20 回合，每回合 15 分钟 |
+| 每次审计中的模型回合 | 最多 20 回合，共用该次审计或复核的阶段预算 |
 | 每个隔离执行动作 | 5 分钟 |
 | 修复次数 | 最多 3 次 |
 

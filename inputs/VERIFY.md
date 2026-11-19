@@ -2,38 +2,82 @@
 
 # Independently review the repair
 
-Read request.json in the brief's read-only review_context for before/after commits, assigned issue IDs, repair claims, original feedback and execution records. source/ and work/ contain the after version. Use protocol.md and system.md as requirements; neither agent's claims are automatically correct.
+Read `request.json` in the brief's read-only `review_context` for before/after commits, assigned issue IDs, repair claims, original feedback and execution records. `source/` and `work/` contain the after version. Use `protocol.md` and `system.md` as requirements; neither agent's claims are automatically correct.
 
-Review exactly request.issue_ids. Other pending issues, history_file and evidence_index_file provide context and reusable checks. Historical closure applies to its recorded version, not this candidate.
+Review exactly `request.issue_ids`. Other pending issues, `history_file` and `evidence_index_file` provide context and reusable checks. Historical closure applies to its recorded version, not this candidate.
 
-## Judge the repair
+## 1. Judge the repair
 
-Check the requirement or candidate claim cited by the audit, whether triggering conditions are allowed and reachable, whether the claimed cause holds, and actual before/after behavior. For timing and failure claims, identify the events the assumptions cover. Assess protocol conformance, correctness and performance separately without imposing your preferred architecture. Base performance conclusions on measurement conditions, causes and practical impact: neither ignore problems for lack of numeric targets nor set pass criteria from subjective expectations. Correcting a documented performance claim is not an implementation improvement; documentation changes or usage restrictions cannot cancel supplied requirements.
+### 1.1 Requirements and claims
 
-Inspect the diff independently. Check affected conditions, message obligations and subsequent paths beyond the original trigger, using relevant historical evidence where useful. For changes to shared synchronization, scheduling, timers/retries, scans or transport, check relevant ordinary-path and original-trigger costs before and after under comparable per-replica resources and stated actual loads. Report repair effectiveness and added costs separately; not every metric must improve. The old witness disappearing or requests eventually succeeding does not establish conformance. If a workaround breaks required behavior, keep the issue unresolved and explain the regression, even without conflicting decisions or permanent stalls.
+- Check the requirement or candidate claim cited by the audit, whether triggering conditions are allowed and reachable, whether the claimed cause holds, and actual before/after behavior. For timing and failure claims, identify the events the assumptions cover.
+- Assess protocol conformance, correctness and performance separately without imposing your preferred architecture. Base performance conclusions on measurement conditions, causes and practical impact: neither ignore problems for lack of numeric targets nor set pass criteria from subjective expectations. Correcting a documented performance claim is not an implementation improvement; documentation changes or usage restrictions cannot cancel supplied requirements.
 
-Check what assertions observe, their polarity, and the actual Node paths exercised. For resource-sensitive checks, inspect available CPU and memory, process layout, runtime limits and CPU allocation, coordinate heavy runs, and explain how in-process or controlled observations map to independent-replica deployment. Explain replaced/bypassed mechanisms; adapters must not supply missing behavior. Preserve the reproduction and justify adaptations. Finite waiting does not refute eventual progress, and missing inputs or broken adapters do not establish a fix.
+### 1.2 The changed behavior
 
-Assess needs_specification even when code is unchanged. It requires a missing or contradictory rule that prevents determining compliance; multiple valid choices or incomplete investigation are insufficient. Identify real gaps without authorizing weaker guarantees or blocking independent repairs. Use not_substantiated when evidence refutes a finding and unresolved when the investigation remains incomplete.
+- Inspect the diff and independently derive the required behavior from the protocol clauses affected by the change. Check the original trigger and a related path that uses the changed mechanism, including its conditions and message obligations. Reuse relevant historical evidence where useful.
+- For changes to shared synchronization, scheduling, timers/retries, scans or transport, check relevant ordinary-path and original-trigger costs before and after under comparable per-replica resources and stated actual loads. Report repair effectiveness and added costs separately; not every metric must improve.
+- The old witness disappearing or requests eventually succeeding does not establish conformance. If a workaround breaks required behavior, keep the issue `unresolved` and explain the regression, even without conflicting decisions or permanent stalls.
 
-## Execute and retain evidence
+### 1.3 What the evidence establishes
 
-Use isolated_exec for TCP/multiprocess checks; follow its description and the brief. source="before" and source="candidate" select the immediate pre-repair and after versions; a finding may originate earlier. Use outputs to retain artifacts and inspect result.artifacts. Cite `executions/<id>/result.json` or its logs. For ordinary shell commands cite `turns/<turn>/stdout.jsonl#<item_id>` and explain the tested version and modifications; a whole-turn log does not identify a verification command.
+- Check what assertions observe, their polarity, and the actual Node paths exercised. Explain replaced/bypassed mechanisms; adapters must not supply missing behavior.
+- For resource-sensitive checks, inspect available CPU and memory, process layout, runtime limits and CPU allocation, coordinate heavy runs, and explain how in-process or controlled observations map to independent-replica deployment.
+- Preserve the reproduction and justify adaptations. Finite waiting does not refute eventual progress, and missing inputs or broken adapters do not establish a fix.
 
-Use the feedback's execution_records to locate commands and results: restore describes how to restore inputs, outputs lists retained files, and cwd_relative identifies the source-relative working directory. Rebuild temporary binaries, inspect overlays that replace implementation code, and explain adaptations. The optional schedule helper in the brief provides --help; evaluate its adapters and observations under the same rules. Execution records and matching replays do not establish assertion validity.
+Assess `needs_specification` even when code is unchanged. It requires a missing or contradictory rule that prevents determining compliance; multiple valid choices or incomplete investigation are insufficient. Identify real gaps without authorizing weaker guarantees or blocking independent repairs.
 
-A fixed disposition requires independent execution on the after version linked to a completed command from this review. Repairer evidence or prose alone is insufficient. If execution is unavailable, use unresolved or environment_blocked; method=blocked cannot close an issue. Source reasoning may refute an invalid finding as not_substantiated. The controller checks record associations, not whether the assertions justify the conclusion.
+Use `not_substantiated` when evidence refutes a finding and `unresolved` when the investigation remains incomplete.
 
-Native Codex subagents may check independently using the same model, effort, permissions and budget. Coordinate edits and consolidate or stop their work before replying. Do not start nested Codex sessions or call external model services. Keep review independent of generation and repair. Address evidence_feedback with evidence, explanation or a narrower claim; it is not a verdict or mandatory test request.
+## 2. Execute and retain evidence
 
-## Report and finish
+### 2.1 Versions and reproductions
 
-Organize report.md around **scope, per-issue assessments, and open or ruled-out concerns**. State what was executed, inspected only in source or left unexamined. Connect each issue's requirement and repair claim to before/after observations, checks of affected behavior, conclusion and limits. Merge headings and share evidence as useful. Separate observations from interpretation, explain changed conclusions and omit empty scaffolding. Retain reproductions and outputs; keep JSON concise rather than duplicating the narrative.
+- Use `isolated_exec` for TCP/multiprocess checks; follow its description and the brief. `source="before"` and `source="candidate"` select the immediate pre-repair and after versions; a finding may originate earlier.
+- Use `outputs` to retain artifacts and inspect `result.artifacts`. Cite `executions/<id>/result.json` or its logs. For ordinary shell commands cite `turns/<turn>/stdout.jsonl#<item_id>` and explain the tested version and modifications; a whole-turn log does not identify a verification command.
+- Use the feedback's `execution_records` to locate commands and results: `restore` describes how to restore inputs, `outputs` lists retained files, and `cwd_relative` identifies the source-relative working directory. Rebuild temporary binaries, inspect overlays that replace implementation code, and explain adaptations.
+- The optional schedule helper in the brief provides `--help`; evaluate its adapters and observations under the same rules. Execution records and matching replays do not establish assertion validity.
 
-Save report.md and corresponding review.json entries as each issue is checked. Do not invent observations to complete an intermediate file. Before replying, review.json needs before_commit, after_commit, descriptive summary and exactly the assigned IDs in issues. Each issue needs id, disposition (fixed, unresolved, not_substantiated, needs_specification, environment_blocked), reason, method (executed, source_review, blocked), before_observation, after_observation and nonempty evidence. Descriptions accept nonempty text, lists or objects; commits, IDs and control values are strings. Evidence references retained work/, executions/ or turns/ files.
+### 2.2 Independent verification
 
-Finish after reporting every assigned issue. Separate supported defects may enter new_issues with id, summary, property, assumptions, reproduction, polarity and nonempty evidence; these refer to the after version. A related regression in an assigned repair belongs in that issue's assessment. Optional cases need summary, reproduction and nonempty evidence explaining scope; open_questions may record unresolved questions. These do not request extra rounds. Preserve uncertainty for unexamined work and use the remaining budget for valuable checks and reporting; this review may be the final stage.
+A `fixed` disposition requires independent execution on the after version linked to a completed command from this review. Repairer evidence or prose alone is insufficient.
+
+- If execution is unavailable, use `unresolved` or `environment_blocked`; `method=blocked` cannot close an issue.
+- Source reasoning may refute an invalid finding as `not_substantiated`.
+
+The controller checks record associations, not whether the assertions justify the conclusion.
+
+Native Codex subagents may check independently using the same model, effort, permissions and budget. Coordinate edits and consolidate or stop their work before replying. Do not start nested Codex sessions or call external model services. Keep review independent of generation and repair. Address `evidence_feedback` with evidence, explanation or a narrower claim; it is not a verdict or mandatory test request.
+
+## 3. Report and finish
+
+### 3.1 `report.md`
+
+Organize `report.md` around **scope, per-issue assessments, and open or ruled-out concerns**.
+
+- State what was executed, inspected only in source or left unexamined. Connect each issue's requirement and repair claim to before/after observations, checks of affected behavior, conclusion and limits.
+- Merge headings and share evidence as useful. Separate observations from interpretation, explain changed conclusions and omit empty scaffolding. Retain reproductions and outputs; keep JSON concise rather than duplicating the narrative.
+
+### 3.2 `review.json`
+
+Save `report.md` and corresponding `review.json` entries as each issue is checked. Do not invent observations to complete an intermediate file.
+
+- Before replying, `review.json` needs `before_commit`, `after_commit`, descriptive `summary` and exactly the assigned IDs in `issues`.
+- Each issue needs `id`, `disposition` (`fixed`, `unresolved`, `not_substantiated`, `needs_specification`, `environment_blocked`), `reason`, `method` (`executed`, `source_review`, `blocked`), `before_observation`, `after_observation` and nonempty `evidence`.
+- Descriptions accept nonempty text, lists or objects; commits, IDs and control values are strings. Evidence references retained `work/`, `executions/` or `turns/` files.
+
+### 3.3 Additional findings and completion
+
+Finish after reporting every assigned issue.
+
+- Separate supported defects may enter `new_issues` with `id`, `summary`, `property`, `assumptions`, `reproduction`, `polarity` and nonempty `evidence`; these refer to the after version. A related regression in an assigned repair belongs in that issue's assessment.
+- Optional `cases` need `summary`, `reproduction` and nonempty `evidence` explaining scope; `open_questions` may record `unresolved` questions. These do not request extra rounds.
+
+Preserve uncertainty for unexamined work and use the remaining budget for valuable checks and reporting; this review may be the final stage.
 
 <!-- continuation -->
 
-Continue the unfinished before/after review using retained observations and concrete feedback. Clarify, test or narrow claims, preserve original evidence and report every assigned ID. Distinguish execution, inference and blocked work; consolidate or stop delegated work before replying.
+Continue the unfinished before/after review using retained observations and concrete feedback.
+
+- Clarify, test or narrow claims, preserve original evidence and report every assigned ID.
+- Distinguish execution, inference and blocked work; consolidate or stop delegated work before replying.

@@ -1,0 +1,261 @@
+{
+  "default-timing-n7-random-r3000-rep1": {
+    "csv_records": 45000,
+    "issued": 44999,
+    "late_sent": 0,
+    "window_completed": 42532,
+    "consistent": true
+  },
+  "default-timing-n7-random-r6000-rep1": {
+    "csv_records": 90000,
+    "issued": 89996,
+    "late_sent": 0,
+    "window_completed": 45647,
+    "consistent": true
+  },
+  "default-timing-n7-random-r800-rep1": {
+    "csv_records": 12000,
+    "issued": 12000,
+    "late_sent": 0,
+    "window_completed": 11995,
+    "consistent": true
+  },
+  "entry-balanced-n7-balanced-r1500-rep1": {
+    "csv_records": 22500,
+    "issued": 22500,
+    "late_sent": 0,
+    "window_completed": 22491,
+    "consistent": true
+  },
+  "entry-balanced-n7-balanced-r3000-rep1": {
+    "csv_records": 45000,
+    "issued": 44999,
+    "late_sent": 0,
+    "window_completed": 44975,
+    "consistent": true
+  },
+  "entry-balanced-n7-balanced-r6000-rep1": {
+    "csv_records": 90000,
+    "issued": 90000,
+    "late_sent": 7,
+    "window_completed": 84620,
+    "consistent": true
+  },
+  "entry-single-n7-single-r1500-rep1": {
+    "csv_records": 22500,
+    "issued": 22500,
+    "late_sent": 0,
+    "window_completed": 22495,
+    "consistent": true
+  },
+  "entry-single-n7-single-r3000-rep1": {
+    "csv_records": 45000,
+    "issued": 44998,
+    "late_sent": 0,
+    "window_completed": 40239,
+    "consistent": true
+  },
+  "entry-single-n7-single-r6000-rep1": {
+    "csv_records": 90000,
+    "issued": 89996,
+    "late_sent": 0,
+    "window_completed": 14804,
+    "consistent": true
+  },
+  "fewer-replicas-n3-random-r10000-rep1": {
+    "csv_records": 150000,
+    "issued": 150000,
+    "late_sent": 0,
+    "window_completed": 90847,
+    "consistent": true
+  },
+  "fewer-replicas-n3-random-r3000-rep1": {
+    "csv_records": 45000,
+    "issued": 44999,
+    "late_sent": 0,
+    "window_completed": 44825,
+    "consistent": true
+  },
+  "fewer-replicas-n3-random-r6000-rep1": {
+    "csv_records": 90000,
+    "issued": 89999,
+    "late_sent": 0,
+    "window_completed": 87923,
+    "consistent": true
+  },
+  "matched-tick40-n7-random-r1500-rep1": {
+    "csv_records": 22500,
+    "issued": 22500,
+    "late_sent": 0,
+    "window_completed": 17016,
+    "consistent": true
+  },
+  "matched-tick40-n7-random-r1500-rep2": {
+    "csv_records": 22500,
+    "issued": 22499,
+    "late_sent": 0,
+    "window_completed": 19903,
+    "consistent": true
+  },
+  "profile-random-n7-random-r6000-rep1": {
+    "csv_records": 72000,
+    "issued": 72000,
+    "late_sent": 13,
+    "window_completed": 67298,
+    "consistent": true
+  },
+  "profile-single-n7-single-r3000-rep1": {
+    "csv_records": 36000,
+    "issued": 36000,
+    "late_sent": 0,
+    "window_completed": 30239,
+    "consistent": true
+  },
+  "scan7-n7-random-r1500-rep1": {
+    "csv_records": 18000,
+    "issued": 18000,
+    "late_sent": 0,
+    "window_completed": 12108,
+    "consistent": true
+  },
+  "scan7-n7-random-r300-rep1": {
+    "csv_records": 3600,
+    "issued": 3600,
+    "late_sent": 0,
+    "window_completed": 3592,
+    "consistent": true
+  },
+  "scan7-n7-random-r3000-rep1": {
+    "csv_records": 36000,
+    "issued": 35271,
+    "late_sent": 0,
+    "window_completed": 18886,
+    "consistent": true
+  },
+  "scan7-n7-random-r6000-rep1": {
+    "csv_records": 72000,
+    "issued": 35291,
+    "late_sent": 0,
+    "window_completed": 18602,
+    "consistent": true
+  },
+  "scan7-n7-random-r800-rep1": {
+    "csv_records": 9600,
+    "issued": 9600,
+    "late_sent": 0,
+    "window_completed": 9497,
+    "consistent": true
+  },
+  "sustained-default-n7-random-r1500-rep1": {
+    "csv_records": 45000,
+    "issued": 45000,
+    "late_sent": 0,
+    "window_completed": 44974,
+    "consistent": true
+  },
+  "sustained-default-n7-random-r1500-rep2": {
+    "csv_records": 45000,
+    "issued": 45000,
+    "late_sent": 0,
+    "window_completed": 44977,
+    "consistent": true
+  },
+  "sustained-lower-n7-random-r1500-rep1": {
+    "csv_records": 45000,
+    "issued": 44999,
+    "late_sent": 0,
+    "window_completed": 44991,
+    "consistent": true
+  },
+  "sustained-lower-n7-random-r1500-rep2": {
+    "csv_records": 45000,
+    "issued": 45000,
+    "late_sent": 0,
+    "window_completed": 44993,
+    "consistent": true
+  },
+  "sustained-lower-n7-random-r2000-rep1": {
+    "csv_records": 60000,
+    "issued": 60000,
+    "late_sent": 0,
+    "window_completed": 59987,
+    "consistent": true
+  },
+  "sustained-lower-n7-random-r2000-rep2": {
+    "csv_records": 60000,
+    "issued": 60000,
+    "late_sent": 0,
+    "window_completed": 59985,
+    "consistent": true
+  },
+  "sustained-random-n7-random-r3000-rep1": {
+    "csv_records": 90000,
+    "issued": 89998,
+    "late_sent": 0,
+    "window_completed": 89970,
+    "consistent": true
+  },
+  "sustained-random-n7-random-r3000-rep2": {
+    "csv_records": 90000,
+    "issued": 89999,
+    "late_sent": 0,
+    "window_completed": 89941,
+    "consistent": true
+  },
+  "sustained-random-n7-random-r4500-rep1": {
+    "csv_records": 135000,
+    "issued": 134998,
+    "late_sent": 0,
+    "window_completed": 132099,
+    "consistent": true
+  },
+  "sustained-random-n7-random-r4500-rep2": {
+    "csv_records": 135000,
+    "issued": 135000,
+    "late_sent": 1,
+    "window_completed": 131605,
+    "consistent": true
+  },
+  "sustained-single-n7-single-r2000-rep1": {
+    "csv_records": 60000,
+    "issued": 59999,
+    "late_sent": 0,
+    "window_completed": 56159,
+    "consistent": true
+  },
+  "sustained-single-n7-single-r2000-rep2": {
+    "csv_records": 60000,
+    "issued": 60000,
+    "late_sent": 0,
+    "window_completed": 59270,
+    "consistent": true
+  },
+  "tick5-n7-random-r1500-rep1": {
+    "csv_records": 22500,
+    "issued": 22500,
+    "late_sent": 0,
+    "window_completed": 22493,
+    "consistent": true
+  },
+  "tick5-n7-random-r3000-rep1": {
+    "csv_records": 45000,
+    "issued": 44999,
+    "late_sent": 0,
+    "window_completed": 44983,
+    "consistent": true
+  },
+  "tick5-n7-random-r6000-rep1": {
+    "csv_records": 90000,
+    "issued": 89995,
+    "late_sent": 0,
+    "window_completed": 83496,
+    "consistent": true
+  },
+  "tick5-n7-random-r800-rep1": {
+    "csv_records": 12000,
+    "issued": 12000,
+    "late_sent": 0,
+    "window_completed": 11995,
+    "consistent": true
+  }
+}

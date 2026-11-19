@@ -1,7 +1,7 @@
 {
-  "generator_model": "gpt-6.1-sol",
+  "generator_model": "gpt-6.2-sol",
   "generator_reasoning_effort": "high",
-  "audit_model": "gpt-6.1-sol",
+  "audit_model": "gpt-6.2-sol",
   "audit_reasoning_effort": "high",
   "codex": "codex",
   "audit_python": "../.venv/bin/python",
@@ -10,7 +10,6 @@
   "repair_prompt": "../inputs/REPAIR.md",
   "output_root": "../experiments",
   "audit_seconds": 3600,
-  "audit_turn_seconds": 900,
   "action_seconds": 300,
   "audit_calls": 20,
   "max_repairs": 3,

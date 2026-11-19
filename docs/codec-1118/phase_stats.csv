@@ -1,0 +1,7 @@
+job,t1,t2,actual_sample_seconds,admitted_per_s,executed_per_s,msg_adm,frame_adm,alloc_kb_adm,gib_heap,inflight_end,undecided_end,drops,short_windows
+gob-profile-r3000-rep1-s30,0,10,10.208,2924,2924,57.26,31.46,86.68,0.96,3,3,0,0
+gob-profile-r3000-rep1-s30,10,20,10.213,3000,3000,59.18,30.13,88.33,1.57,4,4,0,0
+gob-profile-r3000-rep1-s30,20,30,10.21,2890,2891,61.29,28.4,89.32,2.28,0,0,0,0
+gob-profile-r4500-rep1-s30,0,10,10.199,4387,4386,59.42,26.89,87.7,1.34,14,14,0,0
+gob-profile-r4500-rep1-s30,10,20,10.37,4499,4499,63.24,21.38,90.66,2.79,19,19,0,0
+gob-profile-r4500-rep1-s30,20,30,10.338,3515,3285,176.19,12.5,190.4,5.69,2402,2402,222214,6886

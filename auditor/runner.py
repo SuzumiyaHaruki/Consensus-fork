@@ -57,7 +57,7 @@ def implementation_identity(root):
             'execution_input_changes': dirty.splitlines() if dirty is not None else None,
             'execution_inputs_dirty': bool(dirty) if dirty is not None else None,
             'retained_source': retained, 'reload_inputs': reload_inputs, 'python': sys.executable,
-            'catalog_record': 'inputs/models.json', 'server_model_revision': 'unknown',
+            'server_model_revision': 'unknown',
             'execution_service_record': 'inputs/local-exec.json'}
 
 
@@ -210,7 +210,7 @@ def scrub_work(root):
             path.unlink()
 
 
-def brief(root, source, target, deadline, timeout, calls_left):
+def brief(root, source, target, deadline, calls_left):
     remaining = max(0, deadline - time.monotonic())
     return "\n\nRun brief (host facts):\n" + json.dumps({
         "working_directory": str(root / "work"), "read_only_source": str(root / "source"),
@@ -223,10 +223,9 @@ def brief(root, source, target, deadline, timeout, calls_left):
         "execution_evidence": "isolated_exec optionally accepts source and overlays (relative helper/test files). Cite executions/<id>/result.json or its logs. Source selects captured starting bytes, not proof of what an arbitrary command actually tests.",
         "permissions": "Source/logs read only; work writable; ordinary shell has no network. isolated_exec supports private local TCP; no host or external network.",
         "tool_environment": f"Offline {target['execution_backend']}. work/.runtime is disposable, excluded from retained artifacts and removed at cleanup. Keep reproduction source, scripts, notes and outputs needed for review elsewhere under work.",
-        "remaining_total_seconds": remaining, "turn_timeout_seconds": timeout, "remaining_agent_calls": calls_left,
+        "remaining_total_seconds": remaining, "remaining_agent_calls": calls_left,
         "generated_at": now(),
-        "deadline_basis": "Host monotonic clock; preparation, tool work and model waiting all consume total time. "
-                          "Only isolated_exec execution pauses the Agent turn timer, never the investigation/reporting wall deadline; ordinary shell and model waiting count against both."}, indent=2)
+        "deadline_basis": "Preparation, model calls and tool execution share the stage wall-clock budget."}, indent=2)
 
 
 def continuation_plan(total_seconds, remaining, durations, has_report):
@@ -264,7 +263,6 @@ def loop(config, root, source, target, client, deadline, record):
                           reason='Remaining budget is too short for another invocation; retaining the completed report.')
             break
         turn_deadline = deadline - (plan['reporting_reserve_seconds'] if plan['work_mode'] == 'investigate' else 0)
-        timeout = min(config.budget.agent_turn_timeout, turn_deadline - time.monotonic())
         folder = root / "turns" / f"{number:04d}"
         folder.mkdir()
         prompt = task if number == 1 else continuation
@@ -288,18 +286,17 @@ def loop(config, root, source, target, client, deadline, record):
             if fresh:
                 prompt += '\n\nEvidence follow-up (observations, not verdicts or mandatory extra tests):\n' + json.dumps(fresh, ensure_ascii=False, indent=2)
                 delivered.update(json.dumps(item, sort_keys=True) for item in fresh)
-        prompt += brief(root, source, target, deadline, timeout, config.budget.agent_calls - number + 1)
+        prompt += brief(root, source, target, deadline, config.budget.agent_calls - number + 1)
         (folder / "request.txt").write_text(prompt)
-        remaining = max(0, turn_deadline - time.monotonic())
         turn_start = time.monotonic()
         try:
-            result = client.turn(folder, prompt, min(timeout, remaining), session, deadline=turn_deadline)
+            result = client.turn(folder, prompt, session, deadline=turn_deadline)
         except KeyboardInterrupt:
             result = {"status": "cancelled", "session_id": session}
         except (ValueError, OSError) as exc:
             result = {"status": "external_blocker_needs_review", "session_id": session, "reason": str(exc)}
-        result.setdefault('timeout_limit', ('reporting_reserve' if turn_deadline < deadline else 'total_seconds')
-                          if remaining <= config.budget.agent_turn_timeout else 'agent_turn_timeout')
+        if result['status'] == 'timeout':
+            result['timeout_limit'] = 'reporting_reserve' if turn_deadline < deadline else 'total_seconds'
         result["ended_at"] = now()
         result['budget_plan'] = plan
         result["run_elapsed_seconds"] = time.monotonic() - start
@@ -341,7 +338,7 @@ def loop(config, root, source, target, client, deadline, record):
             record.update(stop='budget_wrap_up', budget_plan=plan,
                           reason='Completed the final planned consolidation turn.')
             break
-        if result.get("continuable_timeout") and result["timeout_limit"] in {'agent_turn_timeout', 'reporting_reserve'}:
+        if result.get("continuable_timeout") and result.get("timeout_limit") == 'reporting_reserve':
             continue
         if result["status"] != "completed":
             record["stop"] = ("total_deadline" if result["status"] == "timeout" and result["timeout_limit"] == "total_seconds"
@@ -448,6 +445,8 @@ def run(config, target, *, client_factory=Codex, environment_only=False):
         phase("environment_check", "正在检查本地权限和工具环境；尚未调用模型。")
         record["environment"] = client.prepare()
         identity["codex"] = executable_identity(client)
+        if (root / 'inputs/models.json').is_file():
+            identity['catalog_record'] = 'inputs/models.json'
         write_json(root / record["implementation"], identity)
         if environment_only:
             phase("dependency_check", "正在检查离线依赖；尚未调用模型。")

@@ -87,8 +87,8 @@ def prepare(settings, label='system'):
     return root
 
 
-def branch(source_root, candidate_name, label='audit-branch'):
-    """Start one fresh audit/repair/review cycle from a retained candidate."""
+def branch(source_root, candidate_name, label='audit-branch', *, max_repairs=1):
+    """Prepare a fresh audit workflow starting from a retained candidate."""
     source_root = Path(source_root).resolve()
     if not re.fullmatch(r'v[0-9]{3,}', candidate_name):
         raise ValueError('Candidate name must look like v002')
@@ -103,7 +103,7 @@ def branch(source_root, candidate_name, label='audit-branch'):
     settings = from_dict(source['settings'] | {
         'inputs_dir': str(source_root / 'inputs'), 'audit_prompt': str(source_root / 'inputs/AUDIT.md'),
         'repair_prompt': str(source_root / 'inputs/REPAIR.md'), 'review_prompt': str(source_root / 'inputs/VERIFY.md'),
-        'max_repairs': 1}, source_root)
+        'max_repairs': max_repairs}, source_root)
     root = prepare(settings, label)
     destination = root / 'candidates' / candidate_name
     copy_tree(path, destination)
@@ -154,7 +154,6 @@ class Runtime:
             'auth_mode': 'codex_login', 'runs_dir': str(folder / 'runs'),
             'allow_agent_materials': True, 'allow_experiments': True,
             'budget': {'total_seconds': float(seconds), 'agent_calls': settings.audit_calls,
-                       'agent_turn_timeout': float(min(settings.audit_turn_seconds, seconds)),
                        'action_timeout': float(min(settings.action_seconds, seconds))},
         })
         result = invoke(bridge_command(settings, 'audit', folder / 'config.json'), folder / 'process', timeout, ROOT)

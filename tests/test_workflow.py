@@ -284,6 +284,18 @@ class WorkflowTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'No retained candidate'):
             workflow.branch(source, 'v099')
 
+    def test_branch_from_v000_can_run_three_rounds(self):
+        source, original = self.run_fixture(max_repairs=0)
+        output = subprocess.check_output([sys.executable, str(ROOT / 'forge.py'), 'branch', str(source),
+                                          '--candidate', 'v000', '--max-repairs', '3'], text=True)
+        root = Path(json.loads(output)['experiment_dir'])
+        runtime = OfflineRuntime()
+        result = workflow.execute(root, runtime)
+        self.assertEqual(runtime.calls, ['audit', 'repair', 'verify'] * 3)
+        self.assertEqual(result['candidates'][0]['commit'], original['candidates'][0]['commit'])
+        self.assertEqual([c['version'] for c in result['candidates']], [0, 1, 2, 3])
+        self.assertEqual(result['stop_reason'], 'repair_limit')
+
     def test_full_cycle_versions_exact_feedback_models_and_final_review(self):
         runtime = OfflineRuntime()
         root, result = self.run_fixture(runtime)
@@ -316,7 +328,7 @@ class WorkflowTests(unittest.TestCase):
         for stage in result['stages']:
             if stage['kind'] in {'generation', 'repair'}:
                 args = json.loads((Path(stage['path']) / 'workspace/received-args.json').read_text())
-                self.assertEqual(args[args.index('--model') + 1], 'gpt-6.1-sol')
+                self.assertEqual(args[args.index('--model') + 1], 'gpt-6.2-sol')
                 self.assertIn('model_reasoning_effort="high"', args)
                 stage_path = Path(stage['path'])
                 self.assertEqual((stage_path / 'workspace/protocol.md').read_bytes(), (root / 'inputs/protocol.md').read_bytes())
@@ -326,7 +338,7 @@ class WorkflowTests(unittest.TestCase):
                     self.assertEqual((stage_path / 'prompt.txt').read_bytes(), (root / 'inputs/TASK.md').read_bytes())
                 else:
                     self.assertEqual((stage_path / 'prompt.txt').read_bytes(), (root / 'inputs/REPAIR.md').read_bytes())
-        self.assertEqual(result['settings']['audit_model'], 'gpt-6.1-sol')
+        self.assertEqual(result['settings']['audit_model'], 'gpt-6.2-sol')
         before = (root / 'experiment.json').read_bytes()
         with self.assertRaisesRegex(ValueError, 'already started'):
             workflow.execute(root, runtime)
@@ -1047,7 +1059,7 @@ class BridgeIntegrationTests(unittest.TestCase):
             with patch('workflow.invoke', side_effect=fake_invoke):
                 workflow.Runtime().audit(settings, candidate, folder, 30, 40)
             config = read_json(folder / 'config.json')
-            self.assertEqual(config['agent_model'], 'gpt-6.1-sol')
+            self.assertEqual(config['agent_model'], 'gpt-6.2-sol')
             self.assertEqual(config['agent_reasoning_effort'], 'high')
             self.assertEqual(config['task_path'], settings.audit_prompt)
             code = ('import sys; '

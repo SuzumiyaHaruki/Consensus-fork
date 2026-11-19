@@ -34,7 +34,7 @@ class ScriptedAudit:
     def close(self):
         self.closed = True
 
-    def turn(self, folder, prompt, timeout, session_id, *, deadline=None):
+    def turn(self, folder, prompt, session_id, *, deadline):
         self.sessions.append(session_id)
         self.prompts.append(prompt)
         work = self.root / 'work'
@@ -75,7 +75,7 @@ class AuditorTests(unittest.TestCase):
             task_path=str(self.prompt), agent_model='gpt-6.1-sol', agent_reasoning_effort='high',
             auth_mode='codex_login', runs_dir=str(self.root / 'runs'), allow_agent_materials=True,
             allow_experiments=True, budget={'total_seconds': 30., 'agent_calls': 2,
-                                          'agent_turn_timeout': 5., 'action_timeout': 5.})
+                                          'action_timeout': 5.})
 
     def tearDown(self):
         self.temp.cleanup()
@@ -148,7 +148,7 @@ class AuditorTests(unittest.TestCase):
                 request = {'before_commit': 'before', 'after_commit': 'after', 'issue_ids': ['F1']}
                 write_json(context / 'request.json', request)
                 class CompletingReview(ScriptedAudit):
-                    def turn(client, folder, prompt, timeout, session_id, *, deadline=None):
+                    def turn(client, folder, prompt, session_id, *, deadline):
                         client.sessions.append(session_id)
                         item = {'id': 'F1', 'disposition': 'fixed', 'method': 'executed',
                                 'reason': 'Fixture only', 'before_observation': 'Before', 'after_observation': 'After',
@@ -218,20 +218,18 @@ class AuditorTests(unittest.TestCase):
     def test_resumable_timeout_uses_reporting_window_without_promoting_drafts(self):
         # Include a completed report followed by an unfinished investigation; cleanup
         # consumes two seconds of the reserve in the final case.
-        scenarios = [([820, 5], ['timeout', 'completed']),
-                     ([855, 5], ['timeout', 'completed']),
-                     ([820, 80], ['timeout', 'timeout']),
-                     ([200, 657, 5], ['completed', 'timeout', 'completed'])]
+        scenarios = [([3540, 5], ['timeout', 'completed']),
+                     ([3540, 60], ['timeout', 'timeout']),
+                     ([200, 3342, 5], ['completed', 'timeout', 'completed'])]
         for durations, statuses in scenarios:
             with self.subTest(durations=durations, statuses=statuses):
                 clock = [10000.0]
                 class ResumableAudit(ScriptedAudit):
-                    def turn(inner, folder, prompt, timeout, session_id, *, deadline=None):
+                    def turn(inner, folder, prompt, session_id, *, deadline):
                         inner.prompts.append(prompt)
                         number = len(inner.prompts)
                         final = number == len(statuses)
-                        self.assertEqual(deadline, 10900. if final else 10855.)
-                        self.assertEqual(timeout, min(600., deadline - clock[0]))
+                        self.assertEqual(deadline, 13600. if final else 13540.)
                         self.assertEqual(session_id, None if number == 1 else 'fixture-session')
                         if final:
                             self.assertIn('final planned turn', prompt)
@@ -246,11 +244,10 @@ class AuditorTests(unittest.TestCase):
                         if status == 'completed':
                             write_json(work / 'findings.json', {'candidate_commit': self.commit,
                                 'coverage': 'Fixture only', 'issues': []})
-                        limit = ('total_seconds' if final else 'reporting_reserve') if clock[0] >= deadline else 'agent_turn_timeout'
                         return {'status': status, 'session_id': 'fixture-session',
-                                'continuable_timeout': status == 'timeout', 'timeout_limit': limit}
+                                'continuable_timeout': status == 'timeout'}
                 config = self.config.model_copy(update={'budget': self.config.budget.model_copy(
-                    update={'total_seconds': 900., 'agent_turn_timeout': 600., 'agent_calls': 6})})
+                    update={'total_seconds': 3600., 'agent_calls': 6})})
                 with patch('auditor.runner.time.monotonic', side_effect=lambda: clock[0]):
                     result = run(config, self.target, client_factory=ResumableAudit)
                 self.assertEqual(result['stop'], 'budget_wrap_up' if statuses[-1] == 'completed' else 'total_deadline')
@@ -277,7 +274,7 @@ class AuditorTests(unittest.TestCase):
                 clock = [10000.0]
                 clients = []
                 class TimedAudit(ScriptedAudit):
-                    def turn(inner, folder, prompt, timeout, session_id, *, deadline=None):
+                    def turn(inner, folder, prompt, session_id, *, deadline):
                         inner.prompts.append(prompt)
                         index = len(inner.prompts)
                         clock[0] += durations[index - 1]
@@ -292,7 +289,7 @@ class AuditorTests(unittest.TestCase):
                     clients.append(client)
                     return client
                 config = self.config.model_copy(update={'budget': self.config.budget.model_copy(
-                    update={'total_seconds': 1200., 'agent_turn_timeout': 1200., 'agent_calls': 10})})
+                    update={'total_seconds': 1200., 'agent_calls': 10})})
                 with patch('auditor.runner.time.monotonic', side_effect=lambda: clock[0]):
                     result = run(config, self.target, client_factory=factory)
                 self.assertEqual(result['stop'], expected_stop)
@@ -341,7 +338,7 @@ class AuditorTests(unittest.TestCase):
     def test_next_turn_gets_concrete_feedback_without_repeating_same_question(self):
         clients = []
         class RepeatingAudit(ScriptedAudit):
-            def turn(self, folder, prompt, timeout, session_id, *, deadline=None):
+            def turn(self, folder, prompt, session_id, *, deadline):
                 self.prompts.append(prompt)
                 (self.root/'work/report.md').write_text('Fixture claim, not a consensus result.')
                 (self.root/'work/observation.txt').write_text('Fixture only.')
@@ -391,16 +388,17 @@ class AuditorTests(unittest.TestCase):
         try:
             with patch('auditor.codex.process') as invoke:
                 with self.assertRaisesRegex(ValueError, 'implementation changed'):
-                    client.turn(root / 'turns/0001', 'fixture', 5, None)
+                    client.turn(root / 'turns/0001', 'fixture', None, deadline=client.deadline)
                 invoke.assert_not_called()
             write_json(root / 'inputs/implementation.json', {'reload_inputs': {}})
             client.execution_control = {}
             client.control_path = client.home / 'control.json'
-            with patch('auditor.codex.process', return_value={'status': 'completed'}), \
+            with patch('auditor.codex.process', return_value={'status': 'completed'}) as invoke, \
                  patch('auditor.codex.decode', return_value={'status': 'completed'}):
                 for number, (deadline, kind) in enumerate(((client.deadline - 10, 'reporting_reserve'),
                                                            (client.deadline, 'total_seconds')), 1):
-                    client.turn(root / f'turns/{number:04d}', 'fixture', 5, None, deadline=deadline)
+                    client.turn(root / f'turns/{number:04d}', 'fixture', None, deadline=deadline)
+                    self.assertEqual(invoke.call_args.args[3], deadline)
                     control = json.loads(client.control_path.read_text())
                     self.assertEqual((control['run_deadline'], control['deadline_kind']), (deadline, kind))
         finally:
@@ -467,24 +465,19 @@ class ExecutionBoundaryTests(unittest.TestCase):
             root = Path(temp)
             secret = 'fixture-sensitive-value'
             result = process([sys.executable, '-c', 'import os; print(os.environ["FIXTURE_VALUE"])'],
-                             root, root / 'output', 5, env={'FIXTURE_VALUE': secret}, secrets=[secret])
+                             root, root / 'output', time.monotonic() + 5, env={'FIXTURE_VALUE': secret}, secrets=[secret])
             self.assertEqual(result['status'], 'completed')
             self.assertEqual((root / 'output/stdout.jsonl').read_text(), '[REDACTED_CREDENTIAL]\n')
             result = process([sys.executable, '-c', 'import time; time.sleep(20)'],
-                             root, root / 'timeout', .1, env={})
+                             root, root / 'timeout', time.monotonic() + .1, env={})
             self.assertEqual(result['status'], 'timeout')
-            # Paused agent time must not extend the wall deadline reserved for reporting.
-            clock = root / 'execution-clock.json'
-            write_json(clock, {'elapsed_seconds': 100.})
-            control = {'run_deadline': time.monotonic() + .15, 'deadline_kind': 'reporting_reserve',
-                       'execution_clock_path': str(clock), 'action_timeout': 30.}
-            write_json(root / 'control.json', control)
+            control = {'run_deadline': time.monotonic() + .15, 'deadline_kind': 'reporting_reserve', 'action_timeout': 30.}
             limit, basis = local_exec.remaining(control, 20.)
             self.assertLessEqual(limit, .15)
             self.assertEqual(basis, 'reporting_reserve')
             result = process([sys.executable, '-c', 'import time; time.sleep(20)'],
-                             root, root / 'reserved', .05, env={}, execution_control=root / 'control.json')
-            self.assertEqual((result['status'], result['timeout_limit']), ('timeout', 'reporting_reserve'))
+                             root, root / 'reserved', control['run_deadline'], env={})
+            self.assertEqual(result['status'], 'timeout')
             self.assertLess(result['elapsed_seconds'], 2.)
 
     def test_report_examples_survive_incremental_archive_replay_and_cleanup(self):

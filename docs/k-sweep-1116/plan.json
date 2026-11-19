@@ -1,0 +1,1753 @@
+{
+  "method": "fixed-rate-1115",
+  "shard": "K",
+  "versions": [
+    "baseline",
+    "v000",
+    "v003"
+  ],
+  "options": {
+    "seconds_override": 10.0,
+    "idle_seconds": 10,
+    "cpu_per_replica": 1,
+    "threads_per_core": 1,
+    "replica_gomaxprocs": 1,
+    "native_gomaxprocs": 8,
+    "driver_cpus": 1,
+    "pin": true,
+    "drain_seconds": 20.0,
+    "history_drain_seconds": 30,
+    "preparation_seconds": 30,
+    "observation_seconds": 2
+  },
+  "jobs": [
+    {
+      "version": "v000",
+      "case": {
+        "name": "two-crashed-k64-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "two-crashed",
+        "k": 64,
+        "crashes": 2,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 1,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "v000",
+      "case": {
+        "name": "ordinary-k64-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "ordinary",
+        "k": 64,
+        "crashes": 0,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 1,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "v003",
+      "case": {
+        "name": "two-crashed-k128-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "two-crashed",
+        "k": 128,
+        "crashes": 2,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 1,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "v003",
+      "case": {
+        "name": "ordinary-k64-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "ordinary",
+        "k": 64,
+        "crashes": 0,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 1,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "v000",
+      "case": {
+        "name": "ordinary-k256-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "ordinary",
+        "k": 256,
+        "crashes": 0,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 1,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "baseline",
+      "case": {
+        "name": "two-crashed-k128-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "two-crashed",
+        "k": 128,
+        "crashes": 2,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 1,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "v000",
+      "case": {
+        "name": "ordinary-k128-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "ordinary",
+        "k": 128,
+        "crashes": 0,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 1,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "baseline",
+      "case": {
+        "name": "ordinary-k128-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "ordinary",
+        "k": 128,
+        "crashes": 0,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 1,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "v003",
+      "case": {
+        "name": "ordinary-k128-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "ordinary",
+        "k": 128,
+        "crashes": 0,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 1,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "baseline",
+      "case": {
+        "name": "ordinary-k512-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "ordinary",
+        "k": 512,
+        "crashes": 0,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 1,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "v003",
+      "case": {
+        "name": "two-crashed-k64-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "two-crashed",
+        "k": 64,
+        "crashes": 2,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 1,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "v003",
+      "case": {
+        "name": "ordinary-k256-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "ordinary",
+        "k": 256,
+        "crashes": 0,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 1,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "baseline",
+      "case": {
+        "name": "two-crashed-k512-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "two-crashed",
+        "k": 512,
+        "crashes": 2,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 1,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "baseline",
+      "case": {
+        "name": "two-crashed-k256-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "two-crashed",
+        "k": 256,
+        "crashes": 2,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 1,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "v003",
+      "case": {
+        "name": "ordinary-k512-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "ordinary",
+        "k": 512,
+        "crashes": 0,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 1,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "v000",
+      "case": {
+        "name": "two-crashed-k512-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "two-crashed",
+        "k": 512,
+        "crashes": 2,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 1,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "baseline",
+      "case": {
+        "name": "ordinary-k64-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "ordinary",
+        "k": 64,
+        "crashes": 0,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 1,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "v000",
+      "case": {
+        "name": "two-crashed-k256-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "two-crashed",
+        "k": 256,
+        "crashes": 2,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 1,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "v000",
+      "case": {
+        "name": "two-crashed-k128-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "two-crashed",
+        "k": 128,
+        "crashes": 2,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 1,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "v000",
+      "case": {
+        "name": "ordinary-k512-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "ordinary",
+        "k": 512,
+        "crashes": 0,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 1,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "baseline",
+      "case": {
+        "name": "two-crashed-k64-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "two-crashed",
+        "k": 64,
+        "crashes": 2,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 1,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "v003",
+      "case": {
+        "name": "two-crashed-k256-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "two-crashed",
+        "k": 256,
+        "crashes": 2,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 1,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "v003",
+      "case": {
+        "name": "two-crashed-k512-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "two-crashed",
+        "k": 512,
+        "crashes": 2,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 1,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "baseline",
+      "case": {
+        "name": "ordinary-k256-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "ordinary",
+        "k": 256,
+        "crashes": 0,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 1,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "v003",
+      "case": {
+        "name": "ordinary-k128-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "ordinary",
+        "k": 128,
+        "crashes": 0,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 2,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "v003",
+      "case": {
+        "name": "ordinary-k256-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "ordinary",
+        "k": 256,
+        "crashes": 0,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 2,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "v003",
+      "case": {
+        "name": "two-crashed-k256-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "two-crashed",
+        "k": 256,
+        "crashes": 2,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 2,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "v000",
+      "case": {
+        "name": "ordinary-k128-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "ordinary",
+        "k": 128,
+        "crashes": 0,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 2,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "v003",
+      "case": {
+        "name": "two-crashed-k512-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "two-crashed",
+        "k": 512,
+        "crashes": 2,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 2,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "baseline",
+      "case": {
+        "name": "ordinary-k256-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "ordinary",
+        "k": 256,
+        "crashes": 0,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 2,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "baseline",
+      "case": {
+        "name": "two-crashed-k512-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "two-crashed",
+        "k": 512,
+        "crashes": 2,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 2,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "v003",
+      "case": {
+        "name": "ordinary-k512-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "ordinary",
+        "k": 512,
+        "crashes": 0,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 2,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "v000",
+      "case": {
+        "name": "ordinary-k512-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "ordinary",
+        "k": 512,
+        "crashes": 0,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 2,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "baseline",
+      "case": {
+        "name": "ordinary-k64-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "ordinary",
+        "k": 64,
+        "crashes": 0,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 2,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "baseline",
+      "case": {
+        "name": "ordinary-k512-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "ordinary",
+        "k": 512,
+        "crashes": 0,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 2,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "v000",
+      "case": {
+        "name": "two-crashed-k256-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "two-crashed",
+        "k": 256,
+        "crashes": 2,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 2,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "v003",
+      "case": {
+        "name": "ordinary-k64-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "ordinary",
+        "k": 64,
+        "crashes": 0,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 2,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "v000",
+      "case": {
+        "name": "two-crashed-k128-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "two-crashed",
+        "k": 128,
+        "crashes": 2,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 2,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "baseline",
+      "case": {
+        "name": "two-crashed-k128-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "two-crashed",
+        "k": 128,
+        "crashes": 2,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 2,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "v003",
+      "case": {
+        "name": "two-crashed-k128-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "two-crashed",
+        "k": 128,
+        "crashes": 2,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 2,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "baseline",
+      "case": {
+        "name": "ordinary-k128-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "ordinary",
+        "k": 128,
+        "crashes": 0,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 2,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "v003",
+      "case": {
+        "name": "two-crashed-k64-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "two-crashed",
+        "k": 64,
+        "crashes": 2,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 2,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "baseline",
+      "case": {
+        "name": "two-crashed-k64-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "two-crashed",
+        "k": 64,
+        "crashes": 2,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 2,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "v000",
+      "case": {
+        "name": "two-crashed-k64-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "two-crashed",
+        "k": 64,
+        "crashes": 2,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 2,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "baseline",
+      "case": {
+        "name": "two-crashed-k256-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "two-crashed",
+        "k": 256,
+        "crashes": 2,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 2,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "v000",
+      "case": {
+        "name": "ordinary-k256-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "ordinary",
+        "k": 256,
+        "crashes": 0,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 2,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "v000",
+      "case": {
+        "name": "ordinary-k64-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "ordinary",
+        "k": 64,
+        "crashes": 0,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 2,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "v000",
+      "case": {
+        "name": "two-crashed-k512-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "two-crashed",
+        "k": 512,
+        "crashes": 2,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 2,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "v003",
+      "case": {
+        "name": "ordinary-k512-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "ordinary",
+        "k": 512,
+        "crashes": 0,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 3,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "v003",
+      "case": {
+        "name": "ordinary-k256-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "ordinary",
+        "k": 256,
+        "crashes": 0,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 3,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "v000",
+      "case": {
+        "name": "two-crashed-k64-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "two-crashed",
+        "k": 64,
+        "crashes": 2,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 3,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "baseline",
+      "case": {
+        "name": "ordinary-k512-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "ordinary",
+        "k": 512,
+        "crashes": 0,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 3,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "v000",
+      "case": {
+        "name": "two-crashed-k256-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "two-crashed",
+        "k": 256,
+        "crashes": 2,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 3,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "v000",
+      "case": {
+        "name": "ordinary-k128-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "ordinary",
+        "k": 128,
+        "crashes": 0,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 3,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "baseline",
+      "case": {
+        "name": "two-crashed-k512-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "two-crashed",
+        "k": 512,
+        "crashes": 2,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 3,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "v000",
+      "case": {
+        "name": "two-crashed-k128-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "two-crashed",
+        "k": 128,
+        "crashes": 2,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 3,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "v000",
+      "case": {
+        "name": "ordinary-k64-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "ordinary",
+        "k": 64,
+        "crashes": 0,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 3,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "baseline",
+      "case": {
+        "name": "two-crashed-k128-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "two-crashed",
+        "k": 128,
+        "crashes": 2,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 3,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "baseline",
+      "case": {
+        "name": "ordinary-k64-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "ordinary",
+        "k": 64,
+        "crashes": 0,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 3,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "v000",
+      "case": {
+        "name": "ordinary-k512-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "ordinary",
+        "k": 512,
+        "crashes": 0,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 3,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "v003",
+      "case": {
+        "name": "two-crashed-k64-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "two-crashed",
+        "k": 64,
+        "crashes": 2,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 3,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "baseline",
+      "case": {
+        "name": "two-crashed-k256-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "two-crashed",
+        "k": 256,
+        "crashes": 2,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 3,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "v003",
+      "case": {
+        "name": "two-crashed-k256-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "two-crashed",
+        "k": 256,
+        "crashes": 2,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 3,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "baseline",
+      "case": {
+        "name": "ordinary-k256-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "ordinary",
+        "k": 256,
+        "crashes": 0,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 3,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "v003",
+      "case": {
+        "name": "ordinary-k64-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "ordinary",
+        "k": 64,
+        "crashes": 0,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 3,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "v003",
+      "case": {
+        "name": "ordinary-k128-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "ordinary",
+        "k": 128,
+        "crashes": 0,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 3,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "baseline",
+      "case": {
+        "name": "ordinary-k128-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "ordinary",
+        "k": 128,
+        "crashes": 0,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 3,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "baseline",
+      "case": {
+        "name": "two-crashed-k64-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "two-crashed",
+        "k": 64,
+        "crashes": 2,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 3,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "v003",
+      "case": {
+        "name": "two-crashed-k512-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "two-crashed",
+        "k": 512,
+        "crashes": 2,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 3,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "v000",
+      "case": {
+        "name": "two-crashed-k512-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "two-crashed",
+        "k": 512,
+        "crashes": 2,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 3,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "v003",
+      "case": {
+        "name": "two-crashed-k128-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "two-crashed",
+        "k": 128,
+        "crashes": 2,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 3,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    },
+    {
+      "version": "v000",
+      "case": {
+        "name": "ordinary-k256-r800",
+        "shard": "K",
+        "group": "performance",
+        "scenario_label": "ordinary",
+        "k": 256,
+        "crashes": 0,
+        "entries": [
+          2
+        ],
+        "workers": 4,
+        "rate": 800,
+        "topology": "single",
+        "payload": 64
+      },
+      "repeat": 3,
+      "cpu": {
+        "cpu_per_replica": 1,
+        "threads_per_core": 1
+      },
+      "cpu_layout": "1vcpu-g1"
+    }
+  ]
+}

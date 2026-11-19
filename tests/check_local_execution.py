@@ -57,25 +57,19 @@ async def exercise(prepared, stage, host_port):
                     raise AssertionError(output.model_dump())
                 return json.loads(output.content[0].text)
             # Native subagents may each connect a separate STDIO tool server.
-            # Both servers must serialize mutable-work execution and clock updates.
+            # Both servers must serialize mutable-work execution.
             async with stdio_client(params) as (other_reader, other_writer):
                 async with ClientSession(other_reader, other_writer) as other:
                     await other.initialize()
                     arguments = {'argv': ['/usr/bin/python3', '-I', '-c',
                         'import os,time; fd=os.open("execution-active",os.O_CREAT|os.O_EXCL|os.O_WRONLY); '
                         'time.sleep(.15); os.close(fd); os.unlink("execution-active")'], 'timeout_seconds': 10.0}
-                    prior = json.loads((stage/'execution-clock.json').read_text())['elapsed_seconds']
                     outputs = await asyncio.gather(session.call_tool('isolated_exec', arguments),
                                                    other.call_tool('isolated_exec', arguments))
-                    records = []
                     for output in outputs:
                         assert not output.isError, output
                         record = json.loads(output.content[0].text)
                         assert record['status'] == 'completed' and record['exit_code'] == 0, record
-                        records.append(record)
-                    clock = json.loads((stage/'execution-clock.json').read_text())
-                    assert 'active' not in clock, clock
-                    assert abs(clock['elapsed_seconds']-prior-sum(r['elapsed_seconds'] for r in records)) < .000001, clock
             script = ('from pathlib import Path; import socket; '
                       f'p=Path({str(stage / "inputs/material.txt")!r}); assert p.read_text()=="read-only"; '
                       f'assert not Path({str(stage / "host-only.txt")!r}).exists(); '
@@ -180,8 +174,6 @@ def main():
             finally:
                 client.close()
         assert not client.home.exists()
-        control['execution_clock_path'] = str(stage/'execution-clock.json')
-        (stage/'execution-clock.json').write_text(json.dumps({'elapsed_seconds': 0.0}))
         control['replay_sources'] = {}
         for name, version in [('before', 'old'), ('candidate', 'new')]:
             (stage/name).mkdir()
@@ -204,7 +196,7 @@ def main():
             asyncio.run(asyncio.wait_for(exercise(prepared, stage, host.getsockname()[1]), 120))
         print(json.dumps({'status': 'passed', 'checks': ['native MCP configuration', 'STDIO private TCP',
                          'private generation configuration and explicit supplied instructions without host skills',
-                         'separate MCP servers serialize execution and preserve the shared clock',
+                         'separate MCP servers serialize execution',
                          'two Go subprocesses with race detector', 'read-only materials',
                          'host files/logs/network inaccessible', 'before/after source replay and retained overlays',
                          'selected output retention after success, failure and timeout',

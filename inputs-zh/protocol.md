@@ -4,28 +4,36 @@
 
 ### 1.1 故障与时间
 
-固定成员集合 Pi 有 n 个副本，最多 f 个 crash-stop，0<=f<n。信道识别发送者，内容不被篡改，允许重复和乱序。正确副本间的通信、处理和调度公平，有限真实时间内只有有限事件。可采信成员依协议报告的状态和完整结论。
+固定成员集合 Pi 有 n 个副本，最多 f 个 crash-stop，0<=f<n。信道识别发送者，内容不被篡改，允许重复和乱序。正确副本间的通信、处理和调度公平，有限真实时间内只有有限事件。
 
 W 从开始广播计时，覆盖构造、排队、全部发送、双向通信、处理、必要数据交付与保存及计时误差。收集者若持续存活、完成全体广播并等到 W 截止，仍存活但未返回完整回复的成员至多 s 个。慢成员可随协调者和时间变化。
 
-参数满足 `q=n-f`、`L=f+1`、`0<=s<q<=L`、`F=n-e`、`e>=0`、`2e<q`。q、L 分别用于 Collect 的小、大门槛，F 用于初始快决定；广播包括自身。每个协调者有 K 个准入槽，K>=1。
+参数满足 `q=n-f`、`L=f+1`、`0<=s<q<=L`、`F=n-e`、`e>=0`、`2e<q`。q、L 分别用于 Collect 的小、大门槛，F 用于初始快决定；广播包括自身。
 
 ### 1.2 请求、实例和值
 
-| 记号                          | 含义                                                                                               |
-| ----------------------------- | -------------------------------------------------------------------------------------------------- |
-| `rid=(ClientID,RequestSeq)` | 逻辑请求号：ClientID 是全局唯一会话身份，RequestSeq 在会话内递增且不复用。                         |
-| `x=R.i`                     | 实例标识；R 是副本编号，i 是副本分配的实例序号，从 1 连续递增且不复用。                            |
-| `cmd`                       | 原始命令，包含 rid 和载荷；同一实例的命令不变。                                                    |
-| `V=(cmd,D,seq)`             | 完整值；D 中每个副本至多一个真实冲突代表编号，空分量为 0；seq 用于环内排序。                       |
-| `V0=(cmd,D0,seq0)`          | 不可变初始值。所有后续值保留 cmd，且 D 逐分量不小于 D0。                                           |
-| `b`、`promise`            | ballot 0 属于初始协调者；正 ballot 按 `(递增轮号,协调者编号)` 全序排列。promise 是本地最高承诺。 |
-| `attempt`、`nonce`        | 一次收集及其阶段请求的身份；新调用和新阶段分别使用新身份。                                         |
-| `Done(x,V)`、`Learn`      | 实际决定及其传播消息。                                                                             |
+| 记号                          | 含义                                                                                                                                       |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `rid=(ClientID,RequestSeq)` | 逻辑请求号：ClientID 是全局唯一会话身份，RequestSeq 在会话内递增且不复用。                                                                 |
+| `x=R.i`                     | 实例标识；R 是副本编号，i 是副本分配的实例序号，从 1 连续递增且不复用。                                                                    |
+| `cmd`                       | 原始命令，包含 rid 和载荷；同一实例的命令不变。                                                                                            |
+| `class(cmd)=cmd.key`        | 冲突类：单键 Put、Get 或 Delete 操作使用的键。                                                                                             |
+| `V=(cmd,D,seq)`             | 完整值；D 中每个副本至多一个真实冲突代表编号，空分量为 0；seq 用于环内排序。                                                               |
+| `V0=(cmd,D0,seq0)`          | 不可变初始值。所有后续值保留 cmd，且 D 逐分量不小于 D0。                                                                                   |
+| `b`                         | ballot：初始协调者使用 0；恢复使用 `(轮号, 协调者编号)`，轮号为正整数。0 小于所有恢复 ballot；恢复 ballot 先比较轮号，再比较协调者编号。 |
+| `promise[x]`                | 本地对 x 承诺的最高 ballot，初始为 0；恢复时保存完整的二元组，而非只有轮号。                                                               |
+| `round(b)`                  | 提取恢复 ballot 的轮号，`round(0)=0`。                                                                                                   |
+| `attempt`、`nonce`        | 一次收集及其阶段请求的身份；新调用和新阶段分别使用新身份。                                                                                 |
+| `Done(x,V)`、`Learn`      | 实际决定及其传播消息。                                                                                                                     |
+| `decided[x]`                | 本地记录的完整决定值 V；尚未获知决定时为 ⊥。                                                                                              |
+
+客户端重试保留同一 rid 和完整命令，不把同一 rid 用于不同命令。若初始协调者在任何正确副本获知命令前崩溃，客户端可换入口重试。
 
 ### 1.3 依赖向量
 
-`D[R]` 是副本 R 的实例编号上界，覆盖该上界以内所有与 x 冲突的其他实例；0 表示该分量为空。
+命令当且仅当属于同一冲突类时冲突，包括同键的两个 Get。不同类的操作换序执行后，应用状态、去重状态和各自结果必须不变。
+
+`D[R]` 记录本次依赖计算中，由副本 R 创建的冲突实例的最大编号；没有则为 0。它表示 x 依赖 R 在该编号及以前创建的所有同类实例，对 x=R.i，D0(x)[R] 记录 R 创建的上一条同类实例编号，没有则为 0。沿这些实例各自的前驱记录，可以找到 R 更早的同类实例。最终依赖 D 的变化不覆盖 D0。
 
 | 记号              | 含义                                                                                 |
 | ----------------- | ------------------------------------------------------------------------------------ |
@@ -39,9 +47,11 @@ W 从开始广播计时，覆盖构造、排队、全部发送、双向通信、
 
 同一实例只能决定一个完整值；两条已决定的冲突命令 x、y，按最终依赖向量至少有 `x→y` 或 `y→x`，允许双向依赖。
 
-## 2. 公共收集 Collect
+## 2. 公共收集与轮次更新
 
-按回复副本去重计数，分别保留两阶段的实际回复。
+### 2.1 Collect
+
+Collect 的状态按调用独立保存。A、B 分别记录两个阶段各副本的完整正回复，以副本编号为键。只将匹配的完整正回复交给仍在收集的调用；PreAccept 的快票另按 §3.3 处理。
 
 ```text
 procedure Collect(kind, x, b, V):
@@ -52,11 +62,7 @@ procedure Collect(kind, x, b, V):
     t0 ← start of broadcasting
     broadcast kind(x, b, V, attempt, phase=1, nonce1) to all members
 
-upon receiving a complete positive reply r matching this call from member p do:
-    if kind == PreAccept:
-        HandleInitialVote(x, p, r.first)
-    if this Collect is inactive:
-        return
+upon a matching positive reply r from p do:
     if phase == 1 and r.nonce == nonce1:
         A[p] ← r
     else if phase == 2 and r.nonce == nonce2:
@@ -64,83 +70,93 @@ upon receiving a complete positive reply r matching this call from member p do:
 
 // Large threshold: complete in phase 1
 upon |A| >= L while phase == 1 do:
-    freeze A
     phase ← complete
     complete this Collect with A's actual replies
 
 // Small threshold: start phase 2 after W
 upon now >= t0 + W and q <= |A| < L while phase == 1 do:
-    freeze A
     phase ← 2
     nonce2 ← fresh nonce
     broadcast kind(x, b, V, attempt, phase=2, nonce2) to all members
 
 upon |B| >= q or |members(A) union members(B)| >= L
      while phase == 2 do:
-    freeze B
     phase ← complete
     complete this Collect with all actual replies from A and B
 
-upon receiving a matching NACK for x reporting promise b' do:
-    save the rejection reason
-    update the highest known ballot for x using b'
-    if a local coordination task for x uses ballot b < b':
-        stop that task and its retransmissions
-        add x to pending recovery
-    if the corresponding Collect is still active:
-        phase ← failed
-        fail this Collect
-
-upon raising promise[x] above b when processing a protocol request,
-     or starting local recovery for x at ballot b' > b,
-     while a local coordination task for (x, b) is active do:
-    update the highest known ballot for x using the higher ballot
-    stop that task and its retransmissions
-    add x to pending recovery
+upon receiving a valid NACK(x, b', attempt, phase, nonce) do:
+    RaisePromise(x, b')
 ```
 
-相同 nonce 的重传可复用回复。进入新阶段时重新检查 promise：PreAccept 复用首次观察，Prepare 重读状态，Observe/Validate 重新扫描，Accept 重新检查提案与本地接受记录。缺数据须 Fetch，不能当作没有历史记录或没有冲突；等待期间继续服务其他任务。
+有效 NACK 即使在对应收集结束后到达，也按 §2.2 处理。相同 nonce 的重传可复用回复。第二阶段请求使用新的 nonce，接收方按对应消息的处理规则重新检查并回复，不能直接重发第一阶段的回复。数据要求见 §7；等待期间继续处理其他工作。
+
+### 2.2 更新 promise
+
+收到有效 NACK、处理 Prepare/Observe/Validate/Accept 请求，以及发起恢复时，均通过 RaisePromise 更新 promise。提升 promise 会停止较低 ballot 的协调任务。
+
+```text
+procedure RaisePromise(x, b'):
+    atomic:
+        promise[x] ← max(promise[x], b')
+        if coordinating x at b < promise[x]:
+            stop that task, its active Collect calls and retransmissions
+            if x is undecided:
+                add x to pending recovery
+```
 
 ## 3. 初始提议与快慢路径
 
 ### 3.1 准入
 
-所有冲突扫描均包含已登记的未执行和已执行实例，排队请求除外。准入时原子读取冲突集合 T、生成初始值并登记 x；carry(x) 见 §7.2。
+冲突扫描包含本地所有已登记实例，包括已执行实例；登记所需数据见 §7。
+
+接纳前可以排队或因过载明确拒绝。公平调度当前可接纳的请求和冲突类。不同入口可为同一请求创建不同实例，由 §6.2 按 rid 去重。实例一旦接纳，超时、客户端取消等待或资源紧张都不能撤销其协议工作，也不能把命令替换为空操作。
+
+本地已登记实例（包括其他副本创建的）从首次完整登记起，若持续未执行超过有限阈值，就暂停该类的新客户端接纳，直到该类没有超龄未执行实例。后续消息不重置等待时长。
+
+暂停只限制新接纳，该类的协议处理与执行、其他类的可接纳请求继续推进。阈值可在副本间不同，与 W 分开，仅用于接纳调度；到期处理不能被新流量无限推迟。
 
 | 状态                         | 含义                                                                                       |
 | ---------------------------- | ------------------------------------------------------------------------------------------ |
-| `first[x]=(V0,Dp,sp,vote)` | 不可变首次观察：V0 为初始值，Dp、sp 为建议依赖向量和序号，vote 为 FastOK(V0) 或 Mismatch。 |
+| `first[x]` | 副本尚未对 x 投票时为空，首次投票后不再改变。`FastOK` 表示同意 x 的完整初始值 `V0(x)`；`Mismatch(Dp, sp)` 给出副本建议的依赖向量和序号。 |
 | `fastVoters[x]`            | 初始协调者已计入的 FastOK 副本集合，包含自身。                                             |
+| `O[x]`                     | x 的初始 PreAccept 收集结果；尚未完成收集时为 ⊥。                                         |
 
 ```text
-upon cmd reaches its FIFO turn and a local slot is free do:
+upon selecting cmd for admission do:
     atomic:
+        if cmd is malformed or contradicts a known rid binding:
+            reject cmd
+            return
         if cmd.rid is in executedRequests:
             reply ALREADY_EXECUTED
             return
-        allocate x = self.i with the next consecutive local number i
+        if an instance for cmd.rid was already admitted here:
+            reuse that instance for this request
+            return
+        allocate next local instance x = self.i
         T ← registered conflicts with x
         V0(x) ← (cmd, heads(T), 1 + S(T))
-        bind a slot and carry(x)
         register x
-        first[x] ← (V0(x), D0(x), seq0(x), FastOK(V0(x)))
+        first[x] ← FastOK
         fastVoters[x] ← {self}
         seenMismatch[x] ← false
+        O[x] ← ⊥
 
     Collect(PreAccept, x, 0, V0)
-    process the local PreAccept reply through the same handler
+    handle the local reply under section 3.3
 ```
 
 ### 3.2 副本处理 PreAccept 请求
 
 ```text
-upon PreAccept(x, 0, V0, attempt, phase, nonce) has arrived from x's initial coordinator
-     and its required initial value and carry data are complete and locally available do:
+upon PreAccept(x, 0, V0, attempt, phase, nonce) from x's initial coordinator
+     with required data available (section 7) do:
     atomic:
-        if decided[x]:
+        if decided[x] != ⊥:
             reply Done(x, decided[x], attempt, phase, nonce)
             return
-        if promise[x] > 0:
+        if promise[x] != 0:
             reply NACK(x, promise[x], attempt, phase, nonce)
             return
 
@@ -150,77 +166,98 @@ upon PreAccept(x, 0, V0, attempt, phase, nonce) has arrived from x's initial coo
             Dp ← D0(x) ∨ heads(T)
             sp ← max(seq0(x), 1 + S(T))
             if (Dp, sp) == (D0(x), seq0(x)):
-                vote ← FastOK(V0)
+                first[x] ← FastOK
             else:
-                vote ← Mismatch
-            first[x] ← (V0, Dp, sp, vote)
+                first[x] ← Mismatch(Dp, sp)
 
-        reply PreAcceptReply(x, attempt, phase, nonce, first=first[x])
+        reply PreAcceptReply(x, attempt, phase, nonce, first[x])
 ```
 
 ### 3.3 初始协调者处理 PreAccept 回复
 
-PreAccept 的 Collect 完成只冻结观察结果，不结束初始任务，也不能仅因此取消尚未完成的 PreAccept 发送。收集结束后，仍按下方初始任务的有效条件逐份处理初始票。本地检查与更新按实例原子串行。慢路径复用 §2 的大、小门槛收集结果，t0 是该次 PreAccept 广播的起点。
+`FastOK` 和 `Mismatch(Dp, sp)` 都是 Collect 的完整正回复。与请求匹配的 `FastOK` 同时计为支持 `V0(x)` 的一票，回复无需重传该值。Collect 完成后，只要初始任务仍有效，就继续处理后续快票及未完成的 PreAccept 发送。慢路径须等到 t0+W，其中 t0 为本次广播起点。
 
 ```text
+upon valid PreAcceptReply(x, attempt, phase, nonce, first) from p do:
+    HandleInitialVote(x, p, first)
+    deliver the reply to its active Collect
+
 procedure HandleInitialVote(x, p, first):
-    if the initial task is inactive or x is decided:
+    if initial task inactive or decided[x] != ⊥:
         return
-    if first.vote == Mismatch:
+    if first is Mismatch(Dp, sp):
         seenMismatch[x] ← true
-    if first.vote == FastOK(V0):
+    else if first == FastOK:
         fastVoters[x] ← fastVoters[x] union {p}
 
     // Fast path, also available during Accept(V0)
     if not seenMismatch[x] and |fastVoters[x]| >= F:
-        LearnDecision(x, V0)
+        Decide(x, V0)
 
-upon Collect(PreAccept, x, 0, V0) completes with O do:
-    save O as this initial task's collection result
+upon Collect(PreAccept, x, 0, V0) completes with replies do:
+    O[x] ← replies
 
-// Slow path: either collection threshold leads to formal Accept
-upon O is available and now >= t0 + W
-     while the initial task is active, x is undecided and no proposal is frozen do:
-    D ← D0(x) ∨ all r.first.Dp for r in O
-    seq ← max(seq0(x), all r.first.sp for r in O)
-    V ← (cmd, D, seq)
-    RunAccept(x, 0, V)
+// Slow path after either Collect threshold
+upon O[x] != ⊥ and now >= t0 + W do:
+    atomic:
+        if not coordinating x at 0 or a proposal is frozen:
+            return
+        D, seq ← D0(x), seq0(x)
+        for each reply with Mismatch(Dp, sp) in O[x]:
+            D ← D ∨ Dp
+            seq ← max(seq, sp)
+        V ← (cmd, D, seq)
+        freeze proposal V for ballot 0
+
+    if coordinating x at 0:
+        Collect(Accept, x, 0, V)
 ```
 
 ## 4. 恢复与正式接受
 
-### 4.1 接管
+### 4.1 请求与发起恢复
 
-已知实例尚未决定时，等待有限时间后开始反复发送 NeedRecover，直到获知决定；各实例的恢复请求须公平调度。同一副本对每个实例至多运行一个协调任务，重复通知和 HELP 合并；Omega 选中其他副本时，停止本地协调并保留待办，继续处理收到的请求。
+每个获知实例 x、但尚未获知其决定的副本，从首次获知 x 起等待有限的恢复等待期，随后向自己当前的 Omega 反复发送 NeedRecover(x)，直到获知决定。后续消息不重置等待期，也不能因为重复回复或暂时未决定就删除恢复待办。
+
+接收方若本地 Omega 指向其他副本，保留待办，由同一后台重试规则联系自己的 Omega，不逐条即时转发收到的 NeedRecover。只有本地 Omega 指向自己的副本发起恢复；请求恢复不表示判定初始协调者崩溃。各实例的恢复请求公平调度，重复通知与 HELP 合并。同一副本对每个实例至多运行一个协调任务；Omega 不再指向自己时，停止本地协调，保留待办并继续处理请求。
 
 ```text
-upon receiving NeedRecover(x) do:
-    add x to pending recovery
-    Fetch the initial value if missing
+upon recovery wait or retry expires for undecided x do:
+    send NeedRecover(x) to Omega
 
-upon recovery of x is pending and its complete initial value is available
-     while Omega == self, x is undecided and no recovery task for x is active do:
-    activate the recovery task for x
-    b ← fresh positive ballot above all known promises and own prior ballots
-    Collect(Prepare, x, b, V0)
+upon NeedRecover(x) do:
+    if decided[x] != ⊥:
+        reply Done(x, decided[x])
+    else:
+        add x to pending recovery
+        Fetch missing initial data
+
+upon x pending recovery and required data available (section 7)
+     while Omega == self, decided[x] == ⊥ and no active recovery for x do:
+    atomic:
+        b ← (round(promise[x]) + 1, self)
+        RaisePromise(x, b)
+        activate the recovery task for (x, b)
+    if task active:
+        Collect(Prepare, x, b, V0)
 ```
 
-### 4.2 Prepare 与观察
+### 4.2 副本处理 Prepare、Observe 和 Validate
 
-promise 只增不减，不清空 accepted。Prepare 区分未投初始票、未接受正式值和数据缺失；Observe/Validate 的新扫描不改写 first。
+恢复协调者广播 Prepare、Observe 或 Validate，各接收副本（包括发送者自身）执行下面的处理。Prepare 报告本地保存的 x 的首次票（为空、`FastOK` 或 `Mismatch(Dp, sp)`）、接受记录和决定。须区分没有记录与缺少数据。Observe/Validate 重新扫描冲突，不改变首次票。
 
 ```text
-upon kind(x, b, V0, attempt, phase, nonce) has arrived
-     with kind in {Prepare, Observe, Validate} and required data locally available do:
+upon kind(x, b, V0, attempt, phase, nonce)
+     where kind in {Prepare, Observe, Validate} and required data available do:
     atomic:
-        if decided[x]:
+        if decided[x] != ⊥:
             reply Done(x, decided[x], attempt, phase, nonce)
             return
         if b < promise[x]:
             reply NACK(x, promise[x], attempt, phase, nonce)
             return
 
-        promise[x] ← b
+        RaisePromise(x, b)
         if kind == Prepare:
             response ← snapshot(first[x], accepted[x], decided[x])
         else:
@@ -238,19 +275,26 @@ upon kind(x, b, V0, attempt, phase, nonce) has arrived
 
 ### 4.3 选值与 NoFast
 
-NoFast(x) 表示可以排除 x 已通过或将通过快路径决定 V0 的可能；成立时将初始为 false 的 noFast[x] 置为 true。依据为下述 Prepare 判定、至少 e+1 个不同副本的首次 Mismatch，或 §5 的冲突规则。超时、未取到数据或初始协调者的 seenMismatch 均不足以得出 NoFast。
+NoFast(x) 表示 x 不可能已经或今后通过快路径决定 V0。依据为下述 Prepare 判定、至少 e+1 个不同副本的首次 Mismatch，或 §5.2 的 HELP 规则；成立后将初始为 false 的 noFast[x] 置为 true。
+
+若 x、y 冲突，x 的初始依赖不包含 y，且已知 Done(y,Vy) 的最终依赖不包含 x，也可判定 NoFast(x)。
 
 ```text
 upon Collect(Prepare, x, b, V0) completes with P
-     while this recovery task is active and x is undecided do:
+     while recovery active and decided[x] == ⊥ do:
     if any reply reports Done:
         LearnDecision(x, the reported decided value)
     else if either phase contains an accepted record:
-        a ← highest accepted ballot across both phases' snapshots
-        RunAccept(x, b, a.fullValue)
+        atomic:
+            if not coordinating x at b or a proposal is frozen:
+                return
+            a ← highest-ballot accepted record from both phases
+            freeze proposal a.fullValue for ballot b
+        if coordinating x at b:
+            Collect(Accept, x, b, a.fullValue)
     else:
-        r ← number of distinct members in P
-        h ← number reporting historical FastOK for exact V0
+        r ← |members(P)|
+        h ← count distinct members in P reporting FastOK for x
         if noFast[x] or r - h > e:
             noFast[x] ← true
             Rebuild(x, b)
@@ -259,64 +303,54 @@ upon Collect(Prepare, x, b, V0) completes with P
             ValidateInitial(x, b)
 ```
 
-若已有决定、Prepare 要求沿用的已接受值，或本 ballot 已选定的提案，不能因 NoFast 或 HELP 要求加入的新依赖而改选其他值。
+同一 (x,b) 的提案一经选定不再更换。NoFast 或 HELP 只能在 Prepare 无 accepted 且尚未选定提案时触发同 ballot 重建。
 
 ### 4.4 重建
 
+Prepare 未发现已接受值且 NoFast 成立后，才进入重建。`forcedDeps[x]` 是额外补入的冲突实例集合，初始为空，由 §5 的 HELP 或冲突证据补充。
+
 ```text
 procedure Rebuild(x, b):
-    enter the rebuild branch
-    Collect(Observe, x, b, V0)
+    stop validation for (x, b)
+    if coordinating x at b:
+        Collect(Observe, x, b, V0)
 
-upon Collect(Observe, x, b, V0) completes with O
-     while this task is rebuilding do:
+upon Collect(Observe, x, b, V0) completes with O do:
     atomic:
-        require active rebuild, noFast[x] and no decision
-        require no value to inherit and no frozen proposal
-        T ← current forced dependencies
+        if not coordinating x at b or a proposal is frozen:
+            return
+        T ← forcedDeps[x]
         D ← D0(x) ∨ all suggested vectors in O ∨ heads(T)
         seq ← max(seq0(x), all suggested sequence numbers in O, 1 + S(T))
         V ← (cmd, D, seq)
-        freeze V as this ballot's only proposal
+        freeze proposal V for ballot b
 
-    if the task is still active:
+    if coordinating x at b:
         Collect(Accept, x, b, V)
 ```
 
 ### 4.5 Accept
 
-协调者选值，接收方检查本地状态。同 ballot 只能接受同值，合法的更高 ballot 才能替换 accepted。
-
 ```text
-procedure RunAccept(x, b, V):
-    atomic:
-        if task or selection branch is inactive, or x is decided:
-            return
-        freeze V as this ballot's only proposal
-
-    if the task is still active:
-        Collect(Accept, x, b, V)
-
 upon Collect(Accept, x, b, V) completes with formal ACKs do:
     atomic:
-        if this task is active and x is undecided:
-            LearnDecision(x, V)
+        if coordinating x at b:
+            Decide(x, V)
 
-upon Accept(x, b, V, attempt, phase, nonce) has arrived
-     and its required initial value, dependency representatives and carry data
-     are complete and locally available do:
+upon Accept(x, b, V, attempt, phase, nonce)
+     with required data available (section 7) do:
     atomic:
-        if decided[x]:
+        if decided[x] != ⊥:
             reply Done(x, decided[x], attempt, phase, nonce)
             return
         if b < promise[x]:
             reply NACK(x, promise[x], attempt, phase, nonce)
             return
-        if a different value was accepted in ballot b:
+        if ballot b already accepted a different value:
             reject the proposal
             return
 
-        promise[x] ← b
+        RaisePromise(x, b)
         accepted[x] ← (b, V)
     reply AcceptACK(x, b, V, attempt, phase, nonce)
 ```
@@ -325,25 +359,39 @@ upon Accept(x, b, V, attempt, phase, nonce) has arrived
 
 ### 5.1 验证初始值
 
-确定上界 U 后，逐个取回区间内实例的初始值，检查是否与 x 冲突及其依赖是否覆盖 x；不能因本地已经执行而跳过。回复须对应当前任务和分支。
+恢复协调者收集 Validate 回复，将其中的建议依赖向量与 D0(x) 逐分量取最大值，得到本次验证范围 U。检查回复中出现、但 D0(x) 尚未包含的冲突实例，确认它们是否依赖 x，从而判断能否继续提议初始值 V0。U 在本次收集结束后固定，后来的消息不扩大它。
+
+对每个副本 R，从 U[R] 对应的实例沿同类前驱链向前检查，到 D0(x)[R] 为止，不检查该下界和 x 自身。不能因为某个实例已执行或通过检查，就跳过它的前驱。验证状态属于恢复任务 (x, b)；任务停止或转入重建后，旧验证结果不能用于选值。
 
 ```text
 procedure ValidateInitial(x, b):
-    enter the validation branch
+    enter validation
     Collect(Validate, x, b, V0)
 
 upon Collect(Validate, x, b, V0) completes with O
-     while this task is validating do:
+     while validation active do:
     U ← D0(x) ∨ all suggested vectors in O
-    unresolved ← {R.j : D0(x)[R] < j <= U[R]}
+    cursor[R] ← U[R] for each replica R
+    unresolved ← empty set
 
-upon y enters unresolved or new data for y becomes available
-     while this task is validating, y is unresolved and not noFast[x] do:
-    if y's initial value is missing:
+upon U fixed and cursor[R] > D0(x)[R]
+     while validation active and not noFast[x] do:
+    y ← R.cursor[R]
+    if required initial data for y is missing:
         Fetch(y)
+        resume this cursor when data arrives
         return
+    if class(y.cmd) != class(x.cmd):
+        report invalid dependency y for x
+        stop validation for (x, b)
+        return
+    if y != x:
+        add y to unresolved
+    cursor[R] ← D0(y)[R]
 
-    if y == x or y does not conflict with x or y's initial value covers x:
+upon adding y to unresolved or receiving new data for y
+     while validation active, y in unresolved and not noFast[x] do:
+    if y's initial value covers x:
         remove y from unresolved
     else if Done(y) is known:
         if y's final value covers x:
@@ -352,15 +400,21 @@ upon y enters unresolved or new data for y becomes available
             noFast[x] ← true
     else:
         send HELP(y; x, b, V0, strongX) to current Omega
-        announce NeedRecover(y)
+        send NeedRecover(y) to Omega
 
-upon U is fixed and unresolved is empty
-     while this task is validating, not noFast[x] and no proposal is frozen do:
-    RunAccept(x, b, V0)
+upon U fixed, all cursor[R] == D0(x)[R] and unresolved empty
+     while validation active do:
+    atomic:
+        if not coordinating x at b or noFast[x] or a proposal is frozen:
+            return
+        freeze proposal V0 for ballot b
 
-upon noFast[x] while this task is validating,
-     no value must be inherited and no proposal is frozen do:
-    optionally add the excluding y to x's forced dependencies
+    if coordinating x at b:
+        Collect(Accept, x, b, V0)
+
+upon noFast[x] while validation active,
+     no inherited value and no frozen proposal do:
+    optionally add a known conflict witness y to forcedDeps[x]
     Rebuild(x, b)
 ```
 
@@ -369,8 +423,8 @@ upon noFast[x] while this task is validating,
 strongX 表示在同一次成功 Prepare 中，超过 e 个不同副本报告曾对完整 V0(x) 投过 FastOK，不能拼接不同 Prepare 的票数。HELP 及回复标明 x、y 和 x 的恢复 ballot 与任务，双方初始值须可取回。
 
 ```text
-upon HELP(y; x, b, V0, strongX) has arrived
-     and both instances' required initial values are available do:
+upon HELP(y; x, b, V0, strongX)
+     with required initial data for x and y available do:
     if Done(y) is known:
         reply Done(y)
         return
@@ -384,78 +438,92 @@ upon HELP(y; x, b, V0, strongX) has arrived
         else if strongX:
             noFast[y] ← true
             if Omega != self:
-                add this HELP request to y's pending requests
+                save this pending HELP request for y
                 forward it to current Omega
             else if y's proposal is frozen:
-                add this HELP request to y's pending requests
+                save this pending HELP request for y
                 continue the frozen proposal
             else:
-                add x to y's forced dependencies
+                add x to forcedDeps[y]
                 start or reuse y's recovery
                 preserve highest-accepted inheritance priority
 
-upon Done(y) becomes known while a HELP request for y is pending do:
-    reply Done(y) to the waiting requester and remove the pending request
+upon Done(y) known and HELP for y pending do:
+    reply Done(y) to the requester
+    remove that pending HELP request
 ```
 
 HELP 不改变由 Omega 选定恢复协调者的规则；回复“已在处理”不能作为验证通过的依据。strongY 是对 y 按同一规则取得的 Prepare 支持；在双方冲突且初始值均不覆盖对方时，x 的验证者收到 strongY 可将 noFast[x] 置为 true，按 §5.1 重建。
 
-### 5.3 根据冲突实例的决定排除快路径
-
-若 x、y 冲突，x 的初始依赖不包含 y，且已知的 Done(y,Vy) 中最终依赖不包含 x，则可将 noFast[x] 置为 true。当前 Prepare 未读到已接受值且尚未选定提案时，可在同一 ballot 运行 Observe 重建。
-
 ## 6. 学习与执行
 
-### 6.1 决定传播
+### 6.1 实例与决定传播
 
-Done 仅来自实际快决定、成功的正式 Accept 或已学习的决定，首次票和单条 accepted 均不能替代。任何 ballot 均可学习，同值重复通知复用记录。
+Done(x,V) 表示实例 x 已经决定为 V。副本只有在满足快路径决定条件、为 Accept 收齐协议要求的确认，或从其他副本获知该决定后，才能发送 Done。单个副本投过票或保存了 accepted，不表示已经决定。收到决定后应记录，即使本地已进入更高 ballot；重复收到相同决定无需重复处理。决定不等于执行完成。
+
+记录决定所需的初始数据见 §7，执行及客户端回复见 §6.2。接收 Done/Learn 不触发再次全体广播。
 
 ```text
+procedure Decide(x, V):
+    if LearnDecision(x, V):
+        broadcast Learn(x, V) to all members
+
 procedure LearnDecision(x, V):
     atomic:
-        if decided[x] is not empty:
-            require decided[x] == V
-            return
+        if decided[x] != ⊥:
+            if decided[x] != V:
+                report conflicting decisions for x
+            return false
         decided[x] ← V
         stop local coordination for x
 
-    broadcast Learn(x, V) to all members
-    schedule execution of x
+    reply Done(x, V) to protocol requests waiting for x's decision
+    wake local tasks waiting for x's decision
+    wake dependency checks and execution for x under section 6.2
+    return true
 
 upon receiving Done(x, V) or Learn(x, V) do:
+    if required initial data is missing (section 7):
+        Fetch missing initial data
+        resume this handler when data arrives
+        return
     LearnDecision(x, V)
 ```
 
+即使没有客户端请求，正确副本也须持续传播已登记实例的必要数据及已知决定，最终使所有正确副本获知，包括此前不知道实例编号的副本。实例尚未决定时，其数据仍须传播；收集到部分回复不结束这项工作。持续新输入或较晚决定的旧实例，都不能使某个实例或决定永久得不到传播；最大已决定编号也不能证明此前所有实例均已决定。
+
+协调者在广播中途崩溃时，仍持有决定的正确副本继续传播。获取决定时不能只依赖一个可能崩溃的持有者；尚未取齐决定和必要数据的工作继续推进。若只持有实例数据而不知道决定，按 §4.1、§7 查询并恢复。
+
 ### 6.2 展开依赖与执行
 
-execHi[R] 是最大的 i，使得 R.1 到 R.i 都已在本地执行，初始为 0；更大编号保留各自的 executed 标志。它只用于展开依赖，不改变投票、验证、恢复或数据保留。
+对每个尚未执行的顶点 x=R.i，沿最终 D 的非零代表和初始前驱 R.D0(x)[R] 展开，前驱为 0 时跳过；排除 x 自身并去掉重复目标。这至多 n+1 条边通过同类前驱链保留向量覆盖的依赖；最终代表改变后仍需保留初始前驱边。
 
-| 冲突关系                     | 对顶点 z 的非零分量 D[R]=i 怎样展开                                                                                                                                                              |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 一般关系                     | 检查 execHi[R]+1 到 i 的每个实例，跳过 z 和本地已执行实例；其余取回命令，仅将与 z 冲突的实例加入依赖图。即使代表 R.i 已执行，也不能跳过其余编号。                                                |
-| 已证明完整冲突关系具有传递性 | 沿最终依赖向量的代表展开；对每个顶点 P.k，还沿其初始向量的 D0[P] 分量展开，保留对同一副本较早实例的依赖。零分量跳过，已执行目标可停止展开。传递性须涵盖同 rid 产生的冲突，所有副本采用相同规则。 |
+每次构图只展开每个未执行顶点一次，但保留指向已访问顶点的边，以识别环。遇到本地已执行的实例停止展开，不扫描中间编号，也不等待无关类。同一 rid 已有执行记录，不能让尚未执行的实例绕过自己的依赖。依赖成环时，按强连通分量（SCC）执行，无须先单独执行环内的依赖目标。
 
-未知编号须取回命令后判断是否冲突，不能因超时就认定不存在或无冲突。不冲突的命令无需等待其决定或执行。依赖成环时，按强连通分量（SCC）执行，无须先单独执行环内的依赖目标。
+就绪且彼此没有依赖关系的 SCC 可以并行执行；状态变化和每条命令的返回结果须等价于遵守依赖关系及 SCC 内规定顺序的串行执行。
 
-就绪且彼此没有依赖关系的 SCC 可以并行执行；状态变化和每条命令的返回结果须等价于遵守依赖关系及 SCC 内规定顺序的串行执行。共享应用状态、去重记录和执行元数据的同步方式由实现端选择。
+首次执行向当前等待的客户端返回实际结果；已执行的重复请求或实例返回 ALREADY_EXECUTED，不再应用，也不返回原结果。已准备的原结果继续发送。是否已执行以执行去重记录为准，不能因结果缓存缺失而重做。
 
 ```text
-upon a decided instance x needs execution do:
-    expand its unexecuted dependency closure using the table above
+upon decided x needs execution do:
+    expand x's unexecuted dependency closure
     Fetch missing initial values and decisions
-    announce NeedRecover for known but undecided instances
+    send NeedRecover(y) to Omega for each known undecided dependency y
 
-upon a dependency closure is fully known and all its unexecuted instances are decided do:
-    register its SCCs and schedule those whose external dependencies have executed
+upon closure complete and all unexecuted instances decided do:
+    register its SCCs
+    schedule SCCs whose external dependencies have executed
 
-upon an SCC C is ready for execution do:
+upon SCC C ready to execute do:
     atomic:
-        if any instance in C is already executing or executed:
+        if any x in C is executing or executed:
             stop this execution task
         mark C's instances as executing
     for x in C sorted by (final seq, instance ID):
         rid ← x.cmd.rid
-        require existing rid bindings agree with x.cmd
+        if x.cmd contradicts a known rid binding:
+            report conflicting commands for rid
+            return
         if rid is in executedRequests:
             prepare ALREADY_EXECUTED for current waiters
         else:
@@ -464,54 +532,32 @@ upon an SCC C is ready for execution do:
             prepare response for current waiters
     atomic:
         publish all of C's executed flags together
-        advance each replica's contiguous execHi
-        release this replica's slots for C exactly once
     schedule newly ready dependent SCCs
-    send replies under section 8.3
+    send prepared replies to current waiters
 ```
 
 ### 6.3 最终恢复者 Omega
 
 额外前提是本地时钟漂移有界，且至少一个正确副本发起心跳广播的间隔最终有界。各副本从 1 开始广播递增 HB 编号，接收者记录精确编号后回复 ACK。
 
-观察者从 k=1 顺序检查，每次先等 `(k+1)W`，再对未收到精确 HB(p,k) 的其他成员广播 Complaint(p,k)。q 个不同观察者的投诉形成 Bad(p,k)；成员可转发这一完整事实，按 `(p,k)` 只计一次。每个副本输出“不同 Bad 数量、成员编号”字典序最小者为 Omega，持续公平传播。更大编号不替代缺失心跳，晚到心跳不撤销投诉。
+每个观察者为所有成员（包括自身）维护 BadCount[p]，初始为 0；对其他每个成员分别维护 next[p]，初始为 1。next[p] 是下一个待检查的心跳编号，BadCount[p] 是本地已获知的不同 Bad(p,k) 事件数量。各成员的检查公平调度、独立推进。
 
-## 7. 准入槽与 carry
+1. 连续跳过已经保存的心跳编号，直接推进 next[p]，不额外等待。只对缺失的心跳开始计时。
+2. 对缺失编号 k=next[p]，设置截止时间为 `now + (BadCount[p]+2)W`。收到精确的 HB(p,k) 后结束本次等待，返回第 1 步。更大编号或重复心跳不重置等待；新获知的 Bad 只影响后续等待，不延长已经开始的等待。
+3. 到期时再次检查该心跳是否已保存；仍缺失则广播 Complaint(p,k)。随后将 next[p] 推进到 k+1，返回第 1 步。忽略已不再检查的编号对应的旧计时事件。
+4. 除 p 之外的 q 个不同观察者对同一个 `(p,k)` 的投诉形成 Bad(p,k)。成员可转发这一完整结论，每个 `(p,k)` 只使 BadCount[p] 增加一次。更大编号不能替代缺失心跳；晚到心跳不撤销已有投诉或 Bad。
+5. 每个副本输出 `(BadCount[p], 成员编号)` 字典序最小者为 Omega，候选包含自身。持续公平传播心跳、投诉和完整 Bad 结论。
 
-### 7.1 槽规则
+这样，正常运行时间本身不会使等待期越来越长，也不需要为已经收到的历史心跳补做等待。等待时长随已确认的怀疑调整，而不随心跳编号增长；它不是恢复完成时间的固定上界。
 
-每个副本独占 K 个槽，请求按 FIFO 公平排队。准入时占槽并连续分配实例号；分配该实例的副本在本地完成整个 SCC 的执行与去重后，释放该实例的槽一次。超时、重试、决定和远端执行均不释放槽。恢复沿用原有实例与槽的对应关系，崩溃副本的槽不转移。
+## 7. 数据可用与保留
 
-槽只限制新准入。恢复、HELP、Fetch、决定传播和执行始终公平推进，不受槽满或无新请求影响；不通过 Nop 释放槽。
+初始数据包括实例编号和 V0。登记实例、报告其数据可用、将它用于冲突扫描或给出依赖这些数据的正回复之前，须取得并保存该实例及其 D0 递归引用的全部初始数据。处理提议或已决定的最终值时，还须取齐其每个非零代表的上述初始数据。所有代表必须指向同类的真实实例。
 
-### 7.2 随附实例清单 carry
+这一数据要求只沿初始引用获取数据，不等待所引用实例决定或执行，也不递归要求它们的最终依赖齐全。初始引用指向已经创建的实例，最终依赖则可能成环。消息可用实例编号引用初始数据，缺失时通过 Fetch 获取。
 
-创建 R.i 时，将本副本其他在用槽中的较早实例编号记为 carry(R.i)；接收方须取齐并保存这些实例的数据，包括它们各自 carry 列出的实例数据，才能给出正回复。
+必要初始数据齐全后原子登记，使实例参与后续冲突扫描。Fetch 本身不产生首次票，也不改写 first 或 promise；需要首次投票时，登记与投票扫描仍在同一原子步骤内完成。不为判断冲突类而逐个查询无关的较小编号。
 
-清单创建后不变，直接包含至多 K−1 个编号；列入清单不表示与 R.i 有依赖关系，也不产生投票。
+仅知实例号时向全体发送 Fetch，持有者持续按编号提供已有数据。回复“不持有数据”不能证明实例没有历史记录，也不能得出 NoFast 或 Done。缺数据时继续获取，缺决定时按 §4.1 恢复。
 
-## 8. 数据保留与客户端语义
-
-### 8.1 数据可用与后台进度
-
-通过任何消息取得实例时，须取齐并保存其初始值 V0（含命令）、carry 递归列出的实例，以及本次操作涉及的初始依赖、冲突扫描或最终依赖中的代表数据，才能登记、报告数据可用或给出正回复。只有编号不算数据齐全，须先 Fetch。
-
-从 carry 取回的实例在数据齐全后原子登记，使其参与后续冲突扫描；这不会生成首次票或改写 first、promise。目标实例若需要首次投票，其登记与投票扫描仍在同一原子步骤内完成。
-
-仅知实例号时向全体发送 Fetch；持有数据的副本持续按编号回复。新取得的未决实例加入恢复待办，按 §4.1 推进 NeedRecover。回复“不持有数据”不能证明实例没有历史记录，也不能得出 NoFast 或 Done。Omega 更替、重复消息和暂时未决不删除待办；已知决定直接回复 Done，不等执行。
-
-进度依赖窗口与心跳假设、正确入口、数据可取回及公平推进。初始协调者若在任何正确副本获知命令前崩溃，不保证取回实例；客户端以同一 rid 和载荷换入口重试。
-
-### 8.2 保留范围
-
-保留初始值 V0（含命令）、carry、first、最近 accepted、promise、决定和执行去重记录，供后续扫描与 Fetch 使用。本版没有检查点，也不按 execHi 删除历史。
-
-收集到的回复、验证上界和待办仅在任务需要时保存，不永久归档收包历史。替换 accepted 不删除实例的初始值及所需数据；决定和 Accept 无须携带选值过程中收集的全部回复。
-
-### 8.3 冲突与请求结果
-
-不冲突命令换序执行，最终应用与去重状态及各自返回值须相同。冲突谓词覆盖所有不可交换操作和同 rid 命令；同 rid 异载荷拒绝。
-
-首次执行向当前等待者返回实际结果；已执行的重复请求或实例返回 ALREADY_EXECUTED，不再应用。该状态表示请求已经执行，本次回复不包含原来的执行结果；已准备的原结果继续发送。
-
-同一入口收到尚未执行的重复请求时，复用已有工作，不重复创建实例；跨入口可有不同实例，统一按执行记录去重。排队或接纳不代表已执行，已执行请求不能因为缺少结果缓存而重做。客户端超时或停止等待后，已经接纳的请求仍按协议继续处理。
+本版不提供检查点，也不回收已执行实例的 V0、first、最近 accepted、promise、决定和执行去重记录；这些数据继续供冲突扫描与 Fetch 使用。

@@ -1,6 +1,6 @@
 # 本地审计实现
 
-这里是从 `consensus-assurance` 普通 Codex 审计复制并整理的可编辑 fork，服务于 Consensus Forge 的“生成 → 审计 → 修复 → 再审计”。运行只使用本项目代码和 `.venv` 中的第三方依赖，不导入相邻项目。生成、修复和审计的默认模型均为 `gpt-6.1-sol / high`。
+这里是从 `consensus-assurance` 普通 Codex 审计复制并整理的可编辑 fork，服务于 Consensus Forge 的“生成 → 审计 → 修复 → 再审计”。运行只使用本项目代码和 `.venv` 中的第三方依赖，不导入相邻项目。生成、修复和审计的默认模型均为 `gpt-6.2-sol / high`。
 
 ## 修改入口
 

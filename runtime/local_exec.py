@@ -27,7 +27,7 @@ from runtime import replay
 DESCRIPTION = ('Run an ordinary local test in a private network and PID namespace. The ordinary shell retains its current restrictions. '
                'Use this tool for TCP or a bounded isolated run; start all communicating processes within the same invocation. '
                'Returns execution output, not an audit verdict. cwd is relative to this run working copy. '
-               'Each call has an action timeout; audit and explicitly timed runs also have a phase deadline. Only the auditor pauses its Agent turn timer. '
+               'Each call has an action timeout; audit and explicitly timed runs also have a phase deadline. '
                'No background service survives an invocation. Complete raw logs are retained read-only. '
                'Calls serialize across tool processes, including native subagents; queue waiting consumes the phase budget, or the action timeout when the phase has no deadline. '
                'Optionally select source from the captured sources listed in the run brief and overlays of relative test/helper files from work. '
@@ -86,13 +86,6 @@ def remaining(control, requested):
     return max(0, limits[key]), key
 
 
-def execution_seconds(clock, now):
-    """Only the trusted serial execution service can pause the Agent timer."""
-    active = clock.get('active')
-    # A dead service cannot keep granting time after its last action deadline.
-    return clock['elapsed_seconds'] + (max(0, min(now, active[1]) - active[0]) if active else 0)
-
-
 def validate_directory(work, relative):
     path = Path(relative)
     if path.is_absolute() or '..' in path.parts:
@@ -130,7 +123,7 @@ def isolated_command(command, workspace, directory, hosts, tool_roots=(), read_o
 
 @asynccontextmanager
 async def execution_lock(records, deadline):
-    """Coordinate separate MCP servers sharing mutable work and the execution clock."""
+    """Coordinate separate MCP servers sharing mutable work."""
     records = Path(records)
     records.mkdir(parents=True, exist_ok=True)
     # This directory is outside the candidate's writable execution filesystem.
@@ -183,19 +176,11 @@ async def execute_locked(control, arguments, request_id):
     child = None
     execution_work = None
     pumps = []
-    clock_path = Path(control['execution_clock_path']) if control.get('execution_clock_path') else None
-    clock = None
     try:
         execution_work, environment, context = replay.prepare(control, args.source, args.overlays, folder)
         cwd = validate_directory(execution_work, args.cwd)
         record.update(cwd=str(cwd), cwd_relative=str(cwd.relative_to(execution_work)), source_context=context)
         write_json(folder/'result.json', record)
-        if clock_path:
-            clock = json.loads(clock_path.read_text())
-            # A previous server may have died without clearing its bounded active interval.
-            clock['elapsed_seconds'] = execution_seconds(clock, started)
-            clock['active'] = [started, started + limit]
-            write_json(clock_path, clock)
         if limit <= 0:
             record['status'] = 'timeout'
         else:
@@ -254,10 +239,6 @@ async def execute_locked(control, arguments, request_id):
             except OSError as exc:
                 record['cleanup_error'] = str(exc)
             write_json(folder/'result.json', record)
-            if clock is not None:
-                clock['elapsed_seconds'] += record['elapsed_seconds']
-                clock.pop('active', None)
-                write_json(clock_path, clock)
     return record
 
 

@@ -26,10 +26,11 @@ def main(argv=None):
     child.add_argument('experiment_dir', type=Path)
     child.add_argument('--candidate', required=True, help='retained version, for example v002')
     child.add_argument('--label', default='audit-branch')
+    child.add_argument('--max-repairs', type=int, default=1, help='maximum repair rounds in this branch (default: 1)')
     args = parser.parse_args(argv)
     try:
         if args.action == 'branch':
-            root = workflow.branch(args.experiment_dir, args.candidate, args.label)
+            root = workflow.branch(args.experiment_dir, args.candidate, args.label, max_repairs=args.max_repairs)
             print(json.dumps({'experiment_dir': str(root), 'status': 'prepared'}), flush=True)
             return 0
         if args.action in {'prepare', 'run', 'doctor'}:
