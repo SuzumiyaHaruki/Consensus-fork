@@ -12,7 +12,7 @@ from artifacts import (candidate_commit, check_materials, copy_regular, copy_tre
                        prepare_handoff, read_repair_result)
 from generator.config import Settings
 from processes import invoke
-from generator.runner import (REQUIRED_INPUTS, Terminated, doctor as generation_doctor, execute as execute_agent,
+from generator.runner import (role_inputs, Terminated, doctor as generation_doctor, execute as execute_agent,
                               exclusive_run, prepare as prepare_agent, utc_now)
 from runtime.storage import read_json, write_json
 from runtime.toolchains import go_module
@@ -56,7 +56,8 @@ def doctor(settings):
 def prepare(settings, label='system'):
     if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_-]{0,63}', label):
         raise ValueError('Invalid label: use 1-64 letters, digits, underscores, or hyphens')
-    for name in REQUIRED_INPUTS:
+    materials = role_inputs(Path(settings.inputs_dir), 'TASK.md')
+    for name in materials:
         if not (Path(settings.inputs_dir) / name).is_file():
             raise ValueError(f'Missing input: {name}')
     if not Path(settings.repair_prompt).is_file():
@@ -70,7 +71,7 @@ def prepare(settings, label='system'):
     output = Path(settings.output_root)
     output.mkdir(parents=True, exist_ok=True)
     root = Path(tempfile.mkdtemp(prefix=datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ-') + label + '-', dir=output))
-    for name in REQUIRED_INPUTS:
+    for name in materials:
         copy_regular(Path(settings.inputs_dir) / name, root / 'inputs' / name)
     copy_regular(Path(settings.repair_prompt), root / 'inputs/REPAIR.md')
     copy_regular(Path(settings.audit_prompt), root / 'inputs/AUDIT.md')
@@ -133,13 +134,13 @@ class Runtime:
         require_process(result, logs)
         return read_json(logs / 'stdout.log')
 
-    def audit(self, settings, candidate, folder, seconds, timeout):
-        return self._audit(settings, candidate, folder, seconds, timeout)
+    def audit(self, settings, candidate, folder, seconds, timeout, discovery_round):
+        return self._audit(settings, candidate, folder, seconds, timeout, discovery_round=discovery_round)
 
     def verify(self, settings, candidate, folder, context, seconds, timeout):
         return self._audit(settings, candidate, folder, seconds, timeout, context=context)
 
-    def _audit(self, settings, candidate, folder, seconds, timeout, context=None):
+    def _audit(self, settings, candidate, folder, seconds, timeout, context=None, discovery_round=None):
         folder.mkdir(parents=True)
         write_json(folder / 'target.json', {'execution_backend': 'go_module', 'target': {
             'variant': 'consensus_system', 'expected_module': go_module(Path(candidate['path'])),
@@ -148,8 +149,9 @@ class Runtime:
         write_json(folder / 'config.json', {
             'baseline_id': 'codex_plain', 'target_config': str(folder / 'target.json'),
             'task_path': settings.review_prompt if context else settings.audit_prompt,
+            **({'discovery_round': discovery_round} if discovery_round is not None else {}),
             'task_mode': 'review' if context else 'audit', 'review_context': str(context) if context else None,
-            'repo_path': candidate['path'], 'agent_model': settings.audit_model,
+            'repo_path': candidate['path'], 'codex': settings.codex, 'agent_model': settings.audit_model,
             'agent_reasoning_effort': settings.audit_reasoning_effort, 'codex_provider': None,
             'auth_mode': 'codex_login', 'runs_dir': str(folder / 'runs'),
             'allow_agent_materials': True, 'allow_experiments': True,
@@ -330,14 +332,14 @@ def execute(root, runtime=None, *, resume=False, handoff_generation=False):
             return entry
 
         def run_agent(kind, candidate=None, feedback=None):
-            stage = prepare_agent(agent_settings(settings, root), kind)
+            task_file = 'REPAIR.md' if kind == 'repair' else 'TASK.md'
+            stage = prepare_agent(agent_settings(settings, root), kind, task_file=task_file)
             if candidate is not None:
                 if candidate_commit(Path(candidate['path'])) != candidate['commit']:
                     raise ValueError('Candidate identity changed before repair')
                 for name in candidate['files']:
                     copy_regular(Path(candidate['path']) / name, stage / 'workspace' / name)
                 copy_tree(feedback, stage / 'workspace/.forge/feedback')
-                (stage / 'prompt.txt').write_bytes((root / 'inputs/REPAIR.md').read_bytes())
             entry = phase(kind, stage)
             meta = read_json(stage / 'run.json')
             entry['allocated_seconds'] = None
@@ -357,7 +359,7 @@ def execute(root, runtime=None, *, resume=False, handoff_generation=False):
 
         def capture(stage, number):
             try:
-                check_materials(stage / 'workspace', root / 'inputs', REQUIRED_INPUTS)
+                check_materials(stage / 'workspace', root / 'inputs', role_inputs(root / 'inputs', 'TASK.md' if number == 0 else 'REPAIR.md'))
             except ValueError as exc:
                 raise StopWorkflow('needs_specification', str(exc)) from exc
             candidate = runtime.export(settings, stage / 'workspace', root / 'candidates' / f'v{number:03d}',
@@ -435,7 +437,7 @@ def execute(root, runtime=None, *, resume=False, handoff_generation=False):
                         resumed_entry = None
                         print(f'[resume handoff] {audit_run}', flush=True)
                     else:
-                        audit_run = runtime.audit(settings, candidate, folder, seconds, seconds + 10)
+                        audit_run = runtime.audit(settings, candidate, folder, seconds, seconds + 10, number + 1)
                     if (audit_run / 'run.json').is_file():
                         agents = read_json(audit_run / 'run.json').get('agents')
                         if agents:

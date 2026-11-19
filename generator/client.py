@@ -18,7 +18,6 @@ class Client:
             raise FileNotFoundError('Codex CLI is unavailable: ' + settings.codex)
         if settings.profile:
             raise ValueError('Host Codex profiles are not supported by isolated generation')
-        instructions = (stage / 'inputs/IMPLEMENTATION.md').read_text()
         self.private = tempfile.TemporaryDirectory(prefix='.client-', dir=stage)
         self.home = Path(self.private.name)
         self.client_home = self.home / 'codex'
@@ -33,9 +32,12 @@ class Client:
         self.settings = {**common_settings(), 'web_search': settings.web_search,
                          'model': settings.model, 'sandbox_mode': 'workspace-write',
                          'projects': {str(stage / 'workspace'): {'trust_level': 'untrusted'}},
-                         'developer_instructions': instructions,
+                         'developer_instructions': 'Follow the workspace, access and delegation rules in the supplied task.',
                          'shell_environment_policy.inherit': 'none',
                          'shell_environment_policy.experimental_use_profile': False}
+        archived = stage / 'inputs/IMPLEMENTATION.md'
+        if archived.is_file():
+            self.settings['developer_instructions'] = archived.read_text(encoding='utf-8')
         if settings.reasoning_effort:
             self.settings['model_reasoning_effort'] = settings.reasoning_effort
 
@@ -56,7 +58,7 @@ class Client:
 
     def probe(self):
         result = subprocess.run([self.executable, '--no-daemon', 'debug', 'prompt-input',
-                                 *codex_options(self.settings), 'Local configuration inspection only.'],
+                                 *codex_options(self.settings), (self.stage / 'prompt.txt').read_text(encoding='utf-8')],
                                 cwd=self.stage / 'workspace', env=self.environment,
                                 capture_output=True, text=True,
                                 timeout=max(.01, min(30, self.deadline - time.monotonic())) if self.deadline is not None else 30)

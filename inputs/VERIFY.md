@@ -16,7 +16,7 @@ Review exactly `request.issue_ids`. Other pending issues, `history_file` and `ev
 ### 1.2 The changed behavior
 
 - Inspect the diff and independently derive the required behavior from the protocol clauses affected by the change. Check the original trigger and a related path that uses the changed mechanism, including its conditions and message obligations. Reuse relevant historical evidence where useful.
-- For changes to shared synchronization, scheduling, timers/retries, scans or transport, check relevant ordinary-path and original-trigger costs before and after under comparable per-replica resources and stated actual loads. Report repair effectiveness and added costs separately; not every metric must improve.
+- For changes to shared synchronization, scheduling, timers/retries, scans or transport, compare the original trigger and affected ordinary paths under comparable per-replica resources and actual loads. Check how many requests completed and how much required background work each version finished or left pending. Use those counts to explain whether a change in total resource use reflects a change in efficiency, work completed, or both.
 - The old witness disappearing or requests eventually succeeding does not establish conformance. If a workaround breaks required behavior, keep the issue `unresolved` and explain the regression, even without conflicting decisions or permanent stalls.
 
 ### 1.3 What the evidence establishes

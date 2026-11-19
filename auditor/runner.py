@@ -106,14 +106,14 @@ def capture_source(repo, destination, deadline):
         path = Path(name)
         if path.is_absolute() or ".." in path.parts:
             raise ValueError("Unsafe Git tree path")
-        if (mode == '160000' and not (set(path.parts) & EXCLUDED)
-                and path.name not in {'AGENTS.md', 'IMPLEMENTATION.md', 'SKILL.md'}):
+        excluded_path = (bool(set(path.parts) & EXCLUDED) or name in {'TASK.md', 'REPAIR.md'}
+                         or path.name in {'AGENTS.md', 'IMPLEMENTATION.md', 'SKILL.md'})
+        if mode == '160000' and not excluded_path:
             nested = capture_source(repo/path, destination/path, deadline)
             files.update({str(path/key):value for key,value in nested['files'].items()})
             excluded.update({str(path/key):value for key,value in nested['excluded'].items()})
             continue
-        if (set(path.parts) & EXCLUDED or path.name in {"AGENTS.md", "IMPLEMENTATION.md", "SKILL.md"}
-                or mode not in {"100644", "100755"} or kind != "blob"):
+        if excluded_path or mode not in {"100644", "100755"} or kind != "blob":
             excluded[name] = "instruction, private, excluded directory, link, or submodule"
         else:
             entries.append((name, mode, oid))
@@ -210,9 +210,10 @@ def scrub_work(root):
             path.unlink()
 
 
-def brief(root, source, target, deadline, calls_left):
+def brief(root, source, target, deadline, calls_left, discovery_round):
     remaining = max(0, deadline - time.monotonic())
     return "\n\nRun brief (host facts):\n" + json.dumps({
+        **({"discovery_round": discovery_round} if discovery_round is not None else {}),
         "working_directory": str(root / "work"), "read_only_source": str(root / "source"),
         "source_identity": source.get("commit") or source.get("kind"), "scope": target,
         "report_path": str(root / "work/report.md"), "retained_logs": str(root / "turns"),
@@ -286,7 +287,8 @@ def loop(config, root, source, target, client, deadline, record):
             if fresh:
                 prompt += '\n\nEvidence follow-up (observations, not verdicts or mandatory extra tests):\n' + json.dumps(fresh, ensure_ascii=False, indent=2)
                 delivered.update(json.dumps(item, sort_keys=True) for item in fresh)
-        prompt += brief(root, source, target, deadline, config.budget.agent_calls - number + 1)
+        prompt += brief(root, source, target, deadline, config.budget.agent_calls - number + 1,
+                        config.discovery_round if config.task_mode == "audit" else None)
         (folder / "request.txt").write_text(prompt)
         turn_start = time.monotonic()
         try:

@@ -1,114 +1,92 @@
-# System requirements
+# System Requirements
 
-Implement a runnable Go replicated KV system according to [protocol.md](protocol.md). Choose the architecture, data structures, interfaces, concurrency and scheduling mechanisms that satisfy the following requirements.
+Implement a runnable Go replicated KV system according to [protocol.md](protocol.md). While strictly satisfying the following system and protocol requirements, you may freely choose the architecture, data structures, internal interfaces, concurrency model, and scheduling mechanisms.
 
-## 1. Service and configuration
+## 1. Service and Configuration
 
-- Module: `example.com/mixepaxos`.
-- Components: A reusable consensus Node, standalone server processes, real network transport, a client library and CLI, tests and documentation.
-- Operations: Deterministic single-key Put, Get and Delete through consensus; document inputs, effects, return values and error meanings.
-- Configuration: Member list, replica addresses and f/s/W/e; derive n from membership and satisfy protocol.md's parameter constraints.
+* **Module**: `example.com/mixepaxos`.
+* **Components**: A reusable consensus `Node` library, standalone server processes, real network transport, a client library and CLI, automated tests, and documentation.
+* **Operations**: Execute deterministic single-key `Put`, `Get`, and `Delete` operations through consensus; clearly document inputs, execution effects, return values, and error semantics.
+* **Configuration**: Configure the member list, replica addresses, and protocol parameters `f/s/W/e`; derive `n` from the membership list and enforce all parameter constraints defined in [protocol.md](protocol.md).
+* **Concurrent Access**: Support multiple independent clients sending requests concurrently, as well as multiple replicas receiving client requests simultaneously.
 
-Support multiple independent concurrent clients and multiple replicas receiving requests concurrently.
+## 2. Client Requests and Results
 
-## 2. Client requests and results
+### 2.1 Identity, Admission, and Cross-Entry Deduplication
 
-### 2.1 Identity and admission
+* **Unique Request ID (`rid`)**: Each client session must have a globally unique identity and allocate non-duplicate `RequestSeq` values under concurrency; choose the allocation and encoding mechanisms.
+* **Pre-Admission Validation**: Reject malformed inputs and known contradictory `rid` reuses (such as the same `rid` carrying a different command) before admission; legal commands must never depend on rejected inputs.
+* **Same-Entry Retries**: Retries must preserve the original `rid` and complete command. If the same entry replica receives a duplicate request that has not yet executed, it must reuse the existing in-flight work rather than creating a new consensus instance (choose waiting and reply behaviors).
+* **Cross-Entry Retries & Execution Deduplication**: If a client retries at a different entry replica, that entry may admit a locally unknown `rid` and create a separate consensus instance (each instance carries one logical request). However, each replica must apply the logical request at most once, deduplicating by `rid` at execution.
 
-Client session identities must be unique, with no duplicates in concurrent RequestSeq allocation; choose allocation and encoding mechanisms. Reject malformed inputs and known contradictory rid reuse before admission; legal commands must not depend on rejected input.
+### 2.2 Result Semantics
 
-Retries preserve the original rid and complete command. At the same entry, reuse unexecuted work without creating another instance; choose waiting and reply behavior. Another entry may admit a locally unknown rid; different entries may create different instances, deduplicated by rid at execution.
+Interfaces must clearly distinguish five outcome states (choose specific status codes and representations): **rejected before admission**, **incomplete (in-progress)**, **actual application result**, **`ALREADY_EXECUTED`**, and **unknown outcome**. An incomplete reply confirms that this entry admitted or joined the request and has no execution result to return yet. If the caller cannot determine the outcome, for example after losing the reply, it reports an unknown outcome.
 
-### 2.2 Results
+* **First Execution & Original Result Delivery**: Upon first execution, return the actual application result to current waiters; if an original-result reply has already been prepared for delivery, continue sending that original reply to complete delivery.
+* **Executed Duplicates**: Subsequent retries of an already-executed request must return `ALREADY_EXECUTED` without the original result. Never return this status before execution has occurred.
+* **Authoritative Execution Records**: Determine execution status strictly from execution records; a missing or evicted result cache must never permit re-executing a request.
 
-Distinguish rejection before admission, incomplete work, actual application results, ALREADY_EXECUTED and unknown outcomes; choose status codes and interface representations.
+### 2.3 Waiting, Cancellation, and Client Restart
 
-- After first execution, return the actual application result to current waiters; continue delivering original-result replies already prepared.
-- An executed duplicate returns ALREADY_EXECUTED without the original result. Never return this status before execution.
-- Determine execution from execution records; a missing result cache does not permit re-execution.
+* **Timeouts & Backoff**: Choose client waiting and backoff policies. Once a request is admitted, the cluster must continue advancing the work even after the client times out or stops waiting; decide whether to support active wait cancellation or withdrawal of queued, unadmitted requests.
+* **Client Restart**: If a client restarts without its prior session identity and request records, obtain a new identity for new operations; a persistent client restart log is not required.
 
-### 2.3 Waiting, cancellation and restart
+## 3. Real Runtime and Testability
 
-Choose client waiting and backoff policies. Admitted work continues after clients time out or stop waiting; choose whether to offer active cancellation of waiting and withdrawal of queued, unadmitted requests.
+### 3.1 Separate Processes and Runtime Resources
 
-If a client restarts without its identity and request records, obtain a new identity for new operations; a persistent client restart log is not required.
+* **Separate Process Model**: Each replica runs in a separate OS process with its own Go runtime and configurable runtime settings, even when multiple replicas share a host.
+* **Resource Distinctions**: Clearly distinguish **protocol-worker counts**, process-level **`GOMAXPROCS`**, and **actual CPU allocation**, explaining what each parameter controls.
+* **Failure Model**: Under the crash-stop model, surviving replicas may keep state in memory; disk persistence for post-crash recovery is not required.
 
-## 3. Real runtime and testability
+### 3.2 Concurrency, Parallelism, and Progress
 
-### 3.1 Deployment and runtime resources
+* **Concurrent Multi-Instance Progress**: Once started, a `Node` runs autonomously using real time, advancing multiple consensus instances concurrently while handling protocol messages, timers, and state-machine application. While one instance awaits network replies or missing data, other ready instances and background tasks must continue progressing without being blocked globally.
+* **Intra-Replica Multi-Core Parallelism**: Provide a configurable upper bound on task parallelism. Given sufficient CPUs and where permitted by the protocol, a replica must process ordinary-path consensus work for different instances across multiple cores simultaneously, including handling protocol messages in the same phase.
+* **Shared-State Synchronization & Invariants**: Necessary shared-state operations may be serialized, provided they preserve the protocol's atomic transitions, current authority checks (such as ballot and replica role validity), ordering, dependencies, local admission rules, and fair progress. Choose queues, worker/goroutine models, locks, task partitioning and lifecycles, retries, caches, and evidence retrieval mechanisms.
+* **Lifecycle & Overload Control**: Support graceful node shutdown, overload handling, and admission scheduling per [protocol.md](protocol.md); document how each mechanism affects both **unadmitted** and **admitted** requests.
 
-Each replica runs in a separate process with its own Go runtime and configurable runtime settings, including when replicas share a host. Distinguish protocol-worker counts, process-level GOMAXPROCS and actual CPU allocation; explain what each controls.
+### 3.3 Network, Boundaries, and Timing Assumptions
 
-The crash-stop model permits surviving replicas to keep data in memory; disk support for restarting after a crash is not required.
+* **Replaceable Transport & Trust Boundary**: The transport layer must be replaceable so the consensus core can run without real sockets. Define the trusted-cluster boundary and bind configured member identities to actual message sources; preserve identities and payloads through encoding and decoding, and never trust unchecked member fields inside a message alone.
+* **Message Completeness & Timing Bounds**: Choose the wire format and sending strategy while preserving each logical message's sender, recipients, instance, ballot, collection, phase, and processing rules. If information is omitted, the recipient must reconstruct it from matching context or obtain it per protocol rules before use. Local buffering and queuing delays count toward the applicable protocol timing bounds.
+* **Window and Heartbeat Timing**: Document which runtime event starts the `W` timer, what work the window covers, and which timeouts a replica can detect directly. Explain how heartbeats are scheduled and sent under the protocol's timing assumptions.
 
-### 3.2 Concurrency, parallelism and progress
+### 3.4 Controlled Execution and Observation
 
-- Concurrent instances: Node progresses autonomously using real time after startup and advances multiple consensus instances concurrently, handling protocol messages, timers and application execution. While one instance waits for replies or data, other ready instances and background tasks continue.
-- Intra-replica parallelism: Provide a configurable task-parallelism upper bound. With sufficient CPUs and where the protocol permits, a replica must handle ordinary-path consensus work for different instances on multiple cores simultaneously, including protocol-message handling at the same stage.
+* **Control & Observation Interfaces**: Expose controls and observations for time, message delivery (such as delay, drop, and reordering), and relevant runtime events, along with a runnable example driven through real `Node` or service entry points.
+* **Shared Protocol Implementation**: Controlled and ordinary runs must share the same protocol implementation. Describe exercised code paths as well as replaced or bypassed mechanisms (such as a virtual clock or in-memory transport); control of every goroutine is not required.
 
-Necessary shared-state work may be serialized; preserve the protocol's atomic transitions, current authority checks, ordering, dependencies, local admission rules and fair progress. Choose queues, threads, locks, task partitioning and lifecycles, retries, caches and evidence retrieval.
+## 4. Performance and Validation
 
-Support node shutdown, overload handling and protocol.md's admission scheduling; explain effects on requests before and after admission.
+### 4.1 History Growth and Resource Management
 
-### 3.3 Network and timing
+* **Scaling with Retained History**: Keep ordinary requests efficient as retained history grows. Preserve required conflict, dependency, and retention semantics while promptly releasing temporary state once no longer needed.
+* **Queue Bounds & Overload Regulation**: Bound queued and concurrent work. Under overload, regulate new admissions so that admitted instances and background tasks—including missing-data requests and their replies—continue making progress.
 
-Transport must be replaceable, and the consensus component must also be able to run without sockets. Define the trusted-cluster boundary and associate configured identities with actual message sources. Preserve identities and payloads through encoding; do not trust unchecked member fields alone.
+### 4.2 Workloads and Statistics
 
-Connection reuse, pipelined sends and multiple logical messages per frame are allowed, provided that:
-
-- Each message retains its sender, recipients, instance, ballot, collection/phase identities and processing rules.
-- Buffering and queuing count toward the protocol's applicable timing bounds.
-- Each instance still contains one logical request; do not batch commands into a consensus value.
-
-When designing replica communication, consider which messages a request triggers during coordination and in the background, what each recipient already knows, and the cost of preparing, sending, waiting for and processing those messages. A recipient must be able to reconstruct any omitted information from the matching instance and request context, or obtain missing data as the protocol requires before using it.
-
-Explain how real timing and sending correspond to the protocol's window and heartbeat assumptions. Names such as enqueue or function return do not establish those assumptions. State operating conditions and locally detectable violations without treating them as global window proofs.
-
-### 3.4 Controlled execution
-
-Expose controls and observations for time, message delivery and relevant runtime events, with a runnable example through real Node or service entry points. Use the same protocol implementation in controlled and ordinary runs; describe exercised paths and replaced or bypassed mechanisms. Control of every goroutine is not required.
-
-## 4. Performance and validation
-
-### 4.1 History and resource management
-
-- Follow protocol.md for conflict queries, dependency expansion and retention. Use suitable indexes, incremental work, available data and completed checks to avoid revisiting all history on each request or background wake, or repeatedly traversing, assembling and transferring shared dependencies along different paths.
-- Overdue detection may reuse existing instance state or indexes; choose record layout and checking schedule. Release temporary state when no longer needed.
-- Bound queued and concurrent work while advancing admitted instances and background tasks. Under overload, control new admissions; avoid spending most resources repeatedly preparing work that cannot be queued or is immediately discarded.
-- Waiting tasks must not exhaust resources needed to send and handle Fetch requests and their replies.
-
-Choose queues, limits, caches, encoding and scheduling.
-
-### 4.2 Workloads and statistics
-
-Consensus concurrency counts admitted, undecided instances across the system, not client requests awaiting replies. Distinguish target and observed concurrency, and measure throughput, latency and resource use as concurrency increases; choose workloads and methods yourself. When measuring sustained throughput, run the workload long enough to compare completion rates in earlier and later intervals and see whether outstanding requests keep accumulating.
+Aim for high sustained throughput and low client latency under concurrent load. Provide reproducible measurements showing how successful execution replies per second, latency from submission to reply, and resource use scale with load. State both target concurrency and observed consensus concurrency, measured as admitted, undecided instances across the system.
 
 Reports must include:
 
-- Actual load and resource settings, metric units, request populations and measurement intervals.
-- Counts by actual reply state, including successes, rejections, timeouts and unknown outcomes, plus requests still awaiting replies.
-- Continued observation of existing work after stopping new submissions, including the observation duration and unfinished work.
-- How time, communication and memory costs of ordinary requests, dependency expansion and missing-data retrieval change with history size, and how resource limits affect admitted work.
+* **Send Rate & Completion Stability**: Actual send rate and resource settings, metric units, request populations, and measurement intervals. For sustained throughput, state whether the completion rate holds and whether unfinished work accumulates during the run.
+* **Breakdown by Reply State**: Counts by actual reply state, including successes, rejections, timeouts, and unknown outcomes, plus requests still awaiting replies.
+* **Post-Load Drain Observation**: Continued observation of existing work after stopping new submissions, including observation duration and unfinished work.
+* **History Scaling & Throttling Impact**: How time, communication, and memory costs of ordinary requests, dependency expansion, and missing-data retrieval change with history size, and how resource limits affect admitted work.
 
-When explaining significant latency or target/observed concurrency gaps, use low-overhead observations to distinguish waiting before admission, decision, execution and reply.
+### 4.3 Parallelism and Deployment Validation
 
-### 4.3 Parallelism and deployment validation
+* **Parallel vs. Serial Execution Breakdown**: Show which ordinary consensus steps actually run simultaneously within one replica and explain where serialization is necessary.
+* **Parallelism Scaling Comparison**: Report throughput, latency, and replica CPU use at different parallelism settings under comparable loads.
+* **Real Multiprocess Benchmarks**: Base deployment performance claims on real multiprocess runs and state the resources available.
 
-Use ordinary Node paths to identify which main protocol steps execute simultaneously, which remain serial and why. Worker counts, transport-only or auxiliary preparation parallelism, test-barrier overlap and cross-replica scaling do not alone establish intra-replica consensus parallelism.
+## 5. Delivery and Documentation
 
-Compare throughput, latency and replica CPU use at different parallelism settings under comparable loads. Distinguish actual-parallelism evidence from scaling gains and state local resource limits.
-
-In-process multi-Node tests may check functionality and controlled schedules; deployment-performance conclusions require real multiprocess runs with stated resource conditions.
-
-## 5. Delivery
-
-Support offline builds and include required third-party dependencies in the deliverable. Choose dependencies, transport and encoding based on correctness, runtime costs and implementation complexity. Server and client must start with ordinary commands; use loopback addresses by default.
-
-Put automated tests in `tests/`, runnable with `go test ./...`. Retain runnable tests and commands actually used. Process/runtime settings, workload size, duration and random seed must be adjustable on another machine without rewriting test logic.
-
-Documentation:
-
-- `README`
-
-  - Configuration, interfaces, service semantics, operating conditions and commands to build, start, use and clean up a local multiprocess cluster.
-  - A seven-member configuration, concurrent clients and same-request retries, distinguishing application results, duplicates and unknown outcomes.
+* **Offline Build & Runtime Defaults**: Support offline builds and include required third-party dependencies in the deliverable. Choose dependencies, transport, and encoding based on correctness, runtime costs, and implementation complexity. Server and client must start with ordinary commands and use loopback addresses by default.
+* **Parameterized Test Suite**: Put automated tests in `tests/`, runnable with `go test ./...`. Retain runnable tests and commands actually used. Process/runtime settings, workload size, duration, and random seed must be adjustable on another machine without rewriting test logic.
+* **Documentation (`README.md`)**:
+  * **`README.md`**:
+    * Configuration, interfaces, service semantics, operating conditions, and commands to build, start, use, and clean up a local multiprocess cluster.
+    * Provide a seven-member configuration example. Performance tests may use a different replica count suited to the available CPUs and consistent with the protocol’s parameter constraints. Demonstrate concurrent clients and same-request retries, distinguishing application results, duplicates, and unknown outcomes.

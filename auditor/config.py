@@ -87,9 +87,11 @@ class Config(BaseModel):
     baseline_id: Literal["codex_plain"] = "codex_plain"
     target_config: str
     task_path: str = str(Path(__file__).resolve().parents[1] / "inputs/AUDIT.md")
+    discovery_round: int = Field(default=1, ge=1)
     task_mode: Literal['audit', 'review'] = 'audit'
     review_context: str | None = None
     repo_path: str | None = None
+    codex: str = "codex"
     agent_model: str
     agent_reasoning_effort: str | None
     codex_provider: CodexProvider | None = None
@@ -135,6 +137,8 @@ def load_config(path):
         value = getattr(config, name)
         if value is not None:
             setattr(config, name, relative_path(value, path.parent))
+    if "/" in config.codex:
+        config.codex = relative_path(config.codex, path.parent)
     if config.codex_provider and config.codex_provider.model_catalog_path:
         config.codex_provider.model_catalog_path = relative_path(config.codex_provider.model_catalog_path, path.parent)
     return config

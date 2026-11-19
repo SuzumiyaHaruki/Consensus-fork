@@ -4,7 +4,7 @@
 
 建议先阅读 [protocol.md](protocol.md)，再阅读 [system.md](system.md)（目标服务、运行时与成本要求）。协议稿面向实现，正文只保留概念、前提和行为要求，英文伪代码按判断、更新和发送分行。证明推导、长例子和重复解释留在源文档，不作为生成输入；也不沿用历史实验的验证结论。审计与复核中的 `<!-- continuation -->` 区分首次任务和同一会话的后续回合。
 
-[IMPLEMENTATION.md](IMPLEMENTATION.md) 是生成与修复共用的实现要求，[TASK.md](TASK.md) 定义初始生成任务；[AUDIT.md](AUDIT.md)、[REPAIR.md](REPAIR.md)、[VERIFY.md](VERIFY.md) 分别定义发现、修复和独立复核。角色提示按任务、方法、执行与交付组织；文档格式允许合并和调整标题。
+[TASK.md](TASK.md) 说明初始生成、工程方法与交付，[REPAIR.md](REPAIR.md) 说明如何核查证据、修改实现并验证影响。[AUDIT.md](AUDIT.md) 和 [VERIFY.md](VERIFY.md) 分别用于发现问题与独立复核。角色提示按任务、方法、执行与交付组织；文档格式允许合并和调整标题。
 
 本稿沿用已确认的客户端选择：请求号为 `(ClientID,RequestSeq)`，重试保留身份和载荷；已执行的重复请求返回 ALREADY_EXECUTED，不要求永久保留首次结果。这是对源文档“重复返回首次结果”要求的明确调整，正文、执行伪代码和 system.md 已一致修改。执行规则另允许就绪且彼此独立的 SCC 并行，不再要求所有 SCC 的应用执行全局串行；保留依赖顺序、分量内顺序、去重和完整发布完成状态的要求。
 

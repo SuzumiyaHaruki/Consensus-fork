@@ -16,10 +16,11 @@ The parameters satisfy `q=n-f`, `L=f+1`, `0<=s<q<=L`, `F=n-e`, `e>=0` and `2e<q`
 | --- | --- |
 | `rid=(ClientID,RequestSeq)` | Logical request ID: ClientID is a globally unique session identity; RequestSeq increases within that session and is never reused. |
 | `x=R.i` | Instance ID: R identifies the allocating replica; i is its consecutive instance number, starting at 1 and never reused. |
-| `cmd` | Original command, including rid and payload; an instance's command never changes. |
+| `cmd` | Original client command, including rid and payload. Its contents are immutable. |
 | `class(cmd)=cmd.key` | Conflict class: the key used by the single-key Put, Get or Delete operation. All replicas use the same key identity and class rule throughout the configuration. |
 | `V=(cmd,D,seq)` | Complete value: D contains at most one actual conflicting representative instance number per replica, with 0 for an empty component; seq orders execution within a cycle. |
-| `V0=(cmd,D0,seq0)` | Immutable initial value. Every later value preserves cmd and has D componentwise at least D0. |
+| `V0=(cmd,D0,seq0)` | Immutable initial value. Every later command value preserves cmd and has D componentwise at least D0. |
+| `NOOP` | A possible recovery value for an allocated instance (§4.3). It has no client command, rid or dependency vector. |
 | `b` | Ballot: 0 for the initial coordinator; `(round, coordinator ID)` with a positive round for recovery. Ballot 0 is smaller than every recovery ballot; recovery ballots compare first by round, then by coordinator ID. |
 | `promise[x]` | The highest ballot promised locally for x, initially 0. It stores a complete ballot, including the coordinator ID for recovery. |
 | `round(b)` | The round component of a recovery ballot; `round(0)=0`. |
@@ -56,7 +57,7 @@ An instance can decide only one complete value. For any two decided conflicting 
 Each Collect invocation has its own state. A and B store the two phases' complete positive replies, keyed by member. Deliver only matching complete positive replies to an active collection; §3.3 separately handles PreAccept fast-path votes.
 
 ```text
-procedure Collect(kind, x, b, V):
+procedure Collect(kind, x, b, V optional):
     attempt ← fresh invocation ID
     phase ← 1
     A, B ← empty maps keyed by member
@@ -76,7 +77,8 @@ upon |A| >= L while phase == 1 do:
     complete this Collect with A's actual replies
 
 // Small threshold: start phase 2 after W
-upon now >= t0 + W and q <= |A| < L while phase == 1 do:
+upon phase == 1 and now >= t0 + W and q <= |A| < L
+     and the phase-1 broadcast to all members completed by its W deadline do:
     phase ← 2
     nonce2 ← fresh nonce
     broadcast kind(x, b, V, attempt, phase=2, nonce2) to all members
@@ -90,7 +92,7 @@ upon receiving a valid NACK(x, b', attempt, phase, nonce) do:
     RaisePromise(x, b')
 ```
 
-A valid NACK invokes §2.2 even after its collection has ended. Retransmissions with the same nonce may reuse replies. A phase-2 request has a fresh nonce and is processed again under its message's handler rules, rather than replaying the phase-1 reply. Data requirements are in §7; continue serving other tasks while waiting.
+The timed branch requires the §1.1 window assumption; a failed local enqueue is unfinished broadcast work. A valid NACK invokes §2.2 even after its collection has ended. Retransmissions with the same nonce may reuse replies. A phase-2 request has a fresh nonce and is processed again under its message's handler rules, rather than replaying the phase-1 reply. Data requirements are in §7; continue serving other tasks while waiting.
 
 ### 2.2 Updating promise
 
@@ -110,9 +112,9 @@ procedure RaisePromise(x, b'):
 
 ### 3.1 Admission
 
-Conflict scans include all locally registered instances, including executed ones; registration requires the data specified in §7.
+Conflict scans include locally registered commands, including executed ones. Exclude slots known to have decided NOOP. Registration requires the data in §7.
 
-Before admission, requests may wait or be explicitly rejected under overload. Schedule eligible requests and classes fairly. Different entry replicas may create different instances for the same request; execution deduplicates by rid under §6.2. Once admitted, an instance remains protocol work despite timeouts, client cancellation or resource pressure; do not replace its command with a no-op.
+Before admission, requests may wait or be explicitly rejected under overload. Schedule eligible requests and classes fairly. Different entry replicas may create different instances for the same request; execution deduplicates by rid under §6.2. Once admitted, an instance remains protocol work despite timeouts, cancellation or overload. Only the formal recovery rule in §4.3 can select a new NOOP.
 
 If a locally registered instance, including one allocated elsewhere, remains unexecuted beyond a finite threshold measured from its first complete registration, pause new client admissions for its class until none of that class's unexecuted instances is overdue. Later messages do not restart this wait.
 
@@ -133,7 +135,7 @@ upon selecting cmd for admission do:
         if cmd.rid is in executedRequests:
             reply ALREADY_EXECUTED
             return
-        if an instance for cmd.rid was already admitted here:
+        if an instance for cmd.rid is still in flight here:
             reuse that instance for this request
             return
         allocate next local instance x = self.i
@@ -221,7 +223,7 @@ upon O[x] != ⊥ and now >= t0 + W do:
 
 Each replica that knows x but not its decision waits a finite recovery delay from first learning x, then repeatedly sends NeedRecover(x) to its current Omega until it learns the decision. Later messages do not restart this delay or remove pending recovery merely because they are duplicates or report that x remains undecided.
 
-A recipient whose Omega points elsewhere retains the pending work and uses the same background retries to contact its own Omega; it does not immediately relay each arriving NeedRecover. Only the replica locally selected as Omega starts recovery; the request does not declare the initial coordinator crashed. Schedule recovery requests fairly across instances and merge duplicates and HELP requests. Each replica runs at most one coordination task per instance. When Omega changes away from self, stop local coordination but retain pending work and keep handling requests.
+A recipient whose Omega points elsewhere retains the pending work and uses the same background retries to contact its own Omega; it does not immediately relay each arriving NeedRecover. Recovery may start from the ID of a known allocated instance while Fetch is pending. Only the replica locally selected as Omega starts recovery; the request does not declare the initial coordinator crashed. Schedule recovery requests fairly across instances and merge duplicates and HELP requests. Each replica runs at most one coordination task per instance. When Omega changes away from self, stop local coordination but retain pending work and keep handling requests.
 
 ```text
 upon recovery wait or retry expires for undecided x do:
@@ -234,55 +236,61 @@ upon NeedRecover(x) do:
         add x to pending recovery
         Fetch missing initial data
 
-upon x pending recovery and required data available (section 7)
+upon x pending recovery
      while Omega == self, decided[x] == ⊥ and no active recovery for x do:
     atomic:
         b ← (round(promise[x]) + 1, self)
         RaisePromise(x, b)
         activate the recovery task for (x, b)
     if task active:
-        Collect(Prepare, x, b, V0)
+        Collect(Prepare, x, b)
 ```
 
 ### 4.2 Replicas handling Prepare, Observe and Validate
 
-The recovery coordinator broadcasts Prepare, Observe or Validate. Each recipient, including the sender, runs the handler below. Prepare reports the stored first vote for x (empty, `FastOK` or `Mismatch(Dp, sp)`), the accepted record and the decision. Distinguish an absent record from missing data. Observe/Validate rescan conflicts without changing the first vote.
+Prepare identifies the slot by ID and ballot, including at a replica with no record for that ID. In each phase, every responder first promises b and takes its snapshot in the same atomic step, unless it returns Done or NACK. EMPTY means the replica has no original command data, first vote, accepted value or decision for x. It may know x's ID from another command or from a gap lookup (§7). A positive state reply carries the saved V0 when known, even if first is absent. An EMPTY member counts toward r and contributes no FastOK to h (§4.3). A replica holding V0 but missing some predecessors reports V0 and its actual state immediately; it need not wait for those predecessors to recover. Include the value of any accepted record, including NOOP. Observe and Validate still require §7 data.
 
 ```text
-upon kind(x, b, V0, attempt, phase, nonce)
-     where kind in {Prepare, Observe, Validate} and required data available do:
+upon Prepare(x, b, attempt, phase, nonce) do:
     atomic:
         if decided[x] != ⊥:
-            reply Done(x, decided[x], attempt, phase, nonce)
+            reply Done(x, decided[x])
             return
         if b < promise[x]:
-            reply NACK(x, promise[x], attempt, phase, nonce)
+            reply NACK(x, promise[x])
             return
-
         RaisePromise(x, b)
-        if kind == Prepare:
-            response ← snapshot(first[x], accepted[x], decided[x])
+        if only the instance ID and ballot metadata are known:
+            response ← EMPTY
         else:
-            register x
-            T ← registered conflicts, excluding x
-            Dp ← D0(x) ∨ heads(T)
-            sp ← max(seq0(x), 1 + S(T))
-            response ← (Dp, sp)
+            response ← saved command data, first[x] and accepted[x]
+    reply PrepareReply(x, b, attempt, phase, nonce, response)
 
-    if kind == Prepare:
-        reply PrepareReply(x, b, attempt, phase, nonce, response) with required data
-    else:
-        reply ScanReply(x, b, attempt, phase, nonce, response) with required data
+upon kind(x, b, V0, attempt, phase, nonce) with required data available
+     where kind in {Observe, Validate} do:
+    atomic:
+        if decided[x] != ⊥:
+            reply Done(x, decided[x])
+            return
+        if b < promise[x]:
+            reply NACK(x, promise[x])
+            return
+        RaisePromise(x, b)
+        register x
+        T ← registered conflicts, excluding x
+        Dp ← D0(x) ∨ heads(T)
+        sp ← max(seq0(x), 1 + S(T))
+    reply ScanReply(x, b, attempt, phase, nonce, (Dp, sp))
 ```
 
 ### 4.3 Value selection and NoFast
 
 NoFast(x) rules out x having decided or later deciding V0 through the fast path. Its grounds are the Prepare test below, first Mismatch votes from at least e+1 distinct replicas, or the HELP rule in §5.2. When established, set noFast[x], initially false, to true.
 
-It also holds if x and y conflict, x's initial dependencies exclude y, and the final dependencies in a known Done(y,Vy) exclude x.
+It also holds if x and y are ordinary commands that conflict, x's initial dependencies exclude y, and the final dependencies in a known Done(y,Vy) exclude x.
 
 ```text
-upon Collect(Prepare, x, b, V0) completes with P
+upon Collect(Prepare, x, b) completes with P
      while recovery active and decided[x] == ⊥ do:
     if any reply reports Done:
         LearnDecision(x, the reported decided value)
@@ -294,7 +302,19 @@ upon Collect(Prepare, x, b, V0) completes with P
             freeze proposal a.fullValue for ballot b
         if coordinating x at b:
             Collect(Accept, x, b, a.fullValue)
+    else if every reply in P is EMPTY:
+        atomic:
+            if not coordinating x at b or a proposal is frozen:
+                return
+            if local state for x includes command data, a first vote or an accepted value:
+                retry in a fresh ballot, including the local Prepare reply in A
+                return
+            freeze NOOP for (x, b)
+        if coordinating x at b:
+            Collect(Accept, x, b, NOOP)
     else:
+        obtain V0(x) and resolve its initial references under section 7
+        resume only if still coordinating x at b with no frozen proposal
         r ← |members(P)|
         h ← count distinct members in P reporting FastOK for x
         if noFast[x] or r - h > e:
@@ -304,6 +324,8 @@ upon Collect(Prepare, x, b, V0) completes with P
             strongX ← true  // this Prepare establishes h >= r - e > e
             ValidateInitial(x, b)
 ```
+
+A new NOOP requires exclusively EMPTY replies in a completed Prepare (§2.1), across both phases if used. An ordinary Fetch miss or timeout does not count. With seven members, f=4, s=e=1, five distinct phase-one EMPTY replies suffice; with three or four at W, the fresh second phase needs three replies or five distinct members across both phases. The recovery coordinator decides NOOP only after its Accept for that value completes. Any higher ballot inherits a highest accepted NOOP exactly as it would a command.
 
 Once selected, the proposal for (x,b) cannot change. NoFast or HELP may trigger rebuilding in the same ballot only if Prepare found no accepted value and no proposal has been selected.
 
@@ -332,6 +354,8 @@ upon Collect(Observe, x, b, V0) completes with O do:
 ```
 
 ### 4.5 Accept
+
+Accept for NOOP uses a positive recovery ballot and the same promise, same-ballot value and ACK rules as any Accept. Replicas accept it by instance ID without V0 or prefix data, even if they hold an earlier command observation. A prepared or singly accepted NOOP cannot resolve a dependency.
 
 ```text
 upon Collect(Accept, x, b, V) completes with formal ACKs do:
@@ -363,7 +387,7 @@ upon Accept(x, b, V, attempt, phase, nonce)
 
 The recovery coordinator collects Validate replies and takes the componentwise maximum of their suggested dependency vectors and D0(x) to obtain U, the range for this validation. Check conflicting instances reported by the replies but not already covered by D0(x), asking whether they depend on x so that recovery can still propose the initial value V0. Fix U when this collection completes; later arrivals do not enlarge it.
 
-For each replica R, start at the instance identified by U[R] and follow its same-class predecessor chain down to D0(x)[R], excluding that lower endpoint and x itself. An executed instance or a successful check does not exempt its predecessors from checking. Validation state belongs to the recovery task (x, b); its results cannot select a proposal after that task stops or enters rebuilding.
+For each replica R, start at the instance identified by U[R] and follow its same-class predecessor chain down to D0(x)[R], excluding that lower endpoint and x itself. An executed instance or a successful check does not exempt its predecessors from checking. Finish pending §7 gap walks before confirming validation; NOOP itself supplies no conflict or NoFast evidence. Validation state belongs to the recovery task (x, b); its results cannot select a proposal after that task stops or enters rebuilding.
 
 ```text
 procedure ValidateInitial(x, b):
@@ -379,6 +403,9 @@ upon Collect(Validate, x, b, V0) completes with O
 upon U fixed and cursor[R] > D0(x)[R]
      while validation active and not noFast[x] do:
     y ← R.cursor[R]
+    if decided[y] == NOOP:
+        cursor[R] ← preceding same-class index above D0(x)[R], or D0(x)[R] (§7)
+        continue this cursor
     if required initial data for y is missing:
         Fetch(y)
         resume this cursor when data arrives
@@ -393,7 +420,9 @@ upon U fixed and cursor[R] > D0(x)[R]
 
 upon adding y to unresolved or receiving new data for y
      while validation active, y in unresolved and not noFast[x] do:
-    if y's initial value covers x:
+    if decided[y] == NOOP:
+        replace y in unresolved with a pending §7 walk below y, down to the frozen lower bound
+    else if y's initial value covers x:
         remove y from unresolved
     else if Done(y) is known:
         if y's final value covers x:
@@ -425,11 +454,11 @@ upon noFast[x] while validation active,
 strongX means that one successful Prepare obtained reports from more than e distinct replicas that they had voted FastOK for the exact complete V0(x); do not combine vote counts from different Prepare calls. HELP and its replies identify x, y, and x's recovery ballot and task. Both initial values must be retrievable.
 
 ```text
-upon HELP(y; x, b, V0, strongX)
-     with required initial data for x and y available do:
+upon HELP(y; x, b, V0, strongX) do:
     if Done(y) is known:
         reply Done(y)
         return
+    obtain required initial data for x and y, then recheck decisions
     if y's initial value covers x:
         reply y's initial value
         return
@@ -463,7 +492,7 @@ HELP does not change Omega's role in choosing the recovery coordinator; an "alre
 
 Done(x,V) means that instance x has decided V. A replica may send Done only after meeting the fast-decision conditions, collecting the confirmations required for Accept, or learning that decision from another replica. A single replica's vote or accepted record does not establish a decision. Record a received decision even if the local ballot is higher; duplicate notifications of the same decision need no repeated processing. A decision does not mean execution has finished.
 
-Initial data requirements are in §7; execution and client replies follow §6.2. Receiving Done or Learn does not itself trigger another broadcast to all members.
+Learn a decided NOOP by ID, retain and disseminate it, and return Done(x, NOOP) to later phase requests, Fetch, NeedRecover or HELP for x before checking for V0. It supersedes any tentative original data for this slot; late command data cannot reopen it. Initial data requirements for command decisions are in §7; execution and client replies follow §6.2. Receiving Done or Learn does not itself trigger another broadcast to all members.
 
 ```text
 procedure Decide(x, V):
@@ -485,7 +514,7 @@ procedure LearnDecision(x, V):
     return true
 
 upon receiving Done(x, V) or Learn(x, V) do:
-    if required initial data is missing (section 7):
+    if V != NOOP and required initial data is missing (section 7):
         Fetch missing initial data
         resume this handler when data arrives
         return
@@ -498,16 +527,18 @@ If the coordinator crashes during its broadcast, correct replicas holding the de
 
 ### 6.2 Dependency expansion and execution
 
-For each unexecuted vertex x=R.i, follow the nonzero representatives of its final D and its initial predecessor R.D0(x)[R], if nonzero. Exclude x itself and duplicate targets. These at most n+1 edges preserve the dependencies covered by the vector through same-class predecessor chains; the initial predecessor is needed even when the final representative has changed.
+For each unexecuted command x=R.i, follow the nonzero representatives of its final D and its initial predecessor R.D0(x)[R], if nonzero. Exclude x itself and duplicate targets. These at most n+1 edges preserve the dependencies covered by the vector through same-class predecessor chains; the initial predecessor is needed even when the final representative has changed.
 
-Expand each unexecuted vertex once per graph construction, retaining edges to already visited vertices so cycles remain visible. Stop at locally executed instances; do not scan intervening instance numbers or wait for unrelated classes. An execution record for the same rid does not allow an unexecuted instance to bypass its own dependencies. Execute cycles as strongly connected components (SCCs), without requiring a dependency inside the same SCC to execute separately first.
+Expand each unexecuted vertex once per graph construction, retaining edges to already visited vertices so cycles remain visible. Stop at locally executed commands. Follow direct references in ordinary execution. An edge to a decided NOOP instead resolves to the preceding command of the referencing class under §7, even if the NOOP was processed earlier. An execution record for the same rid does not allow an unexecuted instance to bypass its own dependencies. Execute cycles as strongly connected components (SCCs), without requiring a dependency inside the same SCC to execute separately first.
 
 Independent ready SCCs may execute in parallel; state changes and each command's result must be equivalent to a serial execution respecting dependencies and the prescribed order within each SCC.
+
+NOOP makes no KV change and creates no executed-rid record. Close the old instance and release any local in-flight association. Release waiters; if the outcome of the logical request at other entries is unknown, report that status. A retry with the original rid and payload can enter a new instance. Only actual command execution can yield an application result or ALREADY_EXECUTED. Preserve any result already prepared for an actual execution.
 
 First execution returns the actual result to current client waiters. An already executed duplicate request or instance returns ALREADY_EXECUTED without applying the command again or returning its original result. Continue sending original-result replies already prepared. Execution-deduplication records determine whether a request has executed; a missing result cache does not permit re-execution.
 
 ```text
-upon decided x needs execution do:
+upon decided command x needs execution do:
     expand x's unexecuted dependency closure
     Fetch missing initial values and decisions
     send NeedRecover(y) to Omega for each known undecided dependency y
@@ -554,12 +585,12 @@ Thus healthy uptime alone does not increase the waiting period or require replay
 
 ## 7. Data availability and retention
 
-Initial data consists of the instance ID and V0. Before registering an instance, reporting its data as available, using it in a conflict scan or giving a positive reply that relies on it, obtain and save its initial data and the initial data recursively referenced by its D0. Processing a proposed or decided final value additionally requires this initial data for every nonzero representative in that value. All representatives must be actual instances of the same class.
+For an ordinary command, save its ID, immutable V0 and the initial data recursively referenced by D0 before registration, conflict scans or positive votes that depend on them. An ordinary proposal or decision also requires the initial data of its nonzero final representatives. Initial references point to previously allocated instances; final dependencies can form cycles. This step does not wait for ordinary predecessors to decide or execute.
 
-This data requirement follows initial references only: it does not wait for referenced instances to decide or execute, or recursively require their final dependencies. Initial references point to already created instances; final dependencies may form cycles. Messages may reference initial data by instance ID and Fetch missing data.
+Fetch by ID from all members. A holder can return V0 even while still gathering its predecessors; receiving V0 alone does not register an instance. A decided NOOP is sufficient data for that slot and is returned as Done(x, NOOP). If only the ID is known, keep Fetch and §4.1 recovery pending. Recover only an allocated slot identified by a protocol reference or by the consecutive prefix below such a slot. Fetch does not cast a vote or change a promise. Once the required data is available, register the command atomically with any first voting scan.
 
-Atomically register instances once their required initial data is complete so they participate in later conflict scans. Fetch does not create first votes or overwrite first or promise; when a first vote is needed, registration and the voting scan still occur in one atomic step. Do not query unrelated smaller instance numbers to discover their class.
+**Following a reference through a decided NOOP.** When a command of class k refers to a slot R.i that decided NOOP, continue below i to find the nearest earlier command from R of class k. Check decreasing allocated indices: skip decided NOOPs and commands known to have a different key. For an unclassified slot, Fetch its V0 or recover its decision by ID before passing it. Only its key is needed to rule out another class. At a match, resume the ordinary same-class chain, resolving its initial data as usual. If there is no match in the required range, this branch ends. Keep stored vectors and votes unchanged.
 
-When only an instance ID is known, send Fetch to all members; holders continue serving available data by ID. A "data not held" reply proves neither absence of history nor NoFast nor Done. Continue retrieving missing data and recover missing decisions under §4.1.
+Apply this lookup during registration, validation and execution. Validation checks only indices above its frozen lower bound, including already executed matching commands. Execution may stop at a prefix known to have executed all its ordinary commands. A cached index may skip a range whose relevant slots are already accounted for. Limit this backward lookup to gaps closed by a NOOP; ordinary links still jump directly to their representative.
 
 This version has no checkpoints. Retain V0, first, latest accepted, promise, decision and execution-deduplication records for conflict scans and Fetch; these records are not reclaimed after execution.

@@ -134,16 +134,16 @@ class Codex:
     def __init__(self, config, root, target, deadline):
         self.config, self.root, self.target, self.deadline = config, Path(root), target, deadline
         self.work = self.root / "work"
+        executable = shutil.which(config.codex)
+        if not executable:
+            raise ValueError(f"Codex CLI is unavailable: {config.codex}")
+        self.executable = str(Path(executable).resolve())
         private_parent = self.root
         private_parent.mkdir(exist_ok=True)
         self.private = tempfile.TemporaryDirectory(prefix=".client-", dir=private_parent)
         self.home = Path(self.private.name)
         self.client_home = self.home / "codex"
         self.client_home.mkdir()
-        self.executable = shutil.which("codex")
-        if not self.executable:
-            raise ValueError("Codex CLI is unavailable")
-        self.executable = str(Path(self.executable).resolve())
         self.helpers = self.home / "helpers"
         self.helpers.mkdir()
         for name in ("codex-linux-sandbox", "apply_patch"):

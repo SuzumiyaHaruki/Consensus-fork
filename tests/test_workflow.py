@@ -72,6 +72,7 @@ class OfflineRuntime(workflow.Runtime):
         self.review_dispositions = {}
         self.review_invalid = False
         self.budgets = []
+        self.discovery_rounds = []
 
     def check(self, settings):
         return {'ready': True, 'offline_fixture': True}
@@ -129,8 +130,9 @@ class OfflineRuntime(workflow.Runtime):
         git(destination, 'commit', '--quiet', '-m', 'Offline fixture')
         return {'path': str(destination), 'commit': candidate_commit(destination), 'files': names, 'excluded': {}}
 
-    def audit(self, settings, candidate, folder, seconds, timeout):
+    def audit(self, settings, candidate, folder, seconds, timeout, discovery_round):
         self.calls.append('audit')
+        self.discovery_rounds.append(discovery_round)
         self.audit_prompt = Path(settings.audit_prompt).read_text()
         self.budgets.append(('audit', seconds))
         return fixture_audit(folder / 'runs/fixture', candidate, incomplete=self.incomplete,
@@ -187,8 +189,8 @@ class WorkflowTests(unittest.TestCase):
 
     def test_review_discovery_reaches_next_repair_despite_empty_fresh_audit(self):
         class ReviewDiscovery(OfflineRuntime):
-            def audit(self, settings, candidate, folder, seconds, timeout):
-                audit = super().audit(settings, candidate, folder, seconds, timeout)
+            def audit(self, settings, candidate, folder, seconds, timeout, discovery_round):
+                audit = super().audit(settings, candidate, folder, seconds, timeout, discovery_round)
                 if candidate['version'] == 0:
                     path = audit / 'turns/0001/changes/files/findings.json'
                     result = read_json(path)
@@ -274,6 +276,7 @@ class WorkflowTests(unittest.TestCase):
         result = workflow.execute(root, runtime)
         self.assertEqual(runtime.calls, ['audit', 'repair', 'verify'])
         self.assertEqual(runtime.budgets, [('audit', self.settings.audit_seconds), ('verify', self.settings.repair_verification_seconds)])
+        self.assertEqual(runtime.discovery_rounds, [1])
         self.assertEqual([c['version'] for c in result['candidates']], [2, 3])
         self.assertEqual(result['repairs_completed'], 1)
         self.assertEqual(result['open_issues'], [])
@@ -284,6 +287,16 @@ class WorkflowTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'No retained candidate'):
             workflow.branch(source, 'v099')
 
+    def test_branch_of_split_prompt_archive_keeps_original_instructions(self):
+        source, _ = self.run_fixture(max_repairs=0)
+        saved = source / 'inputs/IMPLEMENTATION.md'
+        put(saved, 'Archived common instructions, prior format.')
+        branch = workflow.branch(source, 'v000', 'saved-instructions')
+        result = workflow.execute(branch, OfflineRuntime())
+        repair = next(Path(s['path']) for s in result['stages'] if s['kind'] == 'repair')
+        self.assertEqual(read_json(repair / 'client-settings.json')['developer_instructions'], saved.read_text())
+        self.assertEqual((repair / 'prompt.txt').read_bytes(), (source / 'inputs/REPAIR.md').read_bytes())
+
     def test_branch_from_v000_can_run_three_rounds(self):
         source, original = self.run_fixture(max_repairs=0)
         output = subprocess.check_output([sys.executable, str(ROOT / 'forge.py'), 'branch', str(source),
@@ -292,6 +305,7 @@ class WorkflowTests(unittest.TestCase):
         runtime = OfflineRuntime()
         result = workflow.execute(root, runtime)
         self.assertEqual(runtime.calls, ['audit', 'repair', 'verify'] * 3)
+        self.assertEqual(runtime.discovery_rounds, [1, 2, 3])
         self.assertEqual(result['candidates'][0]['commit'], original['candidates'][0]['commit'])
         self.assertEqual([c['version'] for c in result['candidates']], [0, 1, 2, 3])
         self.assertEqual(result['stop_reason'], 'repair_limit')
@@ -333,11 +347,13 @@ class WorkflowTests(unittest.TestCase):
                 stage_path = Path(stage['path'])
                 self.assertEqual((stage_path / 'workspace/protocol.md').read_bytes(), (root / 'inputs/protocol.md').read_bytes())
                 self.assertFalse((stage_path / 'workspace/AUDIT.md').exists())
-                if stage['kind'] == 'generation':
-                    self.assertFalse((stage_path / 'workspace/REPAIR.md').exists())
-                    self.assertEqual((stage_path / 'prompt.txt').read_bytes(), (root / 'inputs/TASK.md').read_bytes())
-                else:
-                    self.assertEqual((stage_path / 'prompt.txt').read_bytes(), (root / 'inputs/REPAIR.md').read_bytes())
+                task, other = ('TASK.md', 'REPAIR.md') if stage['kind'] == 'generation' else ('REPAIR.md', 'TASK.md')
+                expected = (root / 'inputs' / task).read_bytes()
+                for folder in ('inputs', 'workspace'):
+                    self.assertFalse((stage_path / folder / other).exists())
+                    self.assertEqual((stage_path / folder / task).read_bytes(), expected)
+                self.assertEqual((stage_path / 'prompt.txt').read_bytes(), expected)
+                self.assertEqual((stage_path / 'workspace/received-prompt.txt').read_bytes(), expected)
         self.assertEqual(result['settings']['audit_model'], 'gpt-6.2-sol')
         before = (root / 'experiment.json').read_bytes()
         with self.assertRaisesRegex(ValueError, 'already started'):
@@ -348,8 +364,8 @@ class WorkflowTests(unittest.TestCase):
         runtime = OfflineRuntime()
         runtime.empty_after = 1
         original_audit, original_agent, original_verify = runtime.audit, runtime.agent, runtime.verify
-        def audit(settings, candidate, folder, seconds, timeout):
-            run = original_audit(settings, candidate, folder, seconds, timeout)
+        def audit(settings, candidate, folder, seconds, timeout, discovery_round):
+            run = original_audit(settings, candidate, folder, seconds, timeout, discovery_round)
             if candidate['version'] == 0:
                 data = read_json(ROOT / 'tests/fixtures/audit-findings.json')
                 # Replay the observed representation against this offline fixture's own commit.
@@ -1022,6 +1038,8 @@ class BridgeIntegrationTests(unittest.TestCase):
             put(workspace / 'main.go', 'package main\nfunc main() {}\n')
             retained = {'protocol.md': (ROOT / 'inputs/protocol.md').read_text(),
                         'system.md': (ROOT / 'inputs/system.md').read_text(),
+                        'docs/REPAIR.md': 'Documented replica recovery procedure.\n',
+                        'fixtures/TASK.md': 'A fixture used by the CLI tests.\n',
                         'wire/auth.go': 'package wire\nfunc Authenticate() bool { return false }\n',
                         'wire/auth.zig': '// Source language is not a capture policy.\n',
                         'docs/secret-key.md': 'Authentication implementation notes.\n',
@@ -1036,13 +1054,14 @@ class BridgeIntegrationTests(unittest.TestCase):
             put(workspace / '.codex/auth.json', 'Framework private directory fixture.\n')
             put(workspace / '.forge/feedback/report.md', 'Old report must not reach fresh audit.\n')
             put(workspace / 'AGENTS.md', 'Instructions must not become audit instructions.\n')
-            put(workspace / 'IMPLEMENTATION.md', 'Generation/repair instructions stay out of audit input.\n')
+            for name in ('TASK.md', 'REPAIR.md'):
+                put(workspace / name, 'Role instructions stay out of audit input.\n')
             (workspace / 'outside').symlink_to('/etc/hostname')
             git(workspace, 'init', '--quiet', '--template=')
             candidate = workflow.Runtime().export(settings, workspace, root / 'candidate', root / 'export', 20)
             self.assertEqual(candidate['files'], sorted(['go.mod', 'main.go', *retained]))
             self.assertEqual(candidate_commit(root / 'candidate'), candidate['commit'])
-            self.assertEqual(set(candidate['excluded']), {'.codex/auth.json', '.forge/feedback/report.md', 'AGENTS.md', 'IMPLEMENTATION.md', 'outside'})
+            self.assertEqual(set(candidate['excluded']), {'.codex/auth.json', '.forge/feedback/report.md', 'AGENTS.md', 'TASK.md', 'REPAIR.md', 'outside'})
             captured = capture_source(root / 'candidate', root / 'captured', time.monotonic() + 20)
             self.assertFalse(captured['excluded'])
             inventory, excluded = file_inventory(root / 'captured')
@@ -1056,16 +1075,25 @@ class BridgeIntegrationTests(unittest.TestCase):
                 logs.mkdir(parents=True)
                 write_json(logs / 'stdout.log', {'run_dir': str(folder / 'runs/fixture'), 'stop': 'agent_call_limit'})
                 return {'status': 'completed', 'returncode': 0}
+            cli = root / 'configured-codex'
+            shutil.copyfile(ROOT / 'tests/fake_codex.py', cli)
+            cli.chmod(0o755)
+            settings = from_dict(settings.to_dict() | {'codex': str(cli)}, root)
             with patch('workflow.invoke', side_effect=fake_invoke):
-                workflow.Runtime().audit(settings, candidate, folder, 30, 40)
+                workflow.Runtime().audit(settings, candidate, folder, 30, 40, 2)
             config = read_json(folder / 'config.json')
             self.assertEqual(config['agent_model'], 'gpt-6.2-sol')
             self.assertEqual(config['agent_reasoning_effort'], 'high')
             self.assertEqual(config['task_path'], settings.audit_prompt)
+            self.assertEqual(config['codex'], settings.codex)
+            self.assertEqual(config['discovery_round'], 2)
             code = ('import sys; '
                     'from auditor.config import load_config,validate_selection; '
                     'c=load_config(sys.argv[1]); t=validate_selection(c); '
-                    'assert t["expected_module"]=="example.org/consensus-demo"; print("config valid; no model call")')
+                    'from auditor.codex import Codex; from pathlib import Path; import time; '
+                    'client=Codex(c,Path(c.runs_dir),t,time.monotonic()+10); '
+                    'assert client.executable == c.codex; client.close(); '
+                    'assert t["expected_module"]=="example.org/consensus-demo"')
             process = subprocess.run([settings.audit_python, '-c', code, str(folder / 'config.json')],
                                      cwd=ROOT, capture_output=True, text=True, timeout=20)
             self.assertEqual(process.returncode, 0, process.stderr)

@@ -9,8 +9,7 @@ baseline/
   run.py                 独立的 prepare/run/execute/inspect/doctor 入口
   config.json            本条件的模型与时间配置
   inputs/
-    IMPLEMENTATION.md    工作范围、权限、委派和测试目录要求
-    TASK.md              自主实现、自测和交付任务
+    TASK.md              自主实现、自测和交付任务，以及工作范围与执行条件
     protocol.md          与主流程相同的协议规范及内嵌伪代码
     system.md            本条件的服务、运行时能力和交付目标
   tests/                 本入口的离线测试
@@ -25,7 +24,7 @@ Codex 启动、认证副本、配置隔离、超时清理和用量采集复用 `
 
 当前 `protocol.md` 与外层协议相同，正文和伪代码已合并，使用 W/s 窗口、Collect、依赖向量、Omega 和客户端重试。具体队列、编码、索引、同步和客户端等待策略由实现选择。两个目录独立维护，运行不会自动同步；比较实验使用各自保存的材料。
 
-`system.md` 保留与 Forge 相同的 Go KV、真实 Node、多进程、并发客户端、真实时间、可控执行、身份绑定、执行结果及资源使用要求。baseline 不强制交付 `DESIGN.md`，也不禁止 agent 自主编写；README 提供运行与使用说明，实际检查、实现选择和限制仍按 `TASK.md`、`IMPLEMENTATION.md` 报告。文档要求可以按实验条件分别维护，无须两份 system.md 逐字相同。
+`system.md` 保留与 Forge 相同的 Go KV、真实 Node、多进程、并发客户端、真实时间、可控执行、身份绑定、执行结果及资源使用要求。baseline 不强制交付 `DESIGN.md`，也不禁止 agent 自主编写；README 提供运行与使用说明，实际检查、实现选择和限制仍按 `TASK.md` 报告。文档要求可以按实验条件分别维护，无须两份 system.md 逐字相同。
 
 `TASK.md` 要求自主实现、自测和交付，不规定开发顺序、调查方向或成本分析方法。Forge 的生成角色提示进一步要求增量实现、明确模块与状态归属、持续更新 DESIGN.md，以及调查实际运行路径和性能成本。两边初始生成均复用同一个原生 Codex 启动器；Forge 在首次交付后才进入独立审计、修复和复核。
 
@@ -67,4 +66,4 @@ Codex 启动、认证副本、配置隔离、超时清理和用量采集复用 `
 .venv/bin/python -m unittest discover -s tests -v
 ```
 
-本目录的测试使用离线 Codex fixture，检查四份本地材料交付、协议材料一致性、准备后的材料副本、路径隔离、真实共享启动器的参数与完成状态，并确认没有进入审计修复流程。system.md 可包含本条件独立的交付要求。不会调用模型。
+本目录的测试使用离线 Codex fixture，检查三份本地材料交付、协议材料一致性、准备后的材料副本、路径隔离、真实共享启动器的参数与完成状态，并确认没有进入审计修复流程。system.md 可包含本条件独立的交付要求。不会调用模型。

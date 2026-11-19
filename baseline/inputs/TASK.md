@@ -1,24 +1,26 @@
-# Implement the supplied consensus system
+# Implement the Supplied Consensus System
 
-Implement the complete system described by `protocol.md` and `system.md`. Read both documents in full.
+Read `protocol.md` and `system.md` in full and implement the complete system they specify.
 
-## 1. Implementation and deliverables
+## 1. Implementation
 
-- Deliver the specified runnable programs, reusable components, tests and documentation.
-- Choose your own design, implementation process, tests and self-review. Do not substitute another consensus algorithm or modify the supplied requirements.
-- Choose unspecified implementation mechanisms yourself; report design problems without waiting for a design-agent response.
+* **Choose the implementation approach**: Choose your own design, development process, tests, and self-review. Implement the supplied consensus algorithm and leave the requirements documents unchanged. Do not inspect other experiments or obtain another consensus implementation as a substitute.
+* **Handle unspecified details**: Decide how to implement mechanisms left open by the requirements. Report design problems and continue.
 
-## 2. Local checks
+## 2. Local Checks
 
-Run the checks feasible on this machine and deliver reusable tests and commands.
+Use this session to implement and test in the supplied workspace. You may write local scripts and testing tools. Run feasible checks and deliver reusable tests and commands.
 
-- Use `forge_local.isolated_exec` for TCP or multi-process checks; its description explains private networking, per-command timeouts and output retention. All communicating test processes run within the same invocation.
-- Optional scheduling/replay helper `../inputs/schedule.py` documents usage through `--help`. Use it or your own tools.
+* **Local tests**: Use loopback addresses for local clusters and client and replica traffic. You may inject faults permitted by the protocol. Stop the processes you start and clean up test resources afterward.
+* **Access and credentials**: Preserve authentication and sandbox protections. Keep credentials out of code, dependency files, and configuration. Do not change credentials, publish code or packages externally, deploy to remote or production infrastructure, send communications to third parties, or modify unrelated resources.
+* **Resource use**: Before resource-sensitive tests, check available CPU and memory, process layout, and runtime settings. Size workloads to those resources, retain real multiprocess checks, and coordinate heavy runs with any subagents. Report each replica’s `GOMAXPROCS`, which limits how many goroutines can execute Go code simultaneously in that process. State which logical CPUs the replicas share or which CPUs each replica is pinned to.
+* **Delegation**: You may use native Codex subagents with the same model, reasoning effort, and permissions. Coordinate shared edits, integrate their results, and finish or stop delegated work before delivery. Do not start nested Codex CLI sessions or call external model services.
+* **TCP and multiprocess checks**: Use `forge_local.isolated_exec`. Run all communicating test processes within the same invocation. The tool description covers private networking, per-command timeouts, and output retention.
+* **Scheduling and replay**: Use your own tools or the optional helper at `../inputs/schedule.py`. See its `--help` for usage.
 
-## 3. Completion and reporting
+## 3. Completion and Reporting
 
-With the default configuration, generation has no fixed stage deadline. Per-command timeouts do not impose a generation-stage deadline.
+With the default configuration, you decide when generation is complete. Per-command timeouts apply to individual checks.
 
-- Finish when the requested implementation, appropriate checks and documentation are complete. After a focused final self-review and fixes for confirmed defects, deliver; do not restart broad self-audits, expand benchmark matrices or pursue optional refactoring merely to increase confidence.
-- Continue checking only for an observed failure, an unmet requirement or behavior affected by a final change, then finish. Report unresolved work or concrete blockers; do not aim to exhaust available time or eliminate every conceivable concern.
-- Report actual commands/results, unresolved failures, material ambiguities and unmet requirements in the delivery.
+* **Decide when to deliver**: Judge whether the implementation, checks, and documentation are ready or warrant further work. Complete a focused final self-review and check any resulting changes.
+* **Report the outcome**: Give the commands you ran and their results. Document significant implementation choices, unresolved failures, ambiguities, and unmet requirements. Put automated tests in `tests/` and keep Markdown paragraphs on one physical line.

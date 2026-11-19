@@ -21,12 +21,10 @@ from runtime.codex_support import codex_options
 from runtime.storage import read_json, write_json
 
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 
-REQUIRED_INPUTS = (
-    "IMPLEMENTATION.md", "TASK.md", "protocol.md", "system.md",
-)
+SYSTEM_INPUTS = ("protocol.md", "system.md")
 
 
 def utc_now() -> str:
@@ -98,11 +96,22 @@ def command_for(settings: Settings, run_dir: Path) -> list[str]:
     return command
 
 
-def prepare(settings: Settings, label: str = "native") -> Path:
+def role_inputs(source: Path, task_file: str):
+    names = (task_file, *SYSTEM_INPUTS)
+    # A branch or continuation uses its original experiment's saved instructions.
+    if (source.parent / "experiment.json").is_file() and (source / "IMPLEMENTATION.md").is_file():
+        return (*names, "IMPLEMENTATION.md")
+    return names
+
+
+def prepare(settings: Settings, label: str = "native", *, task_file="TASK.md") -> Path:
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}", label):
         raise ValueError("label must be 1–64 letters, digits, underscores, or hyphens")
     source = Path(settings.inputs_dir)
-    for relative in REQUIRED_INPUTS:
+    if task_file not in {"TASK.md", "REPAIR.md"}:
+        raise ValueError(f"Unknown stage prompt: {task_file}")
+    materials = role_inputs(source, task_file)
+    for relative in materials:
         if not (source / relative).is_file():
             raise ValueError(f"Missing input material: {source / relative}")
     output = Path(settings.output_root)
@@ -112,11 +121,12 @@ def prepare(settings: Settings, label: str = "native") -> Path:
     metadata = {
         "runner_version": __version__, "condition": "protocol-to-system-native-agent",
         "status": "preparing", "created_at": utc_now(), "settings": settings.to_dict(),
-        "workspace": str(run_dir / "workspace"), "input_files": list(REQUIRED_INPUTS),
+        "workspace": str(run_dir / "workspace"), "input_files": list(materials),
         "environment": {
             "mode": "host", "read_isolation": False,
             "user_config": "private", "user_instructions_and_skills": "disabled",
-            "project_instructions": "explicit inputs/IMPLEMENTATION.md",
+            "project_instructions": (f"inputs/{task_file} via stdin" if "IMPLEMENTATION.md" not in materials else
+                                     f"inputs/{task_file} via stdin and explicit inputs/IMPLEMENTATION.md"),
             "sandbox": "workspace-write", "approval_policy": "never",
             "shared_daemon": False,
             "subagents": "native_allowed",
@@ -124,7 +134,7 @@ def prepare(settings: Settings, label: str = "native") -> Path:
     }
     write_json(run_dir / "run.json", metadata)
     try:
-        for relative in REQUIRED_INPUTS:
+        for relative in materials:
             for destination in (run_dir / "inputs", run_dir / "workspace"):
                 path = destination / relative
                 path.parent.mkdir(parents=True, exist_ok=True)
@@ -132,7 +142,7 @@ def prepare(settings: Settings, label: str = "native") -> Path:
         helper = Path(__file__).resolve().parent.parent / 'runtime/schedule.py'
         shutil.copyfile(helper, run_dir / 'inputs/schedule.py')
         metadata['schedule_helper'] = 'inputs/schedule.py'
-        prompt = (run_dir / "inputs" / "TASK.md").read_text(encoding="utf-8")
+        prompt = (run_dir / "inputs" / task_file).read_text(encoding="utf-8")
         (run_dir / "prompt.txt").write_text(prompt, encoding="utf-8")
         (run_dir / "workspace" / ".gitignore").write_text("*.test\ncoverage.out\n.runtime/\n", encoding="utf-8")
         subprocess.run(

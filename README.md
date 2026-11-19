@@ -2,7 +2,7 @@
 
 本分支围绕混合同步 EPaxos 设计，组织“生成系统 → 审计 → 修复 → 独立复核”的实验；修复轮次允许时继续新的审计，最后审计仍可修复并以独立复核收尾。Python 负责材料、预算、版本和记录；实现与审计交给 Codex CLI。生成、修复、审计和复核模型均为 `gpt-6.2-sol`，推理强度为 `high`。
 
-统一使用 `forge.py` 启动实验，配置位于 `configs/workflow.json`，运行产物统一写入 `experiments/`。实验目录按需创建；已有实验记录保留，新配置只用于新准备的实验。
+完整流程通过 `forge.py` 启动，配置和产物分别位于 `configs/workflow.json` 与 `experiments/`。独立 baseline 使用 [baseline/run.py](baseline/run.py)，产物在 `baseline/experiments/`。实验目录按需创建；已有实验记录保留，新配置只用于新准备的实验。
 
 ## 当前生成目标
 
@@ -10,9 +10,9 @@
 
 [protocol.md](inputs/protocol.md) 和 [system.md](inputs/system.md) 分别定义协议及内嵌伪代码、系统目标；baseline 独立维护自己的材料，协议与系统能力目标对齐，文档交付要求可不同。当前英文材料由审阅后的中文稿同步，协议采用 W/s 广播窗口、Collect、PreAccept/Accept、ballot 恢复、HELP、Omega 和依赖向量。范围为固定成员、crash-stop；执行后仍保留后续扫描和恢复所需的历史，不提供检查点。
 
-K 限制每个副本已经准入但尚未在本地执行完成的实例数，不是历史容量上限。测试规模按具体问题选择，实际成本需随历史规模观察，不预设恒定内存或任意规模下的固定延迟。已执行的重复请求返回 ALREADY_EXECUTED，不要求永久保存原结果。
+接纳由本地资源和同类旧实例的等待状态调节，具体并发上限由实现选择。测试规模按具体问题选择，实际成本需随历史规模观察，不预设恒定内存或任意规模下的固定延迟。已执行的重复请求返回 ALREADY_EXECUTED，不要求永久保存原结果。
 
-生成 agent 从简短的 DESIGN 草稿开始，解释重要实现选择、状态归属及完成事件，并沿实际代码检查。重点包括共享冲突登记与逐实例状态、窗口与回复阶段、证据取齐与失效任务、槽释放与客户端去重。具体同步、接收入口、调度和数据结构由 agent 决定。审计依据共同规则和实际行为判断，修复与独立复核不把偏好的机制当成标准答案；设计文档不替代协议或执行证据。
+生成 agent 从简短的 DESIGN 草稿开始，解释重要实现选择、状态归属及完成事件，并沿实际代码检查。重点包括共享冲突登记与逐实例状态、窗口与回复阶段、证据取齐与失效任务、过载下的推进与客户端去重。具体同步、接收入口、调度和数据结构由 agent 决定。审计依据共同规则和实际行为判断，修复与独立复核不把偏好的机制当成标准答案；设计文档不替代协议或执行证据。
 
 `runtime/schedule.py` 提供可选的事件调度与重放：通过薄适配器调用候选的实际接口，选择待处理动作，并在隔离执行日志中保留请求和实际观察。生成、审计、修复、复核都可使用；不要求候选采用固定接口，也不据此自动判定缺陷或修复。格式、证据交接和验证范围见 [docs/scheduling.md](docs/scheduling.md)。
 
@@ -36,7 +36,7 @@ python3 -m venv .venv
 .venv/bin/python forge.py prepare --label preview
 ```
 
-启动完整实验，使用默认的双模型 `gpt-6.2-sol / high` 配置：
+启动完整实验，各角色均使用默认的 `gpt-6.2-sol / high` 配置：
 
 ```bash
 .venv/bin/python forge.py run --label sol-high-system-01
@@ -98,12 +98,11 @@ flowchart LR
 | 路径 | 作用 |
 | --- | --- |
 | `inputs/TASK.md` | 初始生成的增量构建、调查和交付任务 |
-| `inputs/IMPLEMENTATION.md` | 生成与修复共用的工程方法、证据解释和工作边界 |
 | `inputs/protocol.md` | 混合协议模型、规则及内嵌事件伪代码 |
 | `inputs/system.md` | 服务、网络、客户端、并发、时间、可控执行及交付边界 |
 | `inputs/AUDIT.md` | 初次审计及同会话续审的提示，仅供审计阶段使用 |
 | `inputs/VERIFY.md` | 修复后的独立复核任务，检查原问题、前后版本及证据极性 |
-| `inputs-zh/` | 与七份英文提示词对应的中文审阅稿，不参与实验输入；见 [阅读说明](inputs-zh/README.md) |
+| `inputs-zh/` | 与六份英文提示词对应的中文审阅稿，不参与实验输入；见 [阅读说明](inputs-zh/README.md) |
 | `inputs/REPAIR.md` | 如何核查审计证据、修复、记录逐项处理结果，仅在修复阶段作为 prompt 使用 |
 | `forge.py` / `workflow.py` | 完整实验入口与阶段调度 |
 | `workflow_config.py` | 模型、路径、阶段预算与修复次数 |
@@ -111,7 +110,7 @@ flowchart LR
 | `generator/` | 生成和修复共用的执行代码，与 `auditor/` 并列；`__init__.py` 为包声明 |
 | `generator/runner.py` | 准备阶段工作区、调用原生 Codex、记录事件、处理超时和中断；生成和修复使用同一执行器 |
 | `generator/execution.py` | 为生成/修复挂接公共隔离执行服务，启动前验证真实 STDIO 与私有 TCP |
-| `generator/client.py` | 生成/修复的私有 Codex 配置、显式项目指令、认证副本和无模型上下文检查 |
+| `generator/client.py` | 生成/修复的私有 Codex 配置、认证副本和无模型上下文检查 |
 | `generator/config.py` | 生成与修复阶段内部使用的执行参数，由工作流传入 |
 | `auditor/` | 可独立修改的审计循环、Codex 会话、隔离执行与证据保留，模块说明见 [auditor/README.md](auditor/README.md) |
 | `requirements.txt` | 本地审计运行所需的第三方 Python 依赖 |
@@ -127,30 +126,13 @@ flowchart LR
 
 双方得到相同的 `protocol.md` 和 `system.md`，没有提供可运行协议参考实现、研究者测试答案或固定 Go 骨架。baseline 自主组织实现与自测；主流程在角色提示中额外提供工程方法，再安排独立审计、证据修复和复核。两个输入目录独立维护，协议与系统要求的修改应同步，通用方法指导不加入 baseline。比较必须使用同一协议与系统范围，历史实验按各自保存的输入分析，不改写旧材料和证据。中文材料来源与约定见 [inputs-zh/README.md](inputs-zh/README.md)，所有 Markdown 段落保持单行。
 
-新版实现侧指令统一命名为 `IMPLEMENTATION.md`，由执行器显式加载，仓库根部的 `AGENTS.md` 仍用于维护本项目。baseline 同步文件名但保留自身提示内容。旧实验使用相应 Git 版本复现，本版不自动迁移旧文件名或材料。
+baseline 独立维护自己的 `TASK.md`，由 agent 自主组织实现与自测。仓库根部的 `AGENTS.md` 用于维护本项目。旧实验保留当时的材料，可用相应 Git 版本复现。
 
-材料平铺在 `inputs/`：TASK 是生成任务，AUDIT 是审计任务，REPAIR 是修复任务，VERIFY 是独立复核任务，IMPLEMENTATION 是生成与修复共用的工作要求；protocol 包含协议正文与伪代码，system 是双方共用的系统目标与交付要求，通用工程指导在角色提示中。初始生成不收到审计、修复、复核任务；各阶段使用当次保存的输入。两份设计材料随候选交付审计，并随前后版本进入修复和复核。角色提示的 `<!-- continuation -->` 分隔首次与续轮任务。
+材料平铺在 `inputs/`：TASK 是生成任务，AUDIT 是审计任务，REPAIR 是修复任务，VERIFY 是独立复核任务；protocol 包含协议正文与伪代码，system 是双方共用的系统目标与交付要求，通用工程指导在角色提示中。初始生成不收到审计、修复、复核任务；各阶段使用当次保存的输入。两份设计材料随候选交付审计，并随前后版本进入修复和复核。角色提示的 `<!-- continuation -->` 分隔首次与续轮任务。
 
 ## 文档导航
 
-以下文档供维护和研究使用，不作为实验 agent 的额外输入。协议与系统要求由 inputs 中当次保存的材料提供。
-
-| 文档 | 用途 |
-| --- | --- |
-| [workflow.md](docs/workflow.md) | 当前阶段、执行环境、证据交接、预算及中断处理 |
-| [scheduling.md](docs/scheduling.md) | 可选事件调度与重放工具的接口和示例 |
-| [evaluation.md](docs/evaluation.md) | 协议符合性、正确性、性能和成本的评价方法，含新固定速率口径 |
-| [design-issues.md](docs/design-issues.md) | 待讨论的会话组织、设计边界和协议论证范围 |
-| [paper.md](docs/paper.md) | 研究主线、方法机制、案例与论文组织 |
-| [exploratory-1110.md](docs/exploratory-1110.md) | 11 月 10 日实现的探索性协议检查与修复案例 |
-| [comparison-20261113.md](docs/comparison-20261113.md) | 11 月 13 日生成结果与 baseline、上一批 Forge 的本机比较 |
-| [server-evaluation-1115.md](docs/server-evaluation-1115.md) | 11 月 11 日实现的服务器闭环实验，含五次重复和三档 CPU |
-| [server-A-evaluation.md](docs/server-A-evaluation.md) | 新固定速率普通请求，当前 638/768 项；单点和均衡已完成，随机入口仍在进行 |
-| [server-B-evaluation.md](docs/server-B-evaluation.md) | 新固定速率热点与载荷，当前 851/1,263 项；热点已完成，1 KiB 尚差七项，16/64 KiB 尚无结果 |
-| [server-C-evaluation.md](docs/server-C-evaluation.md) | 新固定速率附加延迟与崩溃后服务，993/993 项已结束，含多副本崩溃和负载中途故障 |
-| [server-D-evaluation.md](docs/server-D-evaluation.md) | 新固定速率历史成本与补齐；原 498 项及补测 45 项均已结束，补测场景全部成立，baseline 单核 5 批未收齐回复 |
-
-报告日期与实现日期分开识别。新固定速率方法已收到 server A、B 的阶段结果，以及 server C、D 的完整运行结果；具体矩阵和命令位于桌面的 consensus-server-evaluation-1111 测试包。旧 1112 报告和图表已移出当前文档集，副本保存在桌面 consensus-docs-server-evaluation-1112.tar.gz。
+[文档索引](docs/README.md) 按用途列出[工作流](docs/workflow.md)、[评价方法](docs/evaluation.md)、论文稿和本机、服务器实验报告。报告与对应数据、图表及复算方法一起保存。
 
 ## 结果在哪里
 
@@ -178,7 +160,7 @@ issues.json                  全部问题的来源版本、证据、状态与复
 
 隔离执行可选 `source` 和 `overlays` 参数：审计的 `candidate` 指当前候选，复核另有 `before`，修复的 `candidate` 指修复前输入。工具复制对应源码并加入 agent 自选的测试文件，保留起始 commit、补充文件、命令和输出；默认仍使用可修改工作区。该记录证明起始输入和执行事实，不能证明任意命令真正检查了所述性质。审计续轮会收到新的具体证据问题，相同问题不反复推送；修复和复核也收到这些反馈及原始记录。使用示例见 [docs/workflow.md](docs/workflow.md)。
 
-生成/修复使用临时私有 `HOME` 和 `CODEX_HOME`，不继承本机用户配置、自动指令、skills、记忆或插件。项目 `inputs/IMPLEMENTATION.md` 从本阶段保存的材料显式传入，自动发现的项目说明关闭；仅注册框架提供的执行工具，仍允许原生子智能体。启动前用本机 CLI 检查实际上下文，保留 `client-prompt.json` 与 `client-settings.json`；前者是无模型检查上下文，实际任务正文仍在 `prompt.txt`。生成侧仅复制现有文件式 ChatGPT 认证，或使用显式 `CODEX_API_KEY`；不读取用户配置中的 provider/profile，不自动登录，退出前采集会话用量并清理私有目录。整个工作流的审计侧仍要求其既有认证方式。
+生成/修复使用临时私有 `HOME` 和 `CODEX_HOME`，不继承本机用户配置、自动指令、skills、记忆或插件。每个阶段只向模型发送对应的角色正文，自动发现的项目说明关闭；仅注册框架提供的执行工具，仍允许原生子智能体。启动前用本机 CLI 检查实际上下文，保留 `client-prompt.json` 与 `client-settings.json`；前者是无模型检查上下文，实际任务正文仍在 `prompt.txt`。生成侧仅复制现有文件式 ChatGPT 认证，或使用显式 `CODEX_API_KEY`；不读取用户配置中的 provider/profile，不自动登录，退出前采集会话用量并清理私有目录。整个工作流的审计侧仍要求其既有认证方式。
 
 生成/修复普通 shell 仍使用 Codex `workspace-write`，这次隔离的是配置和自动加载内容，没有增加主机文件读取隔离。因此独立会话仍不构成严格隐藏评测环境。`forge_local.isolated_exec` 保留私有网络、PID 空间、干净环境、受限文件访问和执行记录；可运行 Go race 与多进程 TCP 测试，所有互通进程必须在同一次工具调用中启动。启动前做无模型的 STDIO/TCP 检查，失败则停止，不退回主机执行。本地审计保留原有隔离措施。
 

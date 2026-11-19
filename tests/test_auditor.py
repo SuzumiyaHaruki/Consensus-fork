@@ -58,7 +58,8 @@ class AuditorTests(unittest.TestCase):
         (repo / 'main.go').write_text('package main\nfunc main() {}\n')
         (repo / 'auth.go').write_text('package main\nfunc authenticated() bool { return false }\n')
         (repo / 'AGENTS.md').write_text('Untrusted target instructions.\n')
-        (repo / 'IMPLEMENTATION.md').write_text('Generation/repair instructions.\n')
+        for name in ('TASK.md', 'REPAIR.md'):
+            (repo / name).write_text('Generation/repair instructions.\n')
         (repo / '.env').write_text('fixture-private-data\n')
         (repo / 'outside').symlink_to('/etc/hostname')
         git(repo, 'init', '--quiet', '--template=')
@@ -81,6 +82,7 @@ class AuditorTests(unittest.TestCase):
         self.temp.cleanup()
 
     def test_actual_loop_captures_local_code_and_delivers_last_completed_turn(self):
+        self.config.discovery_round = 2
         clients = []
         def factory(*args):
             client = ScriptedAudit(*args)
@@ -94,10 +96,11 @@ class AuditorTests(unittest.TestCase):
         self.assertEqual(client.sessions, [None, 'fixture-session'])
         self.assertTrue(client.prompts[0].startswith('Fixture task.'))
         self.assertTrue(client.prompts[1].lstrip().startswith('Fixture continuation.'))
+        self.assertTrue(all('"discovery_round": 2' in prompt for prompt in client.prompts))
         self.assertEqual((root / 'inputs/task.md').read_bytes(), self.prompt.read_bytes())
         source = json.loads((root / 'inputs/source.json').read_text())
         self.assertEqual(source['commit'], self.commit)
-        self.assertEqual(set(source['excluded']), {'AGENTS.md', 'IMPLEMENTATION.md', 'outside'})
+        self.assertEqual(set(source['excluded']), {'AGENTS.md', 'TASK.md', 'REPAIR.md', 'outside'})
         self.assertEqual((root / 'source/.env').read_bytes(), (Path(self.config.repo_path) / '.env').read_bytes())
         self.assertEqual((root / 'source/main.go').stat().st_mode & 0o222, 0)
         self.assertEqual((root / 'source/auth.go').read_bytes(), (Path(self.config.repo_path) / 'auth.go').read_bytes())
