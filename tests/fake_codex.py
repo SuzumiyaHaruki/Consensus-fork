@@ -13,11 +13,14 @@ if "--version" in sys.argv:
     print("fake-codex offline-fixture")
     raise SystemExit(0)
 if "--help" in sys.argv:
-    print("--json --output-last-message --sandbox --no-daemon --ask-for-approval")
+    print("--json --output-last-message --strict-config --no-daemon --ask-for-approval")
     raise SystemExit(0)
 if sys.argv[1:4] == ['--no-daemon', 'debug', 'prompt-input']:
     print(json.dumps([{'role': 'developer', 'content': [],
                       'internal_chat_message_metadata_passthrough': {'content_item_kinds': ['generic.developer_instructions']}}]))
+    raise SystemExit(0)
+if sys.argv[1:3] == ['--no-daemon', 'sandbox']:
+    print('isolated')
     raise SystemExit(0)
 
 arguments = sys.argv[1:]

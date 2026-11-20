@@ -81,7 +81,7 @@ class OfflineRuntime(workflow.Runtime):
         role = read_json(stage / 'run.json')['workflow_role']
         self.calls.append(role)
         workspace = stage / 'workspace'
-        write_json(stage / 'execution-control.json', {'environment': {'PATH': '/usr/bin:/bin'}})
+        write_json(stage / 'execution-control.json', {'environment': {'PATH': '/usr/bin:/bin'}, 'tool_roots': []})
         # Exercise the actual native runner, stdin delivery, model arguments, and final-event validation.
         with patch('generator.execution.prepare', return_value={'options': []}):
             result = execute_agent(stage)

@@ -1,14 +1,14 @@
 # Implementing the Consensus System and Engineering Practices
 
-Read `protocol.md` and `system.md` in full and deliver the complete runnable system they specify. Deliver runnable programs, reusable components, automated tests, and documentation; a plan, consensus package, or library alone is insufficient.
+Read `protocol.md` and `system.md` in full. Before choosing an implementation, analyze what the protocol guarantees, which assumptions those guarantees depend on, and whether its key rules work together to preserve them under the failures and message orderings the protocol allows. Use that analysis to decide how to build the system and which behaviors to verify. Deliver the complete runnable system, including programs, reusable components, automated tests, and documentation.
 
 ## 1. Scope and Boundaries
 
-### 1.1 Requirements and Open Questions
+### 1.1 Design Requirements and Implementation Decisions
 
-* **Do not modify supplied materials**: Do not alter `protocol.md`, `system.md`, or other supplied materials. Where implementation details are unspecified, compare viable options, choose the one best suited to this task, and explain the key tradeoffs.
-* **Do not weaken guarantees or rely on unpromised conditions**: Do not weaken protocol requirements or depend on external conditions beyond what the materials provide. Do not inspect other experiments or fetch another consensus implementation as a substitute.
-* **Record issues and keep progressing**: If requirements are missing or contradictory, or if you find a concrete failure scenario despite following the rules, document the relevant provisions, scenario, and supporting evidence under open issues in `DESIGN.md`. Distinguish issues in the design materials, implementation defects, and unfinished investigations, and continue progressing on unaffected work.
+* **Implement the supplied design**: Base the implementation on `protocol.md` and `system.md`. Do not edit the supplied materials. For choices the protocol leaves to the implementation, weigh the viable options for the intended use and decide which to adopt. Preserve the stated fault model, external assumptions, and protocol guarantees. Do not inspect other experiments or obtain another consensus implementation as a substitute.
+* **Analyze design problems and decide how to proceed**: If you believe the design omits a case, contains conflicting rules, or fails when followed as written, give a reproducible execution or a complete derivation that others can check step by step. Start from a state reachable under the stated assumptions and follow the original rules until you can identify the guarantee they violate or the two obligations that cannot both be met. Only then make the smallest necessary change. Show how it addresses the same scenario and explain why the affected guarantees still hold. If the evidence is inconclusive, follow the written rule, record the question in `DESIGN.md`, and continue unaffected work.
+* **Document your reasoning**: For each key choice in `DESIGN.md`, identify the relevant requirement and scenario, explain why you chose the approach, and describe what the code actually does and what your checks showed.
 
 ### 1.2 Workspace, Safety, and Delegation
 
@@ -20,7 +20,7 @@ Read `protocol.md` and `system.md` in full and deliver the complete runnable sys
 
 ### 2.1 Runnable Increments
 
-* **End-to-end loop first, then full scope**: Start `DESIGN.md` with a brief sketch of your implementation plan and update it alongside the code. First get a single request through client entry, replica communication, decision, state-machine execution, and response; then extend that same implementation to the required concurrency, fault-handling, and lifecycle behavior. This order does not reduce final scope.
+* **End-to-end integration**: Use the protocol analysis to sketch an implementation plan in `DESIGN.md` and update it alongside the code. First get one client request through replica communication, consensus, and state-machine execution, and return the result to the client. Then extend that same implementation to cover concurrency, fault handling, and lifecycle management.
 * **Interactions and code structure**: Verify interactions across components as features are added, and review code organization before delivery to clean up duplicated logic.
 
 ### 2.2 Components and Protocol Actions
@@ -50,7 +50,8 @@ You may merge or adjust headings and share explanations where appropriate. Focus
 
 * **Stepped load and targeted measurement**: Pick a representative ordinary workload and step up the actual send rate under fixed resources, comparing execution reply rates, latency, and unfinished work across intervals until a bottleneck appears or host resources or the load generator can no longer support higher load.
 * **Pinpointing delays and excess work**: Prioritize observed failures as well as meaningful performance signals, even when every request succeeds. Trace the strongest observation along the real request path: for waiting delays, identify which pair of stages—submission, admission, decision, execution, and reply—the delay falls between; for excess overhead, trace the work a request triggers across replicas and background tasks, watching for data the recipient already holds or history processed repeatedly. Choose observations that distinguish candidate causes.
-* **Controlled comparisons and closing investigations**: When evidence points to a consequential implementation choice, test a focused change under comparable load and resources, deciding whether to keep or revise it based on the comparison. Verify that required protocol work still completes, including steps shifted to other replicas or deferred to later stages. Close a performance investigation when evidence supports keeping or changing the implementation, or when further evaluation would require environment capabilities unavailable here; record what remains uncertain.
+* **Test each change**: When measurements identify a significant implementation cost, test a focused change at the load that exposed it, with the same resources. Use the results to keep, revise, or revert the change. Check that the protocol guarantees still hold and that work moved to another replica or a later stage still completes.
+* **Continue from the measured result**: If the bottleneck persists, use the new evidence to investigate its cause. If the system keeps up at the previous limit, increase the actual send rate until the next bottleneck appears, then repeat the comparison. Finish when measurements show why the remaining cost offers little scope for meaningful improvement here, or show that the host or load generator prevents further evaluation. Record the load reached, the evidence for stopping, and any remaining uncertainty.
 * **Classifying issues and final self-review**: Distinguish implementation defects, violated test assumptions, and unresolved questions. When a test fails or conditions change, retain the original inputs and observations, and record the findings and limits in `DESIGN.md`; repeat a measurement when the observed difference is too small to guide a decision. Before handing the candidate over for independent audit, perform a focused final self-review, fix confirmed defects, and check affected behavior.
 
 ### 3.3 Tools and Retained Results
@@ -60,7 +61,7 @@ You may merge or adjust headings and share explanations where appropriate. Focus
 
 ## 4. Delivery Criteria and Formatting
 
-Wrap up once required functionality is integrated, checks for key implementation risks are complete, and the code, `DESIGN.md`, and operating instructions agree. Finish based on these delivery criteria, not by using up all available time or eliminating every conceivable concern.
+Wrap up once required functionality is integrated, checks for key implementation risks are complete, the performance investigation meets the stopping condition in §3.2, and the code, `DESIGN.md`, and operating instructions agree. Finish based on these delivery criteria, not by using up all available time or eliminating every conceivable concern.
 
 * **Tests and standard commands**: Place automated tests in `tests/`. Run the checks feasible on this machine, keep reusable tests and commands, and report the commands actually run, their results, and coverage limits. Remove obsolete implementation plans and provide ordinary startup and usage commands that work without Codex or MCP.
 * **Open issues and blockers**: For unresolved issues, state the supporting evidence, affected requirements, and next useful check. If a concrete blocker prevents completion, explain why and deliver the available work.

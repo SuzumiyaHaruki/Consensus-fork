@@ -47,9 +47,9 @@ def prepare(settings, label='sol-high-generation'):
     record = {'runner_version': runner.__version__, 'condition': CONDITION, 'status': 'preparing',
               'created_at': runner.utc_now(), 'settings': settings.to_dict(),
               'workspace': str(root/'workspace'), 'input_files': list(INPUTS),
-              'environment': {'mode': 'host', 'read_isolation': False, 'user_config': 'private',
+              'environment': {'mode': 'host', 'read_isolation': True, 'user_config': 'private',
                   'user_instructions_and_skills': 'disabled', 'project_instructions': 'inputs/TASK.md via stdin',
-                  'sandbox': 'workspace-write', 'approval_policy': 'never',
+                  'sandbox': runner.SHELL_PROFILE, 'approval_policy': 'never',
                   'shared_daemon': False, 'subagents': 'native_allowed'}}
     runner.write_json(root/'run.json', record)
     try:

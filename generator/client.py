@@ -10,18 +10,26 @@ import time
 from runtime.codex_support import common_settings, codex_options
 
 
+SHELL_PROFILE = 'forge_workspace'
+
+
 class Client:
     def __init__(self, settings, stage, deadline):
         self.stage, self.deadline = stage, deadline
         self.executable = shutil.which(settings.codex)
         if not self.executable:
             raise FileNotFoundError('Codex CLI is unavailable: ' + settings.codex)
+        self.executable = str(Path(self.executable).resolve())
         if settings.profile:
             raise ValueError('Host Codex profiles are not supported by isolated generation')
         self.private = tempfile.TemporaryDirectory(prefix='.client-', dir=stage)
         self.home = Path(self.private.name)
         self.client_home = self.home / 'codex'
         self.client_home.mkdir()
+        self.helpers = self.home / 'helpers'
+        self.helpers.mkdir()
+        for name in ('apply_patch', 'codex-linux-sandbox'):
+            (self.helpers / name).symlink_to(self.executable)
         self.secrets = []
         self.environment = {'PATH': '/usr/local/bin:/usr/bin:/bin', 'HOME': str(self.home),
                             'CODEX_HOME': str(self.client_home), 'LANG': 'C.UTF-8'}
@@ -30,7 +38,7 @@ class Client:
             if key in os.environ:
                 self.environment[key] = os.environ[key]
         self.settings = {**common_settings(), 'web_search': settings.web_search,
-                         'model': settings.model, 'sandbox_mode': 'workspace-write',
+                         'model': settings.model, 'default_permissions': SHELL_PROFILE,
                          'projects': {str(stage / 'workspace'): {'trust_level': 'untrusted'}},
                          'developer_instructions': 'Follow the workspace, access and delegation rules in the supplied task.',
                          'shell_environment_policy.inherit': 'none',
@@ -41,8 +49,15 @@ class Client:
         if settings.reasoning_effort:
             self.settings['model_reasoning_effort'] = settings.reasoning_effort
 
-    def prepare(self, tool_environment):
-        self.settings['shell_environment_policy.set'] = tool_environment
+    def prepare(self, tool_environment, tool_roots=()):
+        read_paths = [self.stage / 'inputs', self.stage / 'executions', self.helpers,
+                      self.client_home / 'tmp/arg0', self.executable, *tool_roots]
+        self.settings[f'permissions.{SHELL_PROFILE}.filesystem'] = {
+            ':root': 'deny', ':minimal': 'read', **{str(p): 'read' for p in read_paths},
+            str(self.stage / 'workspace'): 'write'}
+        self.settings[f'permissions.{SHELL_PROFILE}.network.enabled'] = False
+        self.settings['shell_environment_policy.set'] = {
+            **tool_environment, 'PATH': f"{self.helpers}:{tool_environment['PATH']}"}
         # Bundled skills are materialized on first prompt initialization, without a model call.
         self.probe()
         self.settings['skills.config'] = [{'path': str(path), 'enabled': False}
@@ -53,8 +68,31 @@ class Client:
         if any(kind in {'host_skills.instructions', 'agents_md.instructions'} or 'memory' in kind or 'plugin' in kind
                for kind in kinds):
             raise ValueError('Unexpected automatic instructions in isolated generation prompt')
+        self.check_shell()
         for name, value in [('client-prompt.json', items), ('client-settings.json', self.settings)]:
             (self.stage / name).write_text(json.dumps(value, ensure_ascii=False, indent=2) + '\n')
+
+    def check_shell(self):
+        private = self.home / 'private-check'
+        private.write_text('outside workspace')
+        script = """set -eu
+test -w .
+test -r ../inputs
+test ! -w ../inputs
+for file do
+    if cat "$file" >/dev/null 2>&1; then exit 1; fi
+done
+echo isolated
+"""
+        result = subprocess.run([self.executable, '--no-daemon', 'sandbox', '--include-managed-config',
+            '-P', SHELL_PROFILE, *codex_options(self.settings), '-C', str(self.stage / 'workspace'),
+            '/bin/sh', '-c', script, 'check', str(private), str(self.stage / 'prompt.txt'),
+            str(Path(__file__).resolve())], cwd=self.stage / 'workspace', env=self.environment,
+            capture_output=True, text=True, timeout=max(.01, min(30, self.deadline - time.monotonic()))
+            if self.deadline is not None else 30)
+        if result.returncode or 'isolated' not in result.stdout.splitlines():
+            (self.stage / 'shell-probe.stderr').write_text(result.stderr)
+            raise ValueError('Native shell isolation check failed; see shell-probe.stderr')
 
     def probe(self):
         result = subprocess.run([self.executable, '--no-daemon', 'debug', 'prompt-input',

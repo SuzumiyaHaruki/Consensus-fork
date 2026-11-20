@@ -19,6 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from generator.config import Settings
 from generator.execution import prepare
 from generator.client import Client
+from runtime.codex_support import codex_options
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
@@ -166,11 +167,37 @@ def main():
         with patch.dict(os.environ, {'CODEX_HOME': str(host_config), 'FORGE_HOST_SENTINEL': unwanted}):
             client = Client(Settings(), stage, time.monotonic() + 60)
             try:
-                client.prepare(control['environment'])
+                client.prepare(control['environment'], control['tool_roots'])
                 context = (stage / 'client-prompt.json').read_text()
                 assert 'FORGE_SUPPLIED_INSTRUCTIONS' in context and unwanted not in context
                 assert 'FORGE_HOST_SENTINEL' not in client.environment
                 assert client.settings['features.multi_agent'] is True
+                old = stage / 'other-experiment'
+                old.mkdir()
+                (old / 'final.txt').write_text('earlier experiment')
+                (stage / 'workspace/old-link').symlink_to(old / 'final.txt')
+                (client.client_home / 'private-fixture').write_text('private')
+                script = """set -eu
+                    test -r ../inputs/material.txt
+                    test -r ../executions/.execution.lock
+                    test ! -w ../inputs/material.txt
+                    test ! -w ../executions/.execution.lock
+                    for hidden do
+                        if cat "$hidden" >/dev/null 2>&1; then exit 1; fi
+                    done
+                    if ls ../other-experiment >/dev/null 2>&1; then exit 1; fi
+                    command -v go
+                    go test -run '^$' ./...
+                    printf '%s\\n' '*** Begin Patch' '*** Add File: edit-check.txt' '+ok' '*** End Patch' | apply_patch
+                    test "$(cat edit-check.txt)" = ok
+                """
+                probe = subprocess.run([client.executable, '--no-daemon', 'sandbox', '--include-managed-config',
+                    '-P', client.settings['default_permissions'], *codex_options(client.settings), '-C', str(stage/'workspace'),
+                    '/bin/sh', '-c', script, 'check', str(old/'final.txt'), 'old-link', str(project/'AGENTS.md'),
+                    str(client.client_home/'private-fixture'), str(host_config/'AGENTS.md')],
+                    env={**client.environment, **client.settings['shell_environment_policy.set']},
+                    cwd=stage/'workspace', capture_output=True, text=True, timeout=90)
+                assert probe.returncode == 0, (probe.stdout, probe.stderr)
             finally:
                 client.close()
         assert not client.home.exists()
@@ -196,6 +223,7 @@ def main():
             asyncio.run(asyncio.wait_for(exercise(prepared, stage, host.getsockname()[1]), 120))
         print(json.dumps({'status': 'passed', 'checks': ['native MCP configuration', 'STDIO private TCP',
                          'private generation configuration and explicit supplied instructions without host skills',
+                         'native shell denies unrelated runs, linked files and private configuration; builds and edits work',
                          'separate MCP servers serialize execution',
                          'two Go subprocesses with race detector', 'read-only materials',
                          'host files/logs/network inaccessible', 'before/after source replay and retained overlays',

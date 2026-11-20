@@ -11,6 +11,7 @@ import time
 from artifacts import (candidate_commit, check_materials, copy_regular, copy_tree, inside,
                        prepare_handoff, read_repair_result)
 from generator.config import Settings
+from generator.client import SHELL_PROFILE
 from processes import invoke
 from generator.runner import (role_inputs, Terminated, doctor as generation_doctor, execute as execute_agent,
                               exclusive_run, prepare as prepare_agent, utc_now)
@@ -81,7 +82,7 @@ def prepare(settings, label='system'):
         'status': 'prepared', 'created_at': utc_now(),
         'issue_index_status': 'not_started',
         'settings': settings.to_dict(), 'stages': [], 'candidates': [],
-        'generation_environment': {'mode': 'host', 'read_isolation': False, 'sandbox': 'workspace-write'},
+        'generation_environment': {'mode': 'host', 'read_isolation': True, 'sandbox': SHELL_PROFILE},
         'audit_environment': {'engine': 'auditor/codex_plain', 'isolation': 'CA-derived permission profile and Bubblewrap'},
         'verification': 'Independent agent before/after repair verification; further discovery uses per-audit budgets and the repair-round limit.',
     })

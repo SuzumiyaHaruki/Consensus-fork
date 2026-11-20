@@ -24,7 +24,7 @@ DESIGN.md 由生成侧先写可修改的简短草稿，随实现更新，交付�
 
 生成与修复通过 generator/execution.py 连接 runtime/local_exec.py 的 STDIO MCP 服务。forge_local.isolated_exec 提供受限文件访问、离线 Go、私有网络与 PID/IPC 空间，输入与执行记录不能被测试程序改写。所有互通进程必须在同一次调用中启动，返回或超时后清理子进程。启动模型前检查私有 TCP；失败记为环境问题，不回退到主机执行。这是测试设施的生命周期，交付服务仍须能通过普通命令独立运行。
 
-生成与修复使用临时私有 HOME、CODEX_HOME 和限定环境，关闭本机配置、自动 AGENTS、skills、记忆和插件加载，通过标准输入传入当次归档的角色正文（生成用 TASK.md，修复用 REPAIR.md）。启动前以无模型检查确认上下文，保留 client-prompt.json 与无凭据的 client-settings.json；实际命令和工具配置见 run.json。普通生成 shell 仍是 host/workspace-write，不提供主机读取隔离，因此不能把配置隔离解释成严格隐藏评测环境。
+生成与修复使用临时私有 HOME、CODEX_HOME 和限定环境，关闭本机配置、自动 AGENTS、skills、记忆和插件加载，通过标准输入传入当次归档的角色正文（生成用 TASK.md，修复用 REPAIR.md）。启动前以无模型检查确认上下文，保留 client-prompt.json 与无凭据的 client-settings.json；实际命令和工具配置见 run.json。普通 shell 的权限配置默认拒绝读取宿主机，只开放运行所需系统文件、工具链、本阶段输入与执行记录，以及可写的工作区。启动前用该配置验证本阶段输入可见、工作区外的控制文件和宿主机临时文件不可见。
 
 认证只使用现有文件式 ChatGPT 认证副本或显式 CODEX_API_KEY，不读取本机 provider/profile，不自动登录或修改原认证文件。临时认证文件权限为 0600，认证值不进入记录的 CLI 设置，日志继续脱敏。阶段结束前采集主/子会话用量，再清理私有目录。审计侧保留自己的私有认证、只读源码与日志、执行隔离和清理措施。
 

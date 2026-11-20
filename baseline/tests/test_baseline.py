@@ -99,7 +99,7 @@ class BaselineTests(unittest.TestCase):
         def prepare_execution(settings, root, deadline):
             self.assertIsNone(deadline)
             self.assertEqual(settings.action_seconds, 300)
-            runner.write_json(root/'execution-control.json', {'environment': {'PATH': '/usr/bin:/bin'}})
+            runner.write_json(root/'execution-control.json', {'environment': {'PATH': '/usr/bin:/bin'}, 'tool_roots': []})
             return {'options': []}
         with patch.dict(os.environ, {'CODEX_HOME': str(auth), 'CODEX_API_KEY': ''}), \
                 patch('generator.execution.prepare', side_effect=prepare_execution):

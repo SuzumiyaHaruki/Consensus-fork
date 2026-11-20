@@ -4,10 +4,10 @@ Implement a runnable Go replicated KV system according to [protocol.md](protocol
 
 ## 1. Service and Configuration
 
-* **Module**: `example.com/mixepaxos`.
+* **Module**: `example.com/epaxos`.
 * **Components**: A reusable consensus `Node` library, standalone server processes, real network transport, a client library and CLI, automated tests, and documentation.
-* **Operations**: Execute deterministic single-key `Put`, `Get`, and `Delete` operations through consensus; clearly document inputs, execution effects, return values, and error semantics.
-* **Configuration**: Configure the member list, replica addresses, and protocol parameters `f/s/W/e`; derive `n` from the membership list and enforce all parameter constraints defined in [protocol.md](protocol.md).
+* **Operations**: Execute deterministic single-key `Put`, `Get`, and `Delete` operations through consensus. Document each operation’s inputs, effects, results, and errors.
+* **Configuration**: Configure the member list, replica addresses, and protocol parameters; derive `N` from the membership list and enforce all parameter constraints defined in [protocol.md](protocol.md).
 * **Concurrent Access**: Support multiple independent clients sending requests concurrently, as well as multiple replicas receiving client requests simultaneously.
 
 ## 2. Client Requests and Results
@@ -17,7 +17,7 @@ Implement a runnable Go replicated KV system according to [protocol.md](protocol
 * **Unique Request ID (`rid`)**: Each client session must have a globally unique identity and allocate non-duplicate `RequestSeq` values under concurrency; choose the allocation and encoding mechanisms.
 * **Pre-Admission Validation**: Reject malformed inputs and known contradictory `rid` reuses (such as the same `rid` carrying a different command) before admission; legal commands must never depend on rejected inputs.
 * **Same-Entry Retries**: Retries must preserve the original `rid` and complete command. If the same entry replica receives a duplicate request that has not yet executed, it must reuse the existing in-flight work rather than creating a new consensus instance (choose waiting and reply behaviors).
-* **Cross-Entry Retries & Execution Deduplication**: If a client retries at a different entry replica, that entry may admit a locally unknown `rid` and create a separate consensus instance (each instance carries one logical request). However, each replica must apply the logical request at most once, deduplicating by `rid` at execution.
+* **Cross-Entry Retries & Execution Deduplication**: If a client retries at a different entry replica, that entry may admit a locally unknown `rid` and create a separate consensus instance. These instances interfere because they share a deduplication record. Each replica processes the instances and applies the command at most once by `rid`.
 
 ### 2.2 Result Semantics
 
@@ -38,7 +38,7 @@ Interfaces must clearly distinguish five outcome states (choose specific status 
 
 * **Separate Process Model**: Each replica runs in a separate OS process with its own Go runtime and configurable runtime settings, even when multiple replicas share a host.
 * **Resource Distinctions**: Clearly distinguish **protocol-worker counts**, process-level **`GOMAXPROCS`**, and **actual CPU allocation**, explaining what each parameter controls.
-* **Failure Model**: Under the crash-stop model, surviving replicas may keep state in memory; disk persistence for post-crash recovery is not required.
+* **Failure Model**: Under the crash-stop model, surviving replicas keep state in memory; disk persistence for post-crash recovery is not required.
 
 ### 3.2 Concurrency, Parallelism, and Progress
 
@@ -50,8 +50,8 @@ Interfaces must clearly distinguish five outcome states (choose specific status 
 ### 3.3 Network, Boundaries, and Timing Assumptions
 
 * **Replaceable Transport & Trust Boundary**: The transport layer must be replaceable so the consensus core can run without real sockets. Define the trusted-cluster boundary and bind configured member identities to actual message sources; preserve identities and payloads through encoding and decoding, and never trust unchecked member fields inside a message alone.
-* **Message Completeness & Timing Bounds**: Choose the wire format and sending strategy while preserving each logical message's sender, recipients, instance, ballot, collection, phase, and processing rules. If information is omitted, the recipient must reconstruct it from matching context or obtain it per protocol rules before use. Local buffering and queuing delays count toward the applicable protocol timing bounds.
-* **Window and Heartbeat Timing**: Document which runtime event starts the `W` timer, what work the window covers, and which timeouts a replica can detect directly. Explain how heartbeats are scheduled and sent under the protocol's timing assumptions.
+* **Message Completeness**: Choose the wire format and sending strategy while preserving each logical message's sender, recipients, instance, ballot, phase, and processing rules. If information is omitted, the recipient must reconstruct it from matching context or obtain it per protocol rules before use.
+* **Recovery Timing**: Document how the runtime detects stalled instances and when it retries or starts recovery.
 
 ### 3.4 Controlled Execution and Observation
 
@@ -89,7 +89,7 @@ Reports must include:
 * **Documentation (`README.md` & `DESIGN.md`)**:
   * **`README.md`**:
     * Configuration, interfaces, service semantics, operating conditions, and commands to build, start, use, and clean up a local multiprocess cluster.
-    * Provide a seven-member configuration example. Performance tests may use a different replica count suited to the available CPUs and consistent with the protocol’s parameter constraints. Demonstrate concurrent clients and same-request retries, distinguishing application results, duplicates, and unknown outcomes.
+    * Provide a runnable cluster configuration example. For performance tests, choose a replica count suited to the available CPUs and consistent with the protocol’s parameter constraints. Demonstrate concurrent clients and same-request retries, distinguishing application results, duplicates, and unknown outcomes.
   * **`DESIGN.md`**:
     * Actual architecture, state ownership, important interfaces, and design choices, including timing, conflict indexes, dependency expansion, data retrieval, and retention.
     * Actual checks and local coverage, unperformed larger-scale measurements, unmet requirements, and known limitations; documenting limitations does not remove requirements.

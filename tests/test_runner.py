@@ -64,7 +64,7 @@ class RunnerTests(unittest.TestCase):
         if timeout is not None:
             settings = settings_from_dict(settings.to_dict() | {"timeout_seconds": timeout}, self.root)
         run = prepare(settings)
-        (run / 'execution-control.json').write_text(json.dumps({'environment': {'PATH': '/usr/bin:/bin'}}))
+        (run / 'execution-control.json').write_text(json.dumps({'environment': {'PATH': '/usr/bin:/bin'}, 'tool_roots': []}))
         (run / "workspace" / "FAKE_MODE").write_text(mode)
         return run
 
@@ -101,7 +101,8 @@ class RunnerTests(unittest.TestCase):
         self.assertEqual(result["events"]["usage_events"][0]["input_tokens"], 10)
         self.assertEqual((run / "workspace" / "received-prompt.txt").read_text(), (run / "prompt.txt").read_text())
         args = json.loads((run / "workspace" / "received-args.json").read_text())
-        self.assertIn("workspace-write", args)
+        self.assertIn('default_permissions="forge_workspace"', args)
+        self.assertNotIn('--sandbox', args)
         self.assertNotIn("--dangerously-bypass-approvals-and-sandbox", args)
         self.assertEqual(args[args.index("--ask-for-approval") + 1], "never")
         env = read_json(run / 'workspace/received-environment.json')
@@ -110,6 +111,8 @@ class RunnerTests(unittest.TestCase):
         self.assertFalse(Path(env['CODEX_HOME']).exists())
         self.assertFalse(list(run.glob('.client-*')))
         config = read_json(run / 'client-settings.json')
+        self.assertEqual(config['permissions.forge_workspace.filesystem'][':root'], 'deny')
+        self.assertEqual(config['permissions.forge_workspace.filesystem'][str(run / 'workspace')], 'write')
         self.assertNotIn((run / 'prompt.txt').read_text(), config['developer_instructions'])
         self.assertEqual(config['project_doc_max_bytes'], 0)
 

@@ -15,7 +15,7 @@ import time
 
 from .config import Settings, settings_from_dict
 from . import execution
-from .client import Client
+from .client import Client, SHELL_PROFILE
 from runtime import agent_records
 from runtime.codex_support import codex_options
 from runtime.storage import read_json, write_json
@@ -57,7 +57,7 @@ def doctor(settings: Settings) -> dict:
         "go": version_info("go", "version"),
         "runner_version": __version__,
     }
-    required = ("--json", "--output-last-message", "--sandbox")
+    required = ("--json", "--output-last-message", "--config")
     codex = result["codex"]
     if codex["available"]:
         try:
@@ -82,7 +82,7 @@ def command_for(settings: Settings, run_dir: Path) -> list[str]:
     # Global approval/daemon options precede the subcommand. No shell invocation.
     command = [
         settings.codex, "--no-daemon", "--ask-for-approval", "never", "exec",
-        "--cd", str(run_dir / "workspace"), "--sandbox", "workspace-write",
+        "--cd", str(run_dir / "workspace"),
         "--json", "--color", "never",
         "--output-last-message", str(run_dir / "final.txt"),
         "--config", 'web_search=' + json.dumps(settings.web_search),
@@ -123,11 +123,11 @@ def prepare(settings: Settings, label: str = "native", *, task_file="TASK.md") -
         "status": "preparing", "created_at": utc_now(), "settings": settings.to_dict(),
         "workspace": str(run_dir / "workspace"), "input_files": list(materials),
         "environment": {
-            "mode": "host", "read_isolation": False,
+            "mode": "host", "read_isolation": True,
             "user_config": "private", "user_instructions_and_skills": "disabled",
             "project_instructions": (f"inputs/{task_file} via stdin" if "IMPLEMENTATION.md" not in materials else
                                      f"inputs/{task_file} via stdin and explicit inputs/IMPLEMENTATION.md"),
-            "sandbox": "workspace-write", "approval_policy": "never",
+            "sandbox": SHELL_PROFILE, "approval_policy": "never",
             "shared_daemon": False,
             "subagents": "native_allowed",
         },
@@ -286,8 +286,8 @@ def execute(run_dir: Path) -> dict:
             prepared = execution.prepare(settings, run_dir, deadline)
             execution_ready = True
             client = Client(settings, run_dir, deadline)
-            tool_environment = read_json(run_dir / 'execution-control.json')['environment']
-            client.prepare(tool_environment)
+            control = read_json(run_dir / 'execution-control.json')
+            client.prepare(control['environment'], control['tool_roots'])
             client.authenticate()
             command[0] = client.executable
             command[-1:-1] = [*codex_options(client.settings), *prepared['options']]

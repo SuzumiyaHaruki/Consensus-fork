@@ -5,7 +5,7 @@ Read `protocol.md` and `system.md` in full and implement the complete system the
 ## 1. Implementation
 
 * **Choose the implementation approach**: Choose your own design, development process, tests, and self-review. Implement the supplied consensus algorithm and leave the requirements documents unchanged. Do not inspect other experiments or obtain another consensus implementation as a substitute.
-* **Handle unspecified details**: Decide how to implement mechanisms left open by the requirements. Report design problems and continue.
+* **Handle design choices and problems**: Choose mechanisms the requirements leave open. Depart from an explicit rule only if a reproducible execution or a complete, checkable derivation shows that following it in a reachable scenario violates a stated guarantee or makes two obligations impossible to satisfy together. Document the smallest necessary correction, show how it resolves that same scenario, and justify why the affected safety and progress guarantees still hold under the original assumptions. Otherwise follow the rule, report the uncertainty, and continue unaffected work.
 
 ## 2. Local Checks
 

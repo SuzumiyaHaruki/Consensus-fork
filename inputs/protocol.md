@@ -1,596 +1,272 @@
-# Mixed EPaxos
+## 1. Model and State
 
-## 1. Model and data
+### 1.1 Cluster and Communication
 
-### 1.1 Failures and timing
+* **Membership and faults**  The cluster has a fixed membership of `N = 2F + 1` replicas with `F ≥ 1`. Up to `F` replicas may crash and permanently stop.
+* **Communication and progress**  Messages identify their senders and may be delayed, reordered, or duplicated. Safety does not depend on timing bounds. Progress requires a communicating majority, eventual delivery under retries, fair event processing, and an opportunity for a recovery attempt to complete without being starved by competing recovery attempts.
+* **Quorums**  The replica driving a proposal is its coordinator. The initial fast quorum has `Qfast = F + floor((F+1)/2)` members, and the classic majority has `M = F + 1`; both include the coordinator itself.
+* **Thrifty**  This sending policy reduces message traffic on the ordinary path. The coordinator first sends `PreAccept` only to the selected `Qfast - 1` peers to negotiate command ordering attributes. If a separate acceptance phase is needed, it initially sends `Accept` only to `M - 1` peers to confirm the proposed tuple. After a fast decision or a majority of matching `AcceptOK` replies, the coordinator sends `Commit` to all other replicas.
 
-The fixed membership Pi contains n replicas, with at most f crash-stop failures and 0<=f<n. Channels identify senders and preserve message contents; duplication and reordering are allowed. Communication, processing and scheduling among correct replicas are fair, and only finitely many events occur in finite real time.
+### 1.2 Requests and Instances
 
-W starts when broadcasting begins. It covers construction, queuing, all sends, communication in both directions, processing, delivery and saving of required data, and timing error. If the collector remains alive, completes the broadcast to all members and reaches the W deadline, at most s still-living members have not returned complete replies. Slow members may vary by coordinator and over time.
+Any replica `R` may coordinate a client command and allocate consecutive slots `x = R.i` starting at `1` in its own instance space. Each ordinary slot holds one command, and a client retry preserves the original request ID and payload.
 
-The parameters satisfy `q=n-f`, `L=f+1`, `0<=s<q<=L`, `F=n-e`, `e>=0` and `2e<q`. q and L are Collect's small and large thresholds; F is the initial fast-decision threshold. Broadcasts include self.
+* **Committed value**  Replicas must agree on the complete tuple `t = (cmd, deps, seq)`—command, dependency vector, and execution sequence number—for each slot, and execute committed interfering commands in the same relative order.
+* **Local state**  Recovery must be able to distinguish an original PreAccept vote, tentative support in a recovery ballot, and a formal acceptance. Raising a promise does not change the ballot of an earlier vote. A committed decision remains available after execution.
 
-### 1.2 Requests, instances and values
+### 1.3 Ballots and Request Handling
 
-| Notation | Meaning |
-| --- | --- |
-| `rid=(ClientID,RequestSeq)` | Logical request ID: ClientID is a globally unique session identity; RequestSeq increases within that session and is never reused. |
-| `x=R.i` | Instance ID: R identifies the allocating replica; i is its consecutive instance number, starting at 1 and never reused. |
-| `cmd` | Original client command, including rid and payload. Its contents are immutable. |
-| `class(cmd)=cmd.key` | Conflict class: the key used by the single-key Put, Get or Delete operation. All replicas use the same key identity and class rule throughout the configuration. |
-| `V=(cmd,D,seq)` | Complete value: D contains at most one actual conflicting representative instance number per replica, with 0 for an empty component; seq orders execution within a cycle. |
-| `V0=(cmd,D0,seq0)` | Immutable initial value. Every later command value preserves cmd and has D componentwise at least D0. |
-| `NOOP` | A possible recovery value for an allocated instance (§4.3). It has no client command, rid or dependency vector. |
-| `b` | Ballot: 0 for the initial coordinator; `(round, coordinator ID)` with a positive round for recovery. Ballot 0 is smaller than every recovery ballot; recovery ballots compare first by round, then by coordinator ID. |
-| `promise[x]` | The highest ballot promised locally for x, initially 0. It stores a complete ballot, including the coordinator ID for recovery. |
-| `round(b)` | The round component of a recovery ballot; `round(0)=0`. |
-| `attempt`, `nonce` | Identities of a collection invocation and its phase requests; each new invocation and each new phase uses a fresh identity, respectively. |
-| `Done(x,V)`, `Learn` | An actual decision and its propagation message. |
-| `decided[x]` | The complete decision value V stored locally; ⊥ if the decision is not yet known. |
+A ballot identifies a coordination attempt for a slot. The owner starts at `(0, owner)`, while a recoverer chooses a unique, higher `(round, replica)` pair. The promise for a slot can only increase.
 
-Clients preserve the same rid and complete command on retries and never reuse a rid for a different command. Thus instances of the same logical request belong to the same conflict class. If the initial coordinator crashes before any correct replica learns the command, the client can retry at another entry replica.
+* **Recipient**  For each voting request, including a retransmission, check and update local state atomically. Return a known decision first. For an undecided slot, return `NACK(highest promise)` if the request ballot is lower. Promising a higher ballot stops lower-ballot coordination for that slot.
+* **Coordinator**  Count each sender at most once for replies matching the slot, ballot, and phase. Upon receiving a `NACK` reporting a higher promise, stop coordination in the old ballot.
 
-### 1.3 Dependency vectors
+## 2. PreAccept
 
-Commands conflict exactly when their classes are equal, including two Gets on the same key. Reordering operations in different classes must preserve the final application and deduplication state and each operation's result. The predecessor-chain rules below rely on this transitive conflict relation.
-
-`D[R]` is the largest instance number among R's conflicting instances included in this dependency calculation, or 0 if none. It makes every other same-class instance allocated by R with a number at most D[R] a dependency of x.
-
-| Notation | Meaning |
-| --- | --- |
-| `y=R.j` | R allocated y, and j is its instance number at that replica. |
-| `Covers(x,D,y)` | True exactly when x and y are distinct, their commands conflict, and `1<=j<=D[R]`; y is then a dependency of x. |
-| `x→y` | x depends on y. |
-| `T` | The set of conflicting instances used in the current calculation. |
-| `heads(T)` | Group T by allocating replica and take each group's largest instance number to form a dependency vector; an empty group contributes 0. |
-| `S(T)` | The largest initial execution sequence number seq0 among all instances in T; 0 if T is empty. |
-| `D1 ∨ D2` | Merge two vectors by taking the larger component for each replica. |
-
-For x=R.i, `D0(x)[R]` records R's previous instance in the same class, or 0 if none. Following these instances' own predecessor records finds R's earlier instances of that class. Changes to the final dependencies D do not overwrite D0.
-
-An instance can decide only one complete value. For any two decided conflicting commands x and y, the final dependency vectors must give at least one of `x→y` or `y→x`; both directions are allowed.
-
-## 2. Shared collection and ballot updates
-
-### 2.1 Collect
-
-Each Collect invocation has its own state. A and B store the two phases' complete positive replies, keyed by member. Deliver only matching complete positive replies to an active collection; §3.3 separately handles PreAccept fast-path votes.
+Treat two commands as interfering whenever reordering them can change state or a result. Use the application semantics in `system.md` to identify interfering commands when scanning committed and uncommitted instances. A recovery rescan updates only the ordinary PreAccept record for its ballot.
 
 ```text
-procedure Collect(kind, x, b, V optional):
-    attempt ← fresh invocation ID
-    phase ← 1
-    A, B ← empty maps keyed by member
-    nonce1 ← fresh nonce
-    t0 ← start of broadcasting
-    broadcast kind(x, b, V, attempt, phase=1, nonce1) to all members
+procedure Observe(x, b, cmd, deps, seq):
+    atomic:
+        if x is committed: return its decision
+        if b < promise[x]: return NACK(promise[x])
+        promise[x] ← b
+        if x was formally accepted at b: return its Accepted record
+        if a PreAccept reply for (x, b) exists: return the saved reply
+        for each known instance y interfering with cmd, except x:
+            R ← owner(y)
+            deps[R] ← max(deps[R], index(y))
+            seq ← max(seq, y.seq + 1)
+        u ← (cmd, deps, seq)
+        record PreAccepted(x, b, u)
+        if b = (0, owner(x)): retain u as x's initial vote
+        save and return PreAcceptReply(x, b, u, commit evidence from this observation)
 
-upon a matching positive reply r from p do:
-    if phase == 1 and r.nonce == nonce1:
-        A[p] ← r
-    else if phase == 2 and r.nonce == nonce2:
-        B[p] ← r
+upon admitting cmd at its owner:
+    x ← allocate local slot
+    b ← (0, self)
+    local ← Observe(x, b, cmd, zeros(N), 1)
+    if local is a PreAcceptReply:
+        peers ← choose Qfast−1 other replicas for x
+        send PreAccept(x, b, local.tuple) to peers
 
-// Large threshold: complete in phase 1
-upon |A| >= L while phase == 1 do:
-    phase ← complete
-    complete this Collect with A's actual replies
-
-// Small threshold: start phase 2 after W
-upon phase == 1 and now >= t0 + W and q <= |A| < L
-     and the phase-1 broadcast to all members completed by its W deadline do:
-    phase ← 2
-    nonce2 ← fresh nonce
-    broadcast kind(x, b, V, attempt, phase=2, nonce2) to all members
-
-upon |B| >= q or |members(A) union members(B)| >= L
-     while phase == 2 do:
-    phase ← complete
-    complete this Collect with all actual replies from A and B
-
-upon receiving a valid NACK(x, b', attempt, phase, nonce) do:
-    RaisePromise(x, b')
+upon PreAccept(x, b, t):
+    reply with Observe(x, b, t.cmd, t.deps, t.seq)
 ```
 
-The timed branch requires the §1.1 window assumption; a failed local enqueue is unfinished broadcast work. A valid NACK invokes §2.2 even after its collection has ended. Retransmissions with the same nonce may reuse replies. A phase-2 request has a fresh nonce and is processed again under its message's handler rules, rather than replaying the phase-1 reply. Data requirements are in §7; continue serving other tasks while waiting.
+## 3. Fast Decision, Accept and Commit
 
-### 2.2 Updating promise
+For each instance the coordinator starts in Fast. `replies` contains one matching PreAccept reply per selected remote peer; the coordinator keeps its local record separately.
 
-Valid NACKs, processing Prepare/Observe/Validate/Accept requests, and starting recovery update promise through RaisePromise. Raising promise stops lower-ballot coordination without clearing accepted or changing first.
-
-```text
-procedure RaisePromise(x, b'):
-    atomic:
-        promise[x] ← max(promise[x], b')
-        if coordinating x at b < promise[x]:
-            stop that task, its active Collect calls and retransmissions
-            if x is undecided:
-                add x to pending recovery
-```
-
-## 3. Initial proposal and fast/slow paths
-
-### 3.1 Admission
-
-Conflict scans include locally registered commands, including executed ones. Exclude slots known to have decided NOOP. Registration requires the data in §7.
-
-Before admission, requests may wait or be explicitly rejected under overload. Schedule eligible requests and classes fairly. Different entry replicas may create different instances for the same request; execution deduplicates by rid under §6.2. Once admitted, an instance remains protocol work despite timeouts, cancellation or overload. Only the formal recovery rule in §4.3 can select a new NOOP.
-
-If a locally registered instance, including one allocated elsewhere, remains unexecuted beyond a finite threshold measured from its first complete registration, pause new client admissions for its class until none of that class's unexecuted instances is overdue. Later messages do not restart this wait.
-
-The pause affects only new admissions; protocol processing and execution for that class, and eligible admissions for other classes, continue. The threshold may differ across replicas and is separate from W, serving only admission scheduling. New traffic must not indefinitely delay handling its expiry.
-
-| State | Meaning |
-| --- | --- |
-| `first[x]` | Empty until the replica first votes on x, then immutable. `FastOK` agrees with x's exact initial value `V0(x)`. `Mismatch(Dp, sp)` gives the replica's suggested dependency vector and sequence number. |
-| `fastVoters[x]` | The set of replicas whose FastOK votes the initial coordinator has counted, including itself. |
-| `O[x]` | The result of x's initial PreAccept collection; ⊥ until that collection completes. |
+* **Agree on ordering.** All selected peers must return the same dependency vector and sequence number. Their common answer may differ from the coordinator's initial proposal.
+* **Confirm dependencies.** For each nonzero `deps[R] = k`, the coordinator must be able to confirm that all slots from `R.1` through `R.k` have committed. Confirmation uses only what fast-quorum members, including the coordinator, knew when computing their ordering attributes for `x`.
 
 ```text
-upon selecting cmd for admission do:
+upon Qfast − 1 selected peers replying for x's initial ballot b:
     atomic:
-        if cmd is malformed or contradicts a known rid binding:
-            reject cmd
+        if x is decided or phase ≠ Fast or promise[x] ≠ b: return
+        (deps, seq) ← ordering attributes in the first reply
+        if replies disagree or any slot in deps' prefixes lacks confirmation:
+            phase ← Slow
             return
-        if cmd.rid is in executedRequests:
-            reply ALREADY_EXECUTED
-            return
-        if an instance for cmd.rid is still in flight here:
-            reuse that instance for this request
-            return
-        allocate next local instance x = self.i
-        T ← registered conflicts with x
-        V0(x) ← (cmd, heads(T), 1 + S(T))
-        register x
-        first[x] ← FastOK
-        fastVoters[x] ← {self}
-        seenMismatch[x] ← false
-        O[x] ← ⊥
+        t ← (cmd, deps, seq)
+        record Committed(x, t) and stop local coordination for x
+    wake work waiting for x
+    disseminate Commit(x, t) to all other replicas
 
-    Collect(PreAccept, x, 0, V0)
-    handle the local reply under section 3.3
-```
+upon two remote replies disagreeing on attributes while Fast:
+    phase ← Slow
 
-### 3.2 Replica handling of PreAccept requests
+upon giving up on a slow selected peer while Fast:
+    phase ← Slow
 
-```text
-upon PreAccept(x, 0, V0, attempt, phase, nonce) from x's initial coordinator
-     with required data available (section 7) do:
+upon phase = Slow and 1 + |replies| ≥ M:
+    records ← local PreAccept record plus the remote replies
+    deps ← componentwise max of their dependency vectors
+    seq ← max of their sequence numbers
+    StartAccept(x, b, (cmd, deps, seq))
+
+procedure StartAccept(x, b, t):
     atomic:
-        if decided[x] != ⊥:
-            reply Done(x, decided[x], attempt, phase, nonce)
-            return
-        if promise[x] != 0:
-            reply NACK(x, promise[x], attempt, phase, nonce)
-            return
+        if no longer coordinating undecided x at b: return
+        if a different proposal is fixed at (x, b): return
+        fix t at (x, b)
+        phase ← Accept
+    process Accept(x, b, t) locally and send it to M−1 peers
+    retry the same proposal at other members if needed
 
-        if first[x] is empty:
-            register x
-            T ← registered conflicts, excluding x
-            Dp ← D0(x) ∨ heads(T)
-            sp ← max(seq0(x), 1 + S(T))
-            if (Dp, sp) == (D0(x), seq0(x)):
-                first[x] ← FastOK
-            else:
-                first[x] ← Mismatch(Dp, sp)
-
-        reply PreAcceptReply(x, attempt, phase, nonce, first[x])
-```
-
-### 3.3 Initial coordinator handling of PreAccept replies
-
-Both `FastOK` and `Mismatch(Dp, sp)` are complete positive replies for Collect. A matching `FastOK` also counts as a fast vote for `V0(x)` without echoing the value. Collect completion does not stop later fast votes or unfinished PreAccept sends while the initial task remains active. The slow path waits until t0+W, where t0 is the start of this broadcast. Local checks and updates are atomic per instance.
-
-```text
-upon valid PreAcceptReply(x, attempt, phase, nonce, first) from p do:
-    HandleInitialVote(x, p, first)
-    deliver the reply to its active Collect
-
-procedure HandleInitialVote(x, p, first):
-    if initial task inactive or decided[x] != ⊥:
-        return
-    if first is Mismatch(Dp, sp):
-        seenMismatch[x] ← true
-    else if first == FastOK:
-        fastVoters[x] ← fastVoters[x] union {p}
-
-    // Fast path, also available during Accept(V0)
-    if not seenMismatch[x] and |fastVoters[x]| >= F:
-        Decide(x, V0)
-
-upon Collect(PreAccept, x, 0, V0) completes with replies do:
-    O[x] ← replies
-
-// Slow path after either Collect threshold
-upon O[x] != ⊥ and now >= t0 + W do:
+upon Accept(x, b, t):
     atomic:
-        if not coordinating x at 0 or a proposal is frozen:
-            return
-        D, seq ← D0(x), seq0(x)
-        for each reply with Mismatch(Dp, sp) in O[x]:
-            D ← D ∨ Dp
-            seq ← max(seq, sp)
-        V ← (cmd, D, seq)
-        freeze proposal V for ballot 0
+        if x is Committed or Executed: return its decision
+        if b < promise[x]: return NACK(promise[x])
+        if another tuple was accepted at (x, b): reject and return
+        promise[x] ← b
+        record Accepted(x, b, t)
+    reply AcceptOK(x, b, t)
 
-    if coordinating x at 0:
-        Collect(Accept, x, 0, V)
-```
+upon M distinct AcceptOKs for the active proposal (x, b, t):
+    Commit(x, t)
 
-## 4. Recovery and formal acceptance
-
-### 4.1 Requesting and starting recovery
-
-Each replica that knows x but not its decision waits a finite recovery delay from first learning x, then repeatedly sends NeedRecover(x) to its current Omega until it learns the decision. Later messages do not restart this delay or remove pending recovery merely because they are duplicates or report that x remains undecided.
-
-A recipient whose Omega points elsewhere retains the pending work and uses the same background retries to contact its own Omega; it does not immediately relay each arriving NeedRecover. Recovery may start from the ID of a known allocated instance while Fetch is pending. Only the replica locally selected as Omega starts recovery; the request does not declare the initial coordinator crashed. Schedule recovery requests fairly across instances and merge duplicates and HELP requests. Each replica runs at most one coordination task per instance. When Omega changes away from self, stop local coordination but retain pending work and keep handling requests.
-
-```text
-upon recovery wait or retry expires for undecided x do:
-    send NeedRecover(x) to Omega
-
-upon NeedRecover(x) do:
-    if decided[x] != ⊥:
-        reply Done(x, decided[x])
-    else:
-        add x to pending recovery
-        Fetch missing initial data
-
-upon x pending recovery
-     while Omega == self, decided[x] == ⊥ and no active recovery for x do:
+procedure LearnCommit(x, t):
     atomic:
-        b ← (round(promise[x]) + 1, self)
-        RaisePromise(x, b)
-        activate the recovery task for (x, b)
-    if task active:
-        Collect(Prepare, x, b)
-```
-
-### 4.2 Replicas handling Prepare, Observe and Validate
-
-Prepare identifies the slot by ID and ballot, including at a replica with no record for that ID. In each phase, every responder first promises b and takes its snapshot in the same atomic step, unless it returns Done or NACK. EMPTY means the replica has no original command data, first vote, accepted value or decision for x. It may know x's ID from another command or from a gap lookup (§7). A positive state reply carries the saved V0 when known, even if first is absent. An EMPTY member counts toward r and contributes no FastOK to h (§4.3). A replica holding V0 but missing some predecessors reports V0 and its actual state immediately; it need not wait for those predecessors to recover. Include the value of any accepted record, including NOOP. Observe and Validate still require §7 data.
-
-```text
-upon Prepare(x, b, attempt, phase, nonce) do:
-    atomic:
-        if decided[x] != ⊥:
-            reply Done(x, decided[x])
-            return
-        if b < promise[x]:
-            reply NACK(x, promise[x])
-            return
-        RaisePromise(x, b)
-        if only the instance ID and ballot metadata are known:
-            response ← EMPTY
-        else:
-            response ← saved command data, first[x] and accepted[x]
-    reply PrepareReply(x, b, attempt, phase, nonce, response)
-
-upon kind(x, b, V0, attempt, phase, nonce) with required data available
-     where kind in {Observe, Validate} do:
-    atomic:
-        if decided[x] != ⊥:
-            reply Done(x, decided[x])
-            return
-        if b < promise[x]:
-            reply NACK(x, promise[x])
-            return
-        RaisePromise(x, b)
-        register x
-        T ← registered conflicts, excluding x
-        Dp ← D0(x) ∨ heads(T)
-        sp ← max(seq0(x), 1 + S(T))
-    reply ScanReply(x, b, attempt, phase, nonce, (Dp, sp))
-```
-
-### 4.3 Value selection and NoFast
-
-NoFast(x) rules out x having decided or later deciding V0 through the fast path. Its grounds are the Prepare test below, first Mismatch votes from at least e+1 distinct replicas, or the HELP rule in §5.2. When established, set noFast[x], initially false, to true.
-
-It also holds if x and y are ordinary commands that conflict, x's initial dependencies exclude y, and the final dependencies in a known Done(y,Vy) exclude x.
-
-```text
-upon Collect(Prepare, x, b) completes with P
-     while recovery active and decided[x] == ⊥ do:
-    if any reply reports Done:
-        LearnDecision(x, the reported decided value)
-    else if either phase contains an accepted record:
-        atomic:
-            if not coordinating x at b or a proposal is frozen:
-                return
-            a ← highest-ballot accepted record from both phases
-            freeze proposal a.fullValue for ballot b
-        if coordinating x at b:
-            Collect(Accept, x, b, a.fullValue)
-    else if every reply in P is EMPTY:
-        atomic:
-            if not coordinating x at b or a proposal is frozen:
-                return
-            if local state for x includes command data, a first vote or an accepted value:
-                retry in a fresh ballot, including the local Prepare reply in A
-                return
-            freeze NOOP for (x, b)
-        if coordinating x at b:
-            Collect(Accept, x, b, NOOP)
-    else:
-        obtain V0(x) and resolve its initial references under section 7
-        resume only if still coordinating x at b with no frozen proposal
-        r ← |members(P)|
-        h ← count distinct members in P reporting FastOK for x
-        if noFast[x] or r - h > e:
-            noFast[x] ← true
-            Rebuild(x, b)
-        else:
-            strongX ← true  // this Prepare establishes h >= r - e > e
-            ValidateInitial(x, b)
-```
-
-A new NOOP requires exclusively EMPTY replies in a completed Prepare (§2.1), across both phases if used. An ordinary Fetch miss or timeout does not count. With seven members, f=4, s=e=1, five distinct phase-one EMPTY replies suffice; with three or four at W, the fresh second phase needs three replies or five distinct members across both phases. The recovery coordinator decides NOOP only after its Accept for that value completes. Any higher ballot inherits a highest accepted NOOP exactly as it would a command.
-
-Once selected, the proposal for (x,b) cannot change. NoFast or HELP may trigger rebuilding in the same ballot only if Prepare found no accepted value and no proposal has been selected.
-
-### 4.4 Rebuilding
-
-Rebuild is entered after Prepare finds no accepted value and NoFast is established. `forcedDeps[x]`, initially empty, holds additional conflicting instances supplied by HELP or the conflict evidence in §5.
-
-```text
-procedure Rebuild(x, b):
-    stop validation for (x, b)
-    if coordinating x at b:
-        Collect(Observe, x, b, V0)
-
-upon Collect(Observe, x, b, V0) completes with O do:
-    atomic:
-        if not coordinating x at b or a proposal is frozen:
-            return
-        T ← forcedDeps[x]
-        D ← D0(x) ∨ all suggested vectors in O ∨ heads(T)
-        seq ← max(seq0(x), all suggested sequence numbers in O, 1 + S(T))
-        V ← (cmd, D, seq)
-        freeze proposal V for ballot b
-
-    if coordinating x at b:
-        Collect(Accept, x, b, V)
-```
-
-### 4.5 Accept
-
-Accept for NOOP uses a positive recovery ballot and the same promise, same-ballot value and ACK rules as any Accept. Replicas accept it by instance ID without V0 or prefix data, even if they hold an earlier command observation. A prepared or singly accepted NOOP cannot resolve a dependency.
-
-```text
-upon Collect(Accept, x, b, V) completes with formal ACKs do:
-    atomic:
-        if coordinating x at b:
-            Decide(x, V)
-
-upon Accept(x, b, V, attempt, phase, nonce)
-     with required data available (section 7) do:
-    atomic:
-        if decided[x] != ⊥:
-            reply Done(x, decided[x], attempt, phase, nonce)
-            return
-        if b < promise[x]:
-            reply NACK(x, promise[x], attempt, phase, nonce)
-            return
-        if ballot b already accepted a different value:
-            reject the proposal
-            return
-
-        RaisePromise(x, b)
-        accepted[x] ← (b, V)
-    reply AcceptACK(x, b, V, attempt, phase, nonce)
-```
-
-## 5. Validation and HELP
-
-### 5.1 Validating the initial value
-
-The recovery coordinator collects Validate replies and takes the componentwise maximum of their suggested dependency vectors and D0(x) to obtain U, the range for this validation. Check conflicting instances reported by the replies but not already covered by D0(x), asking whether they depend on x so that recovery can still propose the initial value V0. Fix U when this collection completes; later arrivals do not enlarge it.
-
-For each replica R, start at the instance identified by U[R] and follow its same-class predecessor chain down to D0(x)[R], excluding that lower endpoint and x itself. An executed instance or a successful check does not exempt its predecessors from checking. Finish pending §7 gap walks before confirming validation; NOOP itself supplies no conflict or NoFast evidence. Validation state belongs to the recovery task (x, b); its results cannot select a proposal after that task stops or enters rebuilding.
-
-```text
-procedure ValidateInitial(x, b):
-    enter validation
-    Collect(Validate, x, b, V0)
-
-upon Collect(Validate, x, b, V0) completes with O
-     while validation active do:
-    U ← D0(x) ∨ all suggested vectors in O
-    cursor[R] ← U[R] for each replica R
-    unresolved ← empty set
-
-upon U fixed and cursor[R] > D0(x)[R]
-     while validation active and not noFast[x] do:
-    y ← R.cursor[R]
-    if decided[y] == NOOP:
-        cursor[R] ← preceding same-class index above D0(x)[R], or D0(x)[R] (§7)
-        continue this cursor
-    if required initial data for y is missing:
-        Fetch(y)
-        resume this cursor when data arrives
-        return
-    if class(y.cmd) != class(x.cmd):
-        report invalid dependency y for x
-        stop validation for (x, b)
-        return
-    if y != x:
-        add y to unresolved
-    cursor[R] ← D0(y)[R]
-
-upon adding y to unresolved or receiving new data for y
-     while validation active, y in unresolved and not noFast[x] do:
-    if decided[y] == NOOP:
-        replace y in unresolved with a pending §7 walk below y, down to the frozen lower bound
-    else if y's initial value covers x:
-        remove y from unresolved
-    else if Done(y) is known:
-        if y's final value covers x:
-            remove y from unresolved
-        else:
-            noFast[x] ← true
-    else:
-        send HELP(y; x, b, V0, strongX) to current Omega
-        send NeedRecover(y) to Omega
-
-upon U fixed, all cursor[R] == D0(x)[R] and unresolved empty
-     while validation active do:
-    atomic:
-        if not coordinating x at b or noFast[x] or a proposal is frozen:
-            return
-        freeze proposal V0 for ballot b
-
-    if coordinating x at b:
-        Collect(Accept, x, b, V0)
-
-upon noFast[x] while validation active,
-     no inherited value and no frozen proposal do:
-    optionally add a known conflict witness y to forcedDeps[x]
-    Rebuild(x, b)
-```
-
-### 5.2 Helping a conflicting instance
-
-strongX means that one successful Prepare obtained reports from more than e distinct replicas that they had voted FastOK for the exact complete V0(x); do not combine vote counts from different Prepare calls. HELP and its replies identify x, y, and x's recovery ballot and task. Both initial values must be retrievable.
-
-```text
-upon HELP(y; x, b, V0, strongX) do:
-    if Done(y) is known:
-        reply Done(y)
-        return
-    obtain required initial data for x and y, then recheck decisions
-    if y's initial value covers x:
-        reply y's initial value
-        return
-
-    if x and y conflict and neither initial value covers the other:
-        if applicable strongY is known:
-            reply strongY
-        else if strongX:
-            noFast[y] ← true
-            if Omega != self:
-                save this pending HELP request for y
-                forward it to current Omega
-            else if y's proposal is frozen:
-                save this pending HELP request for y
-                continue the frozen proposal
-            else:
-                add x to forcedDeps[y]
-                start or reuse y's recovery
-                preserve highest-accepted inheritance priority
-
-upon Done(y) known and HELP for y pending do:
-    reply Done(y) to the requester
-    remove that pending HELP request
-```
-
-HELP does not change Omega's role in choosing the recovery coordinator; an "already being processed" reply does not satisfy validation. strongY is Prepare support for y obtained by the same rule. When x and y conflict and neither initial value covers the other, x's validator may set noFast[x] to true upon receiving strongY and rebuild under §5.1.
-
-## 6. Learning and execution
-
-### 6.1 Instance and decision propagation
-
-Done(x,V) means that instance x has decided V. A replica may send Done only after meeting the fast-decision conditions, collecting the confirmations required for Accept, or learning that decision from another replica. A single replica's vote or accepted record does not establish a decision. Record a received decision even if the local ballot is higher; duplicate notifications of the same decision need no repeated processing. A decision does not mean execution has finished.
-
-Learn a decided NOOP by ID, retain and disseminate it, and return Done(x, NOOP) to later phase requests, Fetch, NeedRecover or HELP for x before checking for V0. It supersedes any tentative original data for this slot; late command data cannot reopen it. Initial data requirements for command decisions are in §7; execution and client replies follow §6.2. Receiving Done or Learn does not itself trigger another broadcast to all members.
-
-```text
-procedure Decide(x, V):
-    if LearnDecision(x, V):
-        broadcast Learn(x, V) to all members
-
-procedure LearnDecision(x, V):
-    atomic:
-        if decided[x] != ⊥:
-            if decided[x] != V:
+        if x already has a decision:
+            if any field known in both decisions differs:
                 report conflicting decisions for x
-            return false
-        decided[x] ← V
-        stop local coordination for x
+                return
+            if t supplies no missing data: return
+            complete the stored decision with the matching data
+        else:
+            record Committed(x, t)
+            stop local coordination for x
+    fetch any missing command data
+    wake work waiting for x
 
-    reply Done(x, V) to protocol requests waiting for x's decision
-    wake local tasks waiting for x's decision
-    wake dependency checks and execution for x under section 6.2
-    return true
+procedure Commit(x, t):
+    LearnCommit(x, t)
+    disseminate the stored decision to all other replicas
 
-upon receiving Done(x, V) or Learn(x, V) do:
-    if V != NOOP and required initial data is missing (section 7):
-        Fetch missing initial data
-        resume this handler when data arrives
-        return
-    LearnDecision(x, V)
+upon receiving Commit(x, t):
+    LearnCommit(x, t)
 ```
 
-Even without client requests, correct replicas must continue disseminating registered instances and their required data, as well as known decisions, until all correct replicas learn them, including replicas that did not know the instance IDs. Data for undecided instances must also propagate; completing a collection with a subset of replies does not end this work. Continued arrivals or old instances deciding later must not permanently prevent dissemination of any instance or decision; a largest decided instance number does not prove that all earlier instances have decided.
+Moving to `Accept` closes the fast path permanently for that ballot. If the initial group cannot provide `M` records, start Explicit Prepare (§4) to query replicas for the slot's recorded state and drive recovery; replacement peers cannot supply initial fast votes.
 
-If the coordinator crashes during its broadcast, correct replicas holding the decision continue spreading it. Retrieval must not rely solely on one holder that may crash; keep pending work progressing until the decision and required data are obtained. A replica holding instance data without knowing the decision queries and recovers under §4.1 and §7.
+After up to `F` replica crashes, a decided client command must still be retrievable in full by slot ID. A replica that knows the decision but lacks the complete command fetches it before execution. Replicas waiting for a decision or command continue to retrieve it even if the client leaves or the coordinator crashes.
 
-### 6.2 Dependency expansion and execution
+## 4. Explicit Prepare
 
-For each unexecuted command x=R.i, follow the nonzero representatives of its final D and its initial predecessor R.D0(x)[R], if nonzero. Exclude x itself and duplicate targets. These at most n+1 edges preserve the dependencies covered by the vector through same-class predecessor chains; the initial predecessor is needed even when the final representative has changed.
+A replica may start recovery by slot ID if it has waited for an instance’s decision without learning it, or if executing another command requires a slot whose decision it does not know.
 
-Expand each unexecuted vertex once per graph construction, retaining edges to already visited vertices so cycles remain visible. Stop at locally executed commands. Follow direct references in ordinary execution. An edge to a decided NOOP instead resolves to the preceding command of the referencing class under §7, even if the NOOP was processed earlier. An execution record for the same rid does not allow an unexecuted instance to bypass its own dependencies. Execute cycles as strongly connected components (SCCs), without requiring a dependency inside the same SCC to execute separately first.
-
-Independent ready SCCs may execute in parallel; state changes and each command's result must be equivalent to a serial execution respecting dependencies and the prescribed order within each SCC.
-
-NOOP makes no KV change and creates no executed-rid record. Close the old instance and release any local in-flight association. Release waiters; if the outcome of the logical request at other entries is unknown, report that status. A retry with the original rid and payload can enter a new instance. Only actual command execution can yield an application result or ALREADY_EXECUTED. Preserve any result already prepared for an actual execution.
-
-First execution returns the actual result to current client waiters. An already executed duplicate request or instance returns ALREADY_EXECUTED without applying the command again or returning its original result. Continue sending original-result replies already prepared. Execution-deduplication records determine whether a request has executed; a missing result cache does not permit re-execution.
+A slot with a command record still counts as occupied even if the complete command must be fetched. A `no-op` closes an empty slot without executing a client command or marking a request ID as executed. An unexecuted request may retry with its original ID.
 
 ```text
-upon decided command x needs execution do:
-    expand x's unexecuted dependency closure
-    Fetch missing initial values and decisions
-    send NeedRecover(y) to Omega for each known undecided dependency y
+upon starting recovery of x:
+    b ← fresh ballot above the highest known for x
+    send Prepare(x, b) to all members, including self
 
-upon closure complete and all unexecuted instances decided do:
-    register its SCCs
-    schedule SCCs whose external dependencies have executed
-
-upon SCC C ready to execute do:
+upon Prepare(x, b):
     atomic:
-        if any x in C is executing or executed:
-            stop this execution task
-        mark C's instances as executing
-    for x in C sorted by (final seq, instance ID):
-        rid ← x.cmd.rid
-        if x.cmd contradicts a known rid binding:
-            report conflicting commands for rid
-            return
-        if rid is in executedRequests:
-            prepare ALREADY_EXECUTED for current waiters
+        if x is Committed or Executed: return its decision
+        if b < promise[x]: return NACK(promise[x])
+        promise[x] ← b
+        snapshot ← slot state and votes with their original ballots
+    reply with that snapshot
+
+upon a Prepare reply carrying a decision t for x:
+    if recovering x: Commit(x, t)
+    else: LearnCommit(x, t)
+
+upon M distinct promises P for the active Prepare(x, b), including self:
+    if P contains an Accepted record:
+        t ← tuple with the highest acceptance ballot in P
+        StartAccept(x, b, t)
+    else if all members in P report no command record:
+        deps ← zeros(N)
+        deps[owner(x)] ← index(x) − 1
+        StartAccept(x, b, (no-op, deps, 0))
+    else:
+        b0 ← (0, owner(x))
+        initialVoters(t) ← {p ∈ P | p reports PreAccepted(x, b0, t)}
+        if some tuple t has |initialVoters(t)| ≥ floor((F+1)/2):
+            try to preserve t under §5
         else:
-            response ← apply(x.cmd)
-            executedRequests[rid] ← x.cmd
-            prepare response for current waiters
+            RestartSlow(x, b, P)
+
+procedure RestartSlow(x, b, evidence):
     atomic:
-        publish all of C's executed flags together
-    schedule newly ready dependent SCCs
-    send prepared replies to current waiters
+        if x is decided or (x, b) is no longer in Prepare or Try: return
+        if Prepare at b is incomplete or a proposal is fixed: return
+        if an accepted value must be inherited: return
+        if the evidence no longer satisfies the calling branch: return
+        switch to slow PreAccept and stop counting Try replies
+    obtain x's original command from its records or fetch it by slot x
+    if this rescan is still active:
+        rerun §2 for x at b, sending the tuple returned by the local Observe
+    upon M distinct PreAccept replies for the active rescan, including the local reply:
+        merge their ordering attributes as in §3
+        StartAccept(x, b, merged tuple)
 ```
 
-### 6.3 Eventual recovery coordinator Omega
+Retry Prepare on timeout. If a higher promise ends the attempt and recovery is still needed, restart above the highest known ballot. A timeout cannot rule out a candidate.
 
-Additional assumptions are bounded local clock drift and at least one correct replica whose interval between starting heartbeat broadcasts is eventually bounded. Each replica broadcasts increasing HB numbers starting at 1; recipients save the exact number before replying ACK.
+## 5. TryPreAccept
 
-Each observer maintains BadCount[p]=0 initially for every member, including itself, and independently checks every other member with next[p]=1 initially. next[p] is the next heartbeat number to check; BadCount[p] counts distinct confirmed Bad(p,k) events known locally. Schedule these checks fairly across members.
+For the candidate `t` from §4, the recoverer sends `TryPreAccept(x, b, t)` to Prepare respondents that have not pre-accepted `t`. A `TryOK` makes `t` the replica’s preaccepted tuple. A slow-path rescan at the same ballot can update it. A delayed Try request cannot undo the rescan or a formal acceptance.
 
-1. Skip consecutive heartbeat numbers already saved, advancing next[p] without waiting. Only a missing heartbeat starts a wait.
-2. For that missing number k=next[p], set its deadline to `now + (BadCount[p]+2)W`. Receiving the exact HB(p,k) ends this wait and resumes step 1. Higher-numbered or duplicate heartbeats do not restart it. New Bad events affect later waits, not the deadline of a wait already started.
-3. At the deadline, recheck whether the exact heartbeat has been saved. If it is still missing, broadcast Complaint(p,k). Advance next[p] to k+1 and resume step 1. Ignore timer events for a number no longer being checked.
-4. Complaints from q distinct observers other than p about the same `(p,k)` establish Bad(p,k). Members may forward this complete conclusion and increment BadCount[p] only once per `(p,k)`. A higher heartbeat number cannot replace a missing one; a late heartbeat does not withdraw an earlier complaint or Bad event.
-5. Each replica outputs as Omega the member with the lexicographically smallest pair `(BadCount[p], member ID)`, including itself among the candidates. Continue fair dissemination of heartbeats, complaints and complete Bad conclusions.
+Check an interfering instance against its current tuple and status, using its decision once committed. A dependency vector can implicitly cover earlier interfering instances from the same owner.
 
-Thus healthy uptime alone does not increase the waiting period or require replaying waits for already received heartbeats. The timeout adapts to confirmed suspicions, rather than to the heartbeat number; it is not a fixed bound on recovery completion.
+```text
+procedure CheckTry(x, b, t):
+    atomic:
+        if x is Committed or Executed: return its decision
+        if b < promise[x]: return NACK(promise[x])
+        promise[x] ← b
+        if x has an Accepted record: return that record
+        if a rescan PreAccept reply for (x, b) exists: return that reply
+        if a TryOK for (x, b) is on record:
+            if its tuple equals t: return TryOK(x, b, t)
+            return the prior tentative record
+        for each instance y interfering with t.cmd, except x:
+            if y.deps[owner(x)] ≥ index(x): continue
+            if t depends on y:
+                if y.seq < t.seq: continue
+                if owner(y) == owner(x) and y is only PreAccepted:
+                    continue
+            return Conflict(x, b, y, owner(y), attrs(y), status(y))
+        record tentative support at (x, b) for t
+        return TryOK(x, b, t)
 
-## 7. Data availability and retention
+upon TryPreAccept(x, b, t):
+    response ← CheckTry(x, b, t)
+    reply response
 
-For an ordinary command, save its ID, immutable V0 and the initial data recursively referenced by D0 before registration, conflict scans or positive votes that depend on them. An ordinary proposal or decision also requires the initial data of its nonzero final representatives. Initial references point to previously allocated instances; final dependencies can form cycles. This step does not wait for ordinary predecessors to decide or execute.
+upon evaluating t in the active TryPreAccept for (x, b):
+    support ← initialVoters(t) ∪ {owner(x)}
+    support ← support ∪ senders of TryOK(x, b, t)
+    required ← members required in x's fast group
+    if |support| ≥ M:
+        StartAccept(x, b, t)
+    else if a reported conflict y is committed:
+        RestartSlow(x, b, conflict report for y)
+    else if a reported conflict y has index(y) > t.deps[owner(y)]
+            and owner(y) ∈ required:
+        RestartSlow(x, b, conflict report for y)
+    else if some z was deferred by this recoverer due to conflict with x
+            and owner(z) ∈ required:
+        RestartSlow(x, b, deferral of z on x)
+    else if an undecided conflict y blocks x:
+        record that x waits for y
+        drive recovery of y, then revisit x
+```
 
-Fetch by ID from all members. A holder can return V0 even while still gathering its predecessors; receiving V0 alone does not register an instance. A decided NOOP is sufficient data for that slot and is returned as Done(x, NOOP). If only the ID is known, keep Fetch and §4.1 recovery pending. Recover only an allocated slot identified by a protocol reference or by the consecutive prefix below such a slot. Fetch does not cast a vote or change a promise. Once the required data is available, register the command atomically with any first voting scan.
+In §4 the owner counts if it reports an initial `PreAccepted` record for `t`. Here `support` includes the owner once even if it did not reply. Committing `t` still requires `M` actual acceptances for `(x, b, t)`. The set `required` is the intersection of all initial fast quorums consistent with the available votes and conflict evidence.
 
-**Following a reference through a decided NOOP.** When a command of class k refers to a slot R.i that decided NOOP, continue below i to find the nearest earlier command from R of class k. Check decreasing allocated indices: skip decided NOOPs and commands known to have a different key. For an unclassified slot, Fetch its V0 or recover its decision by ID before passing it. Only its key is needed to rule out another class. At a match, resume the ordinary same-class chain, resolving its initial data as usual. If there is no match in the required range, this branch ends. Keep stored vectors and votes unchanged.
+Revisit deferred recovery on new evidence. Learn any reported decision for x even after leaving Try. During an active Try, an Accepted record for x or an incompatible tentative vote at the same ballot calls for a fresh Prepare.
 
-Apply this lookup during registration, validation and execution. Validation checks only indices above its frozen lower bound, including already executed matching commands. Execution may stop at a prefix known to have executed all its ordinary commands. A cached index may skip a range whose relevant slots are already accounted for. Limit this backward lookup to gaps closed by a NOOP; ordinary links still jump directly to their representative.
+## 6. Execution
 
-This version has no checkpoints. Retain V0, first, latest accepted, promise, decision and execution-deduplication records for conflict scans and Fetch; these records are not reclaimed after execution.
+For a committed vertex v, deps[R] = k covers slots R.1 through R.k, excluding v itself. Expand every unexecuted slot in that prefix, including a slot whose command uses another key. Both fast and slow decisions use this execution rule. Slots already executed locally may be skipped. Apply the same rule to a no-op's prefix. A no-op has no ordinary command to include in a conflict scan. It participates in the graph without changing KV or request-deduplication state.
+
+In the dependency graph, instances mutually reachable along dependency edges form a strongly connected component (SCC). Once a component's external dependencies have executed, execute commands inside the component in the unified order below:
+
+```text
+upon x committed and not yet executed:
+    start the dependency graph at x
+    for each newly reached unexecuted vertex v:
+        obtain its decision and any missing command
+        link v to every unexecuted slot in its prefixes except v
+    when the graph is complete and all its slots are committed:
+        schedule SCCs whose external dependencies have executed
+
+upon executing a ready SCC:
+    for x in order of (seq, owner, slot index):
+        atomic:
+            if x already executed: continue
+            if x is ordinary and its rid has not executed:
+                apply the command and record its rid as executed
+            mark x executed
+    publish execution results
+    wake dependent work
+```
+
+Replies to clients follow state-machine execution. Duplicate `Commit` messages or duplicate request IDs must not cause re-execution, and an instance carrying a duplicate request still obeys its dependencies. Independent ready components may execute concurrently with results equivalent to the specified order. Under sustained conflicting input, prioritize older dependency chains. Retain instance history throughout execution, advancing the executed-prefix watermark only across contiguous executed slots.

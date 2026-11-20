@@ -13,7 +13,7 @@ In controlled tests, identify which mechanisms are replaced or bypassed. Test ad
 * **Derive and verify actions**: First derive the required actions and permitted branches from the protocol under the tested conditions, then use `DESIGN.md` to locate the code and verify actual actions in the source and execution records.
 * **Check taken paths and departures**: When multiple paths are legal under the protocol, verify the conditions required by the path actually taken. Report a well-evidenced protocol departure even if the client ultimately receives the right result.
 
-The protocol and system design are fixed during this audit. If following a rule still causes a problem, document the scenario and the relevant design basis; if the materials leave expected behavior ambiguous without establishing a violation, record an open question. Explanations in the candidate's documentation and the auditor's architectural preferences cannot alter protocol requirements.
+Use the supplied design as the reference throughout the audit. For a suspected design defect, trace a reachable scenario under the original rules through the claimed failure or contradiction. If the candidate changed the rule, independently check that reasoning, what changes in the same scenario, and whether the affected guarantees still hold. Report the observed departure and the evidence for its justification separately. Record ambiguities without an established violation as open questions.
 
 ### 1.2 Correctness
 
